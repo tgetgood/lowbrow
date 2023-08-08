@@ -1,0 +1,14 @@
+name = "brow"
+uuid = "b3639b79-68f5-4663-85a6-f9fc65b59650"
+authors = ["Thomas Getgood <thomas@macroexpanse.com>"]
+version = "0.0.0"
+
+[deps]
+BitMasks = "a3e06817-fd65-4797-8291-16f435bc2529"
+CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
+GLFW = "f7f18e0c-5ee9-5ccd-a5bf-e8befd85ed98"
+LanguageServer = "2b0e0bc5-e4fd-59b4-8912-456d1b03d8d7"
+OpenSSL = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+Vulkan = "9f14b124-c50e-4008-a7d4-969b3a6cd68a"
+VulkanCore = "16167f82-ea26-5cba-b1de-ed6fd5e30a11"
