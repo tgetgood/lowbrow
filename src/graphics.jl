@@ -1,28 +1,25 @@
+import brow
 import GLFW.GLFW as glfw
 import Vulkan as vk
-import BitMasks
+import DataStructures as ds
 
-function window()
+glfw.Init()
 
+function createwindow()
     glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
     glfw.WindowHint(glfw.RESIZABLE, true)
 
   w = glfw.CreateWindow(800, 600, "not quite a browser")
 
-  @async begin
-    while !glfw.WindowShouldClose(w)
-      glfw.PollEvents()
-      sleep(2)
-    end
-
-    glfw.DestroyWindow(w)
-  end
+  # @async begin
+  #   while !glfw.WindowShouldClose(w)
+  #     glfw.PollEvents()
+  #     sleep(2)
+  #   end
+  # end
 
   return w
 end
-
-# w = window()
-
 
 extensions = vcat(
   glfw.GetRequiredInstanceExtensions(),
@@ -60,10 +57,10 @@ LogType = merge(
 
 dumcd = vk.vk.LibVulkan.VkDebugUtilsMessengerCallbackDataEXT
 
-function debugcb(severity, type, data::Ptr{dumcd}, userData)
-  d = unsafe_load(data)
+function debugcb(severity, type, datap::Ptr{dumcd}, userData)
+  data = unsafe_load(datap)
 
-  msg = unsafe_string(d.pMessage)
+  msg = unsafe_string(data.pMessage)
   if severity == LogLevel.error.val
     @error msg
   elseif severity == LogLevel.warn.val
@@ -85,7 +82,7 @@ debuginfo = vk.DebugUtilsMessengerCreateInfoEXT(
     (Cuint, Cuint, Ptr{dumcd}, Ptr{Cvoid}))
 )
 
-function debugmsg(instance)
+function debugmsgr(instance)
   vk.create_debug_utils_messenger_ext(instance, debuginfo)
 end
 
@@ -130,6 +127,108 @@ function instance(extensions, validations; debuginfo=nothing)
     end
 end
 
-inst = vk.unwrap(instance(extensions, validationlayers; debuginfo))
+function devicegraphicsqueue(system)
+  vk.get_device_queue(
+    get(system, :device),
+    vk.find_queue_family(get(system, :physicaldevice), vk.QUEUE_GRAPHICS_BIT),
+    0
+  )
+end
 
-msgr = vk.unwrap(debugmsg(inst))
+function findgraphicsqueue(device)
+  try
+    vk.find_queue_family(device, vk.QUEUE_GRAPHICS_BIT)
+  catch e
+    return nothing
+  end
+end
+
+function findpresentationqueue(system, device)
+  first(
+    filter(
+      i -> vk.unwrap(vk.get_physical_device_surface_support_khr(
+        device,
+        i,
+        get(system, :surface)
+      )),
+      0:length(vk.get_physical_device_queue_family_properties(device)) - 1
+    )
+  )
+end
+
+function checkdevice(system, device, queues)
+  # props = vk.get_physical_device_properties(device)
+  # features = vk.get_physical_device_features(device)
+
+  return get(queues, :graphics) !== nothing &&
+    get(queues, :presentation) !== nothing
+end
+
+function findqueues(system, device)
+  ds.hashmap(
+    :graphics, findgraphicsqueue(device),
+    :presentation, findpresentationqueue(system, device)
+  )
+end
+
+function pdevice(system)
+  devs =
+    filter(
+      x -> checkdevice(system, x[1], x[2]),
+      map(
+        x -> [x, findqueues(system, x)],
+        vk.unwrap(vk.enumerate_physical_devices(get(system, :instance)))
+      )
+    )
+
+  if length(devs) == 0
+    nothing
+  else
+    first(devs)
+  end
+end
+
+function createdevice(system)
+  (pdev, queues) = pdevice(system)
+
+  qci = vk.DeviceQueueCreateInfo(
+    vk.find_queue_family(pdev, vk.QUEUE_GRAPHICS_BIT),
+    [1.0]
+  )
+  dci = vk.DeviceCreateInfo(
+    [qci],
+    validationlayers,
+    []
+  )
+  dev = vk.unwrap(vk.create_device(pdev, dci))
+
+  return merge(system, ds.hashmap(:physicaldevice, pdev, :device, dev, :queues, queues))
+end
+
+function start(system)
+  inst = vk.unwrap(instance(extensions, validationlayers; debuginfo))
+  debug = vk.unwrap(debugmsgr(inst))
+  w = createwindow()
+  surface = glfw.CreateWindowSurface(inst, w)
+
+  system = merge(
+    system,
+    ds.hashmap(
+      :instance, inst,
+      :debugmsgr, debug,
+      :window, w,
+      :surface, surface
+    ))
+
+  system = createdevice(system)
+  return system
+end
+
+system = start(ds.emptyorderedmap)
+
+
+function repl_teardown()
+  # This should destroy all windows, surfaces, etc., no need to go through them
+  # one by one.
+  glfw.Terminate()
+end
