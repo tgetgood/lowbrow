@@ -1,10 +1,12 @@
-abstract type Vector end
+abstract type Vector <: Sequential end
 
 abstract type PersistentVector <: Vector end
 
 struct VectorLeaf <: PersistentVector
     elements::Base.Vector{Any}
 end
+
+Base.convert(::Type{Base.Vector}, xs::VectorLeaf) = xs.elements
 
 struct VectorNode <: PersistentVector
     elements::Base.Vector{Any}
@@ -15,6 +17,10 @@ emptyvector = VectorLeaf([])
 
 function empty(x::PersistentVector)
     emptyvector
+end
+
+function count(v::Base.Vector)
+  length(v)
 end
 
 function count(v::VectorLeaf)
@@ -152,6 +158,10 @@ end
 
 function seq(v::Vector)
     VectorSeq(v, 1)
+end
+
+function rest(v::Base.Vector)
+  v[2:end]
 end
 
 function rest(v::Vector)

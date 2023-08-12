@@ -1,4 +1,4 @@
-abstract type Map end
+abstract type Map <: Sequential end
 
 struct MapEntry
     key::Any
@@ -99,6 +99,15 @@ function get(m::Map, k, default)
     end
 end
 
+function getin(m::Map, ks)
+  getin(m, ks, nothing)
+end
+
+function getin(m::Map, ks, default)
+  reduce((m, k) -> get(m, k, default), m, ks)
+end
+
+
 function get(m::PersistentArrayMap, k)
     for e in m.kvs
         if e != nil && e.key == k
@@ -110,6 +119,15 @@ end
 
 function assoc(x::Nothing, k, v)
     assoc(emptymap, k, v)
+end
+
+function associn(m::Map, ks::Vector, v)
+  if emptyp(ks)
+    v
+  else
+    k = first(ks)
+    assoc(m, k, associn(get(m, k, emptymap), rest(ks), v))
+  end
 end
 
 function assoc(m::PersistentArrayMap, k, v)
@@ -227,6 +245,10 @@ end
 
 function dissoc(m::PersistentHashMap, k)
     throw("not implemented")
+end
+
+function seq(m::PersistentArrayMap)
+  m.kvs
 end
 
 function seq(m::PersistentHashMap)

@@ -1,4 +1,4 @@
-abstract type Sequence end
+abstract type Sequential end
 
 function reduce(f, coll)
     reduce(f, f(), coll)
@@ -93,7 +93,7 @@ function cat()
     end
 end
 
-function map(f)
+function map(f::Function)
     function(emit)
         function inner()
             emit()
@@ -108,11 +108,11 @@ function map(f)
     end
 end
 
-function map(f, xs)
+function map(f, xs::Sequential)
     into(vector(), map(f), xs)
 end
 
-function filter(p)
+function filter(p::Function)
     function(emit)
         function inner()
             emit()
@@ -131,7 +131,7 @@ function filter(p)
     end
 end
 
-function filter(p, xs)
+function filter(p, xs::Sequential)
     into(vector(), filter(p), xs)
 end
 
