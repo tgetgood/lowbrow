@@ -121,9 +121,9 @@ function assoc(x::Nothing, k, v)
     assoc(emptymap, k, v)
 end
 
-function associn(m::Map, ks::Vector, v)
-  if emptyp(ks)
-    v
+function associn(m::Map, ks::Union{Vector, Base.Vector}, v)
+  if count(ks) == 1
+    assoc(m, first(ks), v)
   else
     k = first(ks)
     assoc(m, k, associn(get(m, k, emptymap), rest(ks), v))
@@ -276,6 +276,10 @@ end
 
 function update(m::Map, k, f, v...)
     assoc(m, k, f(get(m, k), v...))
+end
+
+function updatein(m::Map, ks, f, v...)
+  associn(m, ks, f(getin(m, ks), v...))
 end
 
 function hashmap(args...)
