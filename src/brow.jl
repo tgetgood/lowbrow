@@ -1,9 +1,8 @@
 module brow
 
 function __init__()
-    # Add local submodules to the load path
-    push!(LOAD_PATH, "./")
-    push!(LOAD_PATH, "../modules")
-end
+  # Add local submodules to the load path
+  include @__DIR__ * "../repl.jl"
+ end
 
 end
