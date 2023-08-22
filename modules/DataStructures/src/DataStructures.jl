@@ -1,6 +1,6 @@
 module DataStructures
 
-import Base: string,hash,==,length,iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter
+import Base: string,hash,==,length,iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex
 
 # How many bits of hash are used at each level of the HAMT?
 hashbits = 5
