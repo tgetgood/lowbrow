@@ -3,7 +3,8 @@ import pipeline as gp
 import debug
 import window
 import Vulkan as vk
-import DataStructures: getin, hashmap
+import DataStructures as ds
+import DataStructures: hashmap, emptymap
 
 function configure()
   staticconfig = hashmap(
@@ -28,15 +29,17 @@ function configure()
 end
 
 function init(config)
-  system = hashmap(:instance, vk.unwrap(hw.instance(config)))
-  system = debug.debugmsgr(config, system)
-  system = window.createwindow(config, system)
-  system = window.createsurface(config, system)
+  steps = [
+    hw.instance,
+    debug.debugmsgr,
+    window.createwindow,
+    window.createsurface,
+    hw.createdevice,
+    hw.createswapchain,
+    gp.createpipelines
+  ]
 
-  system = hw.createdevice(config, system)
-  system = hw.createswapchain(config, system)
-  system = gp.create(config, system)
-  return system
+  ds.reduce((s, f) -> merge(s, f(config, s)), emptymap, steps)
 end
 
 config = configure()

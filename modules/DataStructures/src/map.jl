@@ -117,6 +117,12 @@ function get(m::PersistentArrayMap, k)
     return nothing
 end
 
+function assoc(m::Map, k, v, kvs...)
+  @assert length(kvs) % 2 == 0
+
+  merge(m, hashmap(k, v, kvs...))
+end
+
 function assoc(x::Nothing, k, v)
     assoc(emptymap, k, v)
 end

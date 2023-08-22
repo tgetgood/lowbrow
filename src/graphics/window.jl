@@ -14,7 +14,7 @@ function createwindow(config, system)
     "not quite a browser"
   )
 
-  assoc(system, :window, window)
+  hashmap(:window, window)
 end
 
 function createsurface(config, system)
@@ -31,7 +31,7 @@ function createsurface(config, system)
     Base.Threads.Atomic{UInt64}(0)
   )
 
-  assoc(system, :surface, surface)
+  hashmap(:surface, surface)
 end
 
 function configure(config)

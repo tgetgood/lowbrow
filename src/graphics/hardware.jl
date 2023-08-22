@@ -2,13 +2,13 @@ module hardware
 
 import Vulkan as vk
 import DataStructures as ds
-import DataStructures: getin, hashmap, assoc, into, emptyvector, emptymap
+import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
 
 function containsall(needles, hay)::Bool
   return [nothing] == indexin([nothing], indexin(needles, hay))
 end
 
-function instance(config)
+function instance(config, _)
   ic = get(config, :instance)
   validationlayers = get(ic, :validation)
   extensions = get(ic, :extensions)
@@ -37,20 +37,14 @@ function instance(config)
     engine_name="integrated"
   )
 
-  if ds.containsp(config, :debuginfo)
-    return vk.create_instance(
-      validationlayers,
-      extensions;
-      next=get(config, :debuginfo),
-      application_info=appinfo
-    )
-  else
-    return vk.create_instance(
-      validationlayers,
-      extensions;
-      application_info=appinfo
-    )
-  end
+  inst = vk.unwrap(vk.create_instance(
+    validationlayers,
+    extensions;
+    next=ds.containsp(config, :debuginfo) ? get(config, :debuginfo) : C_NULL,
+    application_info=appinfo
+  ))
+
+  return hashmap(:instance, inst)
 end
 
 function findgraphicsqueue(device)
@@ -199,13 +193,14 @@ end
 
 function createswapchain(config, system)
   format = findformat(config, system)
+  extent = findextent(config, system)
   sc = vk.create_swapchain_khr(
     get(system, :device),
     get(system, :surface),
     getin(config, [:swapchain, :images]),
     format.format,
     format.color_space,
-    findextent(config, system),
+    extent,
     1, # image arrays
     vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
     vk.SHARING_MODE_EXCLUSIVE, # <- FIXME: don't hardcode this
@@ -215,7 +210,8 @@ function createswapchain(config, system)
     findpresentmode(config, system),
     true
   )
-  assoc(system, :swapchain, vk.unwrap(sc))
+
+  hashmap(:swapchain, vk.unwrap(sc), :extent, extent, :format, format)
 end
 
 function createimageviews(config, system)
