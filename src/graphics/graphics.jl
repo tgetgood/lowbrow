@@ -1,5 +1,6 @@
 import hardware as hw
 import pipeline as gp
+import commands
 import debug
 import window
 import Vulkan as vk
@@ -17,7 +18,7 @@ function configure()
       :extensions, [vk.VK_KHR_SWAPCHAIN_EXTENSION_NAME],
       :validation, ["VK_LAYER_KHRONOS_validation"]
     ),
-    :debuginfo, debug.debuginfo(),
+    :debuglevel, vk.DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT,
     :window, hashmap(:width, 1920, :height, 1080),
     :swapchain, hashmap(:format, vk.FORMAT_B8G8R8A8_SRGB,
       :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
@@ -25,7 +26,10 @@ function configure()
       :images, 4)
   )
 
-  window.configure(staticconfig)
+  ds.reduce((s, f) -> f(s), staticconfig, [
+    window.configure,
+    debug.configure
+  ])
 end
 
 function init(config)
@@ -36,7 +40,12 @@ function init(config)
     window.createsurface,
     hw.createdevice,
     hw.createswapchain,
-    gp.createpipelines
+    hw.createimageviews,
+    gp.createpipelines,
+    gp.createframebuffers,
+    commands.pool,
+    commands.buffer
+
   ]
 
   ds.reduce((s, f) -> merge(s, f(config, s)), emptymap, steps)
@@ -44,6 +53,7 @@ end
 
 config = configure()
 system = init(config)
+@info "Ready"
 
 function repl_teardown()
   # Vulkan.jl mostly cleans up with finalisers, but GLFW.jl is just a C ffi

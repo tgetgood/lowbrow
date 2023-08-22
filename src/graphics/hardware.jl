@@ -218,29 +218,32 @@ function createimageviews(config, system)
   dev = get(system, :device)
   images = vk.unwrap(vk.get_swapchain_images_khr(dev, get(system, :swapchain)))
 
-  into(
-    emptyvector,
-    map(image -> vk.create_image_view(
-      dev,
-      image,
-      vk.IMAGE_VIEW_TYPE_2D,
-      findformat(config, system).format,
-      vk.ComponentMapping(
-        vk.COMPONENT_SWIZZLE_IDENTITY,
-        vk.COMPONENT_SWIZZLE_IDENTITY,
-        vk.COMPONENT_SWIZZLE_IDENTITY,
-        vk.COMPONENT_SWIZZLE_IDENTITY
-      ),
-      vk.ImageSubresourceRange(
-        vk.IMAGE_ASPECT_COLOR_BIT,
-        0,
-        1,
-        0,
-        1
-      )
-    )) ∘
-    map(vk.unwrap),
-    images
+  hashmap(
+  :imageviews,
+    into(
+      emptyvector,
+      map(image -> vk.create_image_view(
+        dev,
+        image,
+        vk.IMAGE_VIEW_TYPE_2D,
+        findformat(config, system).format,
+        vk.ComponentMapping(
+          vk.COMPONENT_SWIZZLE_IDENTITY,
+          vk.COMPONENT_SWIZZLE_IDENTITY,
+          vk.COMPONENT_SWIZZLE_IDENTITY,
+          vk.COMPONENT_SWIZZLE_IDENTITY
+        ),
+        vk.ImageSubresourceRange(
+          vk.IMAGE_ASPECT_COLOR_BIT,
+          0,
+          1,
+          0,
+          1
+        )
+      )) ∘
+      map(vk.unwrap),
+      images
+    )
   )
 end
 

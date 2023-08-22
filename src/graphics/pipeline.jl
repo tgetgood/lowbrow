@@ -2,7 +2,7 @@ module pipeline
 
 import hardware as hw
 import Vulkan as vk
-import DataStructures: getin, emptymap, hashmap
+import DataStructures: getin, emptymap, hashmap, emptyvector, into
 
 function glslc(src, out)
   run(`glslc ../../shaders/$src -o $out`)
@@ -128,6 +128,30 @@ function createpipelines(config, system)
   ))
 
   hashmap(:renderpass, render_pass, :pipelines, ps)
+end
+
+function createframebuffers(config, system)
+  dev = get(system, :device)
+  images = get(system, :imageviews)
+  pass = get(system, :renderpass)
+  extent = get(system, :extent)
+
+  hashmap(
+    :framebuffers,
+    into(
+      emptyvector,
+      map(image -> vk.create_framebuffer(
+        dev,
+        pass,
+        [image],
+        extent.width,
+        extent.height,
+        1
+      )) ∘
+      map(vk.unwrap),
+      images
+    )
+  )
 end
 
 end
