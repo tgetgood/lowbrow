@@ -3,6 +3,8 @@ module debug
 import Vulkan as vk
 import DataStructures: assoc
 
+dumcd = vk.vk.LibVulkan.VkDebugUtilsMessengerCallbackDataEXT
+
 LogLevel = (
   debug=vk.DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
   info=vk.DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT,
@@ -26,33 +28,46 @@ LogType = merge(
   (all=LogType.general | LogType.validation | LogType.performance,)
 )
 
-dumcd = vk.vk.LibVulkan.VkDebugUtilsMessengerCallbackDataEXT
 
-function debugcb(severity, type, datap::Ptr{dumcd}, userData)
+function debugcb(severity, type, datap::Ptr{dumcd}, userData::Ptr{Cvoid})
   data = unsafe_load(datap)
 
   msg = unsafe_string(data.pMessage)
-  if severity == LogLevel.error.val
-    @error msg
-  elseif severity == LogLevel.warn.val
-    @warn msg
-  elseif severity == LogLevel.info.val
-    @info msg
-  elseif severity == LogLevel.debug.val
-    @debug msg
+
+  level = Base.cconvert(Int64, userData)
+
+  if severity >= level
+    if severity == LogLevel.error.val
+      @error msg
+    elseif severity == LogLevel.warn.val
+      @warn msg
+    elseif severity == LogLevel.info.val
+      @info msg
+    elseif severity == LogLevel.debug.val
+      @debug msg
+    end
   end
+
   return false
 end
 
-function debuginfo()
+function debuginfo(config)
+  data = Base.cconvert(Int64, get(config, :debuglevel).val)
+  user_data = Ptr{Cvoid}(data)
+
   vk.DebugUtilsMessengerCreateInfoEXT(
     LogLevel.all,
     LogType.all,
     @cfunction(
       debugcb,
       Bool,
-      (Cuint, Cuint, Ptr{dumcd}, Ptr{Cvoid}))
+      (Cuint, Cuint, Ptr{dumcd}, Ptr{Cvoid}));
+    user_data
   )
+end
+
+function configure(config)
+  assoc(config, :debuginfo, debuginfo(config))
 end
 
 function debugmsgr(config, system)

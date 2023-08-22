@@ -1,3 +1,5 @@
+ENV["JULIA_DEBUG"] = Main
+
 function pushonce(path)
   dir = *(@__DIR__, "/", path)
   if indexin(dir, Base.load_path())[1] === nothing
