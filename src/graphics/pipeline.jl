@@ -51,7 +51,14 @@ function renderpass(config, system)
       [vk.AttachmentReference(0, vk.IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)],
       []
     )],
-    []
+    [vk.SubpassDependency(
+      vk.SUBPASS_EXTERNAL,
+      0;
+      src_stage_mask=vk.PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+      dst_stage_mask=vk.PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+      src_access_mask=0,
+      dst_access_mask=vk.ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+    )]
   ))
 end
 
@@ -127,7 +134,7 @@ function createpipelines(config, system)
     )]
   ))
 
-  hashmap(:renderpass, render_pass, :pipelines, ps)
+  hashmap(:renderpass, render_pass, :pipeline, ps[1][1])
 end
 
 function createframebuffers(config, system)

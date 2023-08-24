@@ -1,4 +1,4 @@
-ENV["JULIA_DEBUG"] = Main
+ENV["JULIA_DEBUG"] = "all"
 
 function pushonce(path)
   dir = *(@__DIR__, "/", path)

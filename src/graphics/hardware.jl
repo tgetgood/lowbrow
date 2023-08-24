@@ -168,7 +168,7 @@ function pdevice(config, system)
 end
 
 function getqueue(system, queue)
-  i = get(get(system, :queues), queue)
+  i = getin(system, [:queues, queue])
   return vk.get_device_queue(get(system, :device), i, 0)
 end
 

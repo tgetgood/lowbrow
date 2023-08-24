@@ -4,6 +4,10 @@ import Vulkan as vk
 import GLFW.GLFW as glfw
 import DataStructures: getin, hashmap, assoc, into, emptymap, updatein
 
+function closep(window)
+  glfw.WindowShouldClose(window)
+end
+
 function createwindow(config, system)
   glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
   glfw.WindowHint(glfw.RESIZABLE, true)
