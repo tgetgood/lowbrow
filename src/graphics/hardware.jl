@@ -1,5 +1,6 @@
 module hardware
 
+import window
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
@@ -87,7 +88,10 @@ function checkdevice(config, system)
   # props = vk.get_physical_device_properties(pdev)
   # features = vk.get_physical_device_features(pdev)
 
-  return getin(system, [:queues, :graphics]) !== nothing && getin(system, [:queues, :presentation]) !== nothing && swapchainsupport(system) && containsall(
+  return getin(system, [:queues, :graphics]) !== nothing &&
+    getin(system, [:queues, :presentation]) !== nothing &&
+    swapchainsupport(system) &&
+    containsall(
            getin(config, [:device, :extensions]),
            map(
              x -> x.extension_name,
@@ -122,9 +126,16 @@ function findformat(config, system)
 end
 
 function findextent(config, system)
+  sc = vk.unwrap(vk.get_physical_device_surface_capabilities_khr(
+    get(system, :physicaldevice),
+    get(system, :surface)
+  ))
+
+  win = window.size(get(system, :window))
+
   vk.Extent2D(
-    getin(config, [:window, :width]),
-    getin(config, [:window, :height])
+    clamp(win.width, sc.min_image_extent.width, sc.max_image_extent.width),
+    clamp(win.height, sc.min_image_extent.height, sc.max_image_extent.height)
   )
 end
 
@@ -194,6 +205,7 @@ end
 function createswapchain(config, system)
   format = findformat(config, system)
   extent = findextent(config, system)
+
   sc = vk.create_swapchain_khr(
     get(system, :device),
     get(system, :surface),
@@ -208,7 +220,8 @@ function createswapchain(config, system)
     vk.SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
     vk.COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     findpresentmode(config, system),
-    true
+    true;
+    old_swapchain=get(system, :swapchain, C_NULL)
   )
 
   hashmap(:swapchain, vk.unwrap(sc), :extent, extent, :format, format)

@@ -4,13 +4,26 @@ import Vulkan as vk
 import GLFW.GLFW as glfw
 import DataStructures: getin, hashmap, assoc, into, emptymap, updatein
 
+function size(window)
+  glfw.GetFramebufferSize(window)
+end
+
+function onresize(window, f)
+  glfw.SetFramebufferSizeCallback(window, f)
+end
+
 function closep(window)
   glfw.WindowShouldClose(window)
+end
+
+function poll()
+  glfw.PollEvents()
 end
 
 function createwindow(config, system)
   glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
   glfw.WindowHint(glfw.RESIZABLE, true)
+  glfw.WindowHint(glfw.REFRESH_RATE, glfw.DONT_CARE)
 
   window = glfw.CreateWindow(
     getin(config, [:window, :width]),
