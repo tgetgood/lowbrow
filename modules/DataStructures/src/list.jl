@@ -7,92 +7,92 @@ abstract type List end
 # right side as well.
 
 struct VectorList <: List
-    contents::Vector
+  contents::Vector
 end
 
 struct VectorListSeq <: List
-    contents::Vector
-    last
+  contents::Vector
+  last
 end
 
 emptylist = VectorList(emptyvector)
 
 function count(x::VectorList)
-    count(x.contents)
+  count(x.contents)
 end
 
 function count(x::VectorListSeq)
-    x.last
+  x.last
 end
 
 function length(x::List)
-    count(x)
+  count(x)
 end
 
 function first(x::VectorList)
-    nth(x.contents, count(x.contents))
+  nth(x.contents, count(x.contents))
 end
 
 function nth(l::VectorList, i)
-    nth(l.contents, count(l) - i + 1)
+  nth(l.contents, count(l) - i + 1)
 end
 
 function rest(x::VectorList)
-    if count(x) == 0
-        emptylist
-    else
-        VectorListSeq(x.contents, count(x) - 1)
-    end
+  if count(x) == 0
+    emptylist
+  else
+    VectorListSeq(x.contents, count(x) - 1)
+  end
 end
 
 function first(x::VectorListSeq)
-    if count(x) > 0
-        nth(x.contents, x.last)
-    else
-        nil
-    end
+  if count(x) > 0
+    nth(x.contents, x.last)
+  else
+    nil
+  end
 end
 
 function rest(x::VectorListSeq)
-    if x.last < 1
-        emptylist
-    else
-        VectorListSeq(x.contents, x.last - 1)
-    end
+  if x.last < 1
+    emptylist
+  else
+    VectorListSeq(x.contents, x.last - 1)
+  end
 end
 
 function conj(l::VectorList, x)
-    VectorList(conj(l.contents, x))
+  VectorList(conj(l.contents, x))
 end
 
 function list(xs...)
-    tolist(xs)
+  tolist(xs)
 end
 
 function tolist(xs)
-    VectorList(reverse(vec(xs)))
+  VectorList(reverse(vec(xs)))
 end
 
 function vec(args::List)
-    r = emptyvector
-    for i = count(args):-1:1
-        r = conj(r, nth(args, i))
-    end
-    r
+  r = emptyvector
+  for i = count(args):-1:1
+    r = conj(r, nth(args, i))
+  end
+  r
 end
 
 function string(x::List)
-    "(" * transduce(interpose(" ") ∘ map(string), *, "", x) * ")"
+  "(" * transduce(interpose(" ") ∘ map(string), *, "", x) * ")"
 end
 
 function iterate(v::List)
-    first(v), rest(v)
+  first(v), rest(v)
 end
 
 function iterate(v::List, state)
-    if count(state) == 0
-        nothing
-    else
-        first(state), rest(state)
-    end
+  if count(state) == 0
+    nothing
+  else
+    first(state), rest(state)
+  end
 end

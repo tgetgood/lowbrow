@@ -1,6 +1,6 @@
 module DataStructures
 
-import Base: string,hash,==,length,iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex
+import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex
 
 # How many bits of hash are used at each level of the HAMT?
 hashbits = 5
@@ -18,7 +18,7 @@ include("./queue.jl")
 export first, rest, take, drop, reduce, transduce, into, map, filter, interpose, dup, cat, partition
 
 # Vectors
-export  emptyvector, nth, vec, vector, zip
+export emptyvector, nth, vec, vector, zip
 
 # Lists
 
