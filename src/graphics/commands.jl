@@ -1,6 +1,7 @@
 module commands
 
 import hardware as hw
+import vertex
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, nth
@@ -52,7 +53,7 @@ end
 
 function recorder(config, system, n, cmd)
   # REVIEW: This can probably be sped up a lot by moving all of the lookups out
-  # of the main loop.
+  # of the body.
   #
   # N.B.: This runs in the render loop!
 
@@ -91,11 +92,20 @@ function recorder(config, system, n, cmd)
     graphics_pipeline
   )
 
+  vdata = vertex.verticies(vertex.vertex_data)
+  vbuffer = vertex.buffer(config, system, vdata)
+
+  vk.cmd_bind_vertex_buffers(
+    cmdbuf,
+    [vbuffer],
+    Vector{vk.VkDeviceSize}([0])
+  )
+
   vk.cmd_set_viewport(cmdbuf, viewports)
 
   vk.cmd_set_scissor(cmdbuf, scissors)
 
-  vk.cmd_draw(cmdbuf, 3, 1, 0, 0)
+  vk.cmd_draw(cmdbuf, length(vdata), 1, 0, 0)
 
   vk.cmd_end_render_pass(cmdbuf)
 
@@ -120,9 +130,11 @@ function draw(config, system, cmd)
     err = vk.unwrap_error(imres)
     return err.code
   else
-
-    vk.reset_fences(dev, [fence])
     image = vk.unwrap(imres)[1]
+
+    #  Don't record over unsubmitted buffer
+    vk.reset_fences(dev, [fence])
+
     recorder(config, system, image + 1, cmd)
 
     submission = vk.SubmitInfo(
@@ -133,6 +145,8 @@ function draw(config, system, cmd)
     )
 
     vk.queue_submit(hw.getqueue(system, :graphics), [submission]; fence)
+
+    # end fenced region
 
     preres = vk.queue_present_khr(
       hw.getqueue(system, :presentation),

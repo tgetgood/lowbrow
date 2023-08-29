@@ -8,8 +8,20 @@ function size(window)
   glfw.GetFramebufferSize(window)
 end
 
-function onresize(window, f)
-  glfw.SetFramebufferSizeCallback(window, f)
+function minimised(window)
+  (width, height) = size(window)
+  return width == 0 || height == 0
+end
+
+function resized(ch)
+  function inner()
+    res = false
+    while isready(ch)
+      take!(ch)
+      res = true
+    end
+    return res
+  end
 end
 
 function closep(window)
@@ -18,6 +30,18 @@ end
 
 function poll()
   glfw.PollEvents()
+end
+
+function resizecb(ch)
+  function inner(win, _, _)
+    try
+      if !isready(ch)
+        @async put!(ch, true)
+      end
+    catch e
+      @error e
+    end
+  end
 end
 
 function createwindow(config, system)
@@ -31,7 +55,11 @@ function createwindow(config, system)
     "not quite a browser"
   )
 
-  hashmap(:window, window)
+  ch = Channel()
+
+  glfw.SetFramebufferSizeCallback(window, resizecb(ch))
+
+  hashmap(:window, window, :resizecb, resized(ch))
 end
 
 function createsurface(config, system)

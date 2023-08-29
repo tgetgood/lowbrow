@@ -2,6 +2,7 @@ module pipeline
 
 import window
 import hardware as hw
+import vertex
 import Vulkan as vk
 import DataStructures: getin, emptymap, hashmap, emptyvector, into
 
@@ -137,8 +138,8 @@ function createpipelines(config, system)
       layout,
       0,
       -1;
-      vertex_input_state=vk.PipelineVertexInputStateCreateInfo([], []),
-      input_assembly_state,
+      vertex_input_state=vertex.input_state(vertex.Vertex, vertex.vattrs),
+     input_assembly_state,
       viewport_state,
       multisample_state,
       color_blend_state,

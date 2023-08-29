@@ -70,8 +70,6 @@ system = dynamicinit(config, system)
 
 function main(config, system)
   sigkill = Channel()
-  resizech = Channel()
-
 
   handle = Threads.@spawn begin
     @info "starting main loop"
@@ -81,24 +79,18 @@ function main(config, system)
     t = time()
     while !window.closep(get(system, :window)) && !isready(sigkill)
       window.poll()
-      if isready(resizech)
-        take!(resizech)
-        system = dynamicinit(config, system)
+      if !window.minimised(get(system, :window))
+
+        res = commands.draw(config, system, buffers[i+1])
+
+        if res == vk.ERROR_OUT_OF_DATE_KHR ||
+          res == vk.SUBOPTIMAL_KHR ||
+          get(system, :resizecb)()
+          system = dynamicinit(config, system)
+        end
+        i = (i + 1) % get(config, :concurrent_frames)
       end
-
-      res = commands.draw(config, system, buffers[i+1])
-
-      if res == vk.ERROR_OUT_OF_DATE_KHR || res == vk.SUBOPTIMAL_KHR
-        system = dynamicinit(config, system)
-      end
-      i = (i + 1) % get(config, :concurrent_frames)
-
-      # frames += 1
-      # if frames % 100 == 0
-      #   @info "frame rate: " * string(100/(time() - t))
-      #   t = time()
-      # end
-    end
+   end
 
     @info "finished main loop; cleaning up"
     vk.device_wait_idle(get(system, :device))

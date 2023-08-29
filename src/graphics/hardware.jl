@@ -260,4 +260,27 @@ function createimageviews(config, system)
   )
 end
 
+function findmemtype(config, system, req)
+  properties = vk.get_physical_device_memory_properties(
+    get(system, :physicaldevice)
+  )
+
+  mask = get(req, :typemask)
+  flags = get(req, :flags)
+
+
+  mt = into(
+    [],
+    ds.mapindex((x, i) -> (x, i-1))
+    ∘ filter(x -> (mask & (1 << x[2])) > 0)
+    ∘ filter(x -> (x[1].property_flags & flags) == flags)
+    ,
+    properties.memory_types[1:properties.memory_type_count]
+  )
+
+  @assert length(mt) > 0
+
+  mt[1]
+end
+
 end
