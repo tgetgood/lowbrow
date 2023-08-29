@@ -27,12 +27,21 @@ function configure()
       :presentmode, vk.PRESENT_MODE_FIFO_KHR,
       :images, 3
     ),
-    :concurrent_frames, 2
+    :concurrent_frames, 2,
+    :vertex_data, [
+      [[0, -0.5], [1, 1, 1]],
+      [[0.5, 0.5], [0, 1, 0]],
+      [[-0.5, 0.5], [0, 0, 1]],
+      [[0,0], [1,0,0]],
+      [[0,1.0], [1,0,1]],
+      [[-1,0], [1,1,0]],
+    ]
   )
 
   ds.reduce((s, f) -> f(s), staticconfig, [
     window.configure,
-    debug.configure
+    debug.configure,
+    vertex.configure
   ])
 end
 
@@ -55,11 +64,11 @@ function dynamicinit(config, system)
   vk.device_wait_idle(get(system, :device))
 
   steps = [
-    vertex.bufferfrom(vertex.verticies(vertex.vertex_data)),
     hw.createswapchain,
     hw.createimageviews,
     gp.createpipelines,
     gp.createframebuffers,
+    vertex.buffer,
   ]
 
   ds.reduce((s, f) -> merge(s, f(config, s)), system, steps)
