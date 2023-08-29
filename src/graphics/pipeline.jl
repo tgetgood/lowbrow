@@ -2,9 +2,9 @@ module pipeline
 
 import window
 import hardware as hw
-import vertex
 import Vulkan as vk
-import DataStructures: getin, emptymap, hashmap, emptyvector, into
+import DataStructures as ds
+import DataStructures: getin, emptymap, hashmap, emptyvector, into, mapindex
 
 function glslc(src, out)
   run(`glslc $(@__DIR__)/../../shaders/$src -o $out`)
@@ -66,6 +66,60 @@ function renderpass(config, system)
         dst_access_mask=vk.ACCESS_COLOR_ATTACHMENT_WRITE_BIT
       )]
     ))
+  )
+end
+
+
+function channels(n, w)
+  ds.reduce(*, "", ds.take(n, map(s -> s*w, ["R", "G", "B", "A"])))
+end
+
+typenames = hashmap(
+  Signed, "SINT",
+  Unsigned, "UINT",
+  AbstractFloat, "SFLOAT"
+)
+
+"""
+Returns the Vulkan Format for julia type `T`.
+
+`T` must have fixed size.
+
+Not tested for completeness.
+"""
+function typeformat(T)
+  n = Int(sizeof(T) / sizeof(eltype(T)))
+  w = string(sizeof(eltype(T)) * 8)
+  t = get(typenames, supertype(eltype(T)))
+
+  getfield(vk, Symbol("FORMAT_" * channels(n, w) * "_" * t))
+end
+
+"""
+Generates PiplineVertexInputStateCreateInfo from struct `T` via reflection.
+
+N.B.: The location pragmata in the shaders are assumed to follow the order of
+the fields in the struct.
+
+TODO: Add 2 arg version that allows overriding location order.
+"""
+function vertex_input_state(T)
+  vk.PipelineVertexInputStateCreateInfo(
+    [vk.VertexInputBindingDescription(
+      0, sizeof(T), vk.VERTEX_INPUT_RATE_VERTEX
+    )],
+    into(
+      [],
+      mapindex(
+        (field, i) -> vk.VertexInputAttributeDescription(
+          i - 1,
+          0,
+          typeformat(fieldtype(T, field)),
+          fieldoffset(T, i)
+        )
+      ),
+      fieldnames(T)
+    )
   )
 end
 
@@ -138,7 +192,7 @@ function createpipelines(config, system)
       layout,
       0,
       -1;
-      vertex_input_state=vertex.input_state(vertex.Vertex, vertex.vattrs),
+      vertex_input_state=vertex_input_state(eltype(get(config, :vertex_data))),
      input_assembly_state,
       viewport_state,
       multisample_state,

@@ -1,7 +1,6 @@
 module commands
 
 import hardware as hw
-import vertex
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, nth
