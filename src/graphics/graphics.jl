@@ -1,5 +1,6 @@
 import hardware as hw
 import pipeline as gp
+import vertex
 import commands
 import debug
 import window
@@ -44,7 +45,7 @@ function staticinit(config)
     hw.createdevice,
     gp.renderpass,
     commands.pool,
-    commands.buffers,
+    commands.buffers
   ]
 
   ds.reduce((s, f) -> merge(s, f(config, s)), emptymap, steps)
@@ -54,6 +55,7 @@ function dynamicinit(config, system)
   vk.device_wait_idle(get(system, :device))
 
   steps = [
+    vertex.bufferfrom(vertex.verticies(vertex.vertex_data)),
     hw.createswapchain,
     hw.createimageviews,
     gp.createpipelines,
@@ -62,6 +64,10 @@ function dynamicinit(config, system)
 
   ds.reduce((s, f) -> merge(s, f(config, s)), system, steps)
 end
+
+# FIXME: These should be inside `main`, but it's convenient for repl purposes to
+# make them global during development.
+
 config = configure()
 system = staticinit(config)
 system = dynamicinit(config, system)
@@ -79,8 +85,8 @@ function main(config, system)
     t = time()
     while !window.closep(get(system, :window)) && !isready(sigkill)
       window.poll()
-      if !window.minimised(get(system, :window))
 
+      if !window.minimised(get(system, :window))
         res = commands.draw(config, system, buffers[i+1])
 
         if res == vk.ERROR_OUT_OF_DATE_KHR ||

@@ -92,12 +92,9 @@ function recorder(config, system, n, cmd)
     graphics_pipeline
   )
 
-  vdata = vertex.verticies(vertex.vertex_data)
-  vbuffer = vertex.buffer(config, system, vdata)
-
   vk.cmd_bind_vertex_buffers(
     cmdbuf,
-    [vbuffer],
+    [ds.getin(system, [:vertexbuffer, :buffer])],
     Vector{vk.VkDeviceSize}([0])
   )
 
@@ -105,7 +102,7 @@ function recorder(config, system, n, cmd)
 
   vk.cmd_set_scissor(cmdbuf, scissors)
 
-  vk.cmd_draw(cmdbuf, length(vdata), 1, 0, 0)
+  vk.cmd_draw(cmdbuf, getin(system, [:vertexbuffer, :verticies]), 1, 0, 0)
 
   vk.cmd_end_render_pass(cmdbuf)
 

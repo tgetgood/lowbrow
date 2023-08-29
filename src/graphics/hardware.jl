@@ -283,4 +283,36 @@ function findmemtype(config, system, req)
   mt[1]
 end
 
+function buffer(config, system)
+  buffer = vk.unwrap(vk.create_buffer(
+    get(system, :device),
+    get(config, :size),
+    get(config, :usage),
+    get(config, :mode),
+    [ds.getin(system, [:queues, get(config, :queue)])]
+  ))
+
+  memreq = vk.get_buffer_memory_requirements(
+    get(system, :device),
+    buffer
+  )
+
+  req = ds.hashmap(
+    :typemask, memreq.memory_type_bits,
+    :flags, get(config, :memoryflags)
+  )
+
+  memtype = findmemtype(config, system, req)
+
+  memory = vk.unwrap(vk.allocate_memory(
+    get(system, :device),
+    memreq.size,
+    memtype[2]
+  ))
+
+  vk.unwrap(vk.bind_buffer_memory(get(system, :device), buffer, memory, 0))
+
+  hashmap(:buffer, buffer, :memory, memory)
+end
+
 end

@@ -62,56 +62,36 @@ function input_state(T, attrs)
   )
 end
 
-function buffer(config, system, data)
-  buffer = vk.unwrap(vk.create_buffer(
-    get(system, :device),
-    sizeof(data),
-    vk.BUFFER_USAGE_VERTEX_BUFFER_BIT,
-    vk.SHARING_MODE_EXCLUSIVE,
-    [ds.getin(system, [:queues, :graphics])]
-  ))
+function bufferfrom(data)
+  function(config, system)
+    buffer = hw.buffer(
+      ds.assoc(
+        config,
+        :size, sizeof(data),
+        :usage, vk.BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        :mode, vk.SHARING_MODE_EXCLUSIVE,
+        :queue, :graphics,
+        :memoryflags, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT |
+                      vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
+      ),
+      system)
 
-  memreq = vk.get_buffer_memory_requirements(
-    get(system, :device),
-    buffer
-  )
+    memptr::Ptr{eltype(data)} = vk.unwrap(vk.map_memory(
+      get(system, :device), get(buffer, :memory), 0, sizeof(data)
+    ))
 
-  req = ds.hashmap(
-    :typemask, memreq.memory_type_bits,
-    :flags,
-      vk.MEMORY_PROPERTY_HOST_COHERENT_BIT | vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
-  )
+    unsafe_copyto!(memptr, pointer(data), length(data))
 
-  memtype = hw.findmemtype(config, system, req)
+    # I'm guessing unsafe_copyto! just does:
+    # ccall(
+    #   :memcpy, Cvoid, (Ptr{Cvoid}, Ptr{Cvoid}, Csize_t),
+    #   memptr, pointer(data), sizeof(data)
+    # )
 
-  memory = vk.unwrap(vk.allocate_memory(
-    get(system, :device),
-    memreq.size,
-    memtype[2]
-  ))
+    vk.unmap_memory(get(system, :device), get(buffer, :memory))
 
-  vk.unwrap(vk.bind_buffer_memory(
-    get(system, :device),
-    buffer,
-    memory,
-    0
-  ))
-
-  memptr::Ptr{eltype(data)} = vk.unwrap(vk.map_memory(
-    get(system, :device), memory, 0, sizeof(data)
-  ))
-
-  unsafe_copyto!(memptr, pointer(data), length(data))
-
-  # I'm guessing unsafe_copyto! just does:
-  # ccall(
-  #   :memcpy, Cvoid, (Ptr{Cvoid}, Ptr{Cvoid}, Csize_t),
-  #   memptr, pointer(data), sizeof(data)
-  # )
-
-  vk.unmap_memory(get(system, :device), memory)
-
-  buffer
+    ds.hashmap(:vertexbuffer, ds.assoc(buffer, :verticies, length(data)))
+  end
 end
 
 end # module
