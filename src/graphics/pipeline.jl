@@ -20,7 +20,7 @@ function compileshader(system, fname)
   vk.unwrap(vk.create_shader_module(get(system, :device), size, code))
 end
 
-function shaders(config, system)
+function shaders(system, config)
   vert = vk.PipelineShaderStageCreateInfo(
     vk.SHADER_STAGE_VERTEX_BIT,
     compileshader(system, getin(config, [:shaders, :vert])),
@@ -36,7 +36,7 @@ function shaders(config, system)
   [vert, frag]
 end
 
-function renderpass(config, system)
+function renderpass(system, config)
   hashmap(
     :renderpass,
     vk.unwrap(vk.create_render_pass(
@@ -123,7 +123,7 @@ function vertex_input_state(T)
   )
 end
 
-function createpipelines(config, system)
+function createpipelines(system, config)
   dynamic_state = vk.PipelineDynamicStateCreateInfo([
     vk.DYNAMIC_STATE_SCISSOR,
     vk.DYNAMIC_STATE_VIEWPORT
@@ -178,7 +178,7 @@ function createpipelines(config, system)
   ps = vk.unwrap(vk.create_graphics_pipelines(
     get(system, :device),
     [vk.GraphicsPipelineCreateInfo(
-      shaders(config, system),
+      shaders(system, config),
       vk.PipelineRasterizationStateCreateInfo(
         false,
         false,
@@ -205,7 +205,7 @@ function createpipelines(config, system)
   hashmap(:pipeline, ps[1][1], :viewports, viewports, :scissors, scissors)
 end
 
-function createframebuffers(config, system)
+function createframebuffers(system, config)
   dev = get(system, :device)
   images = get(system, :imageviews)
   pass = get(system, :renderpass)

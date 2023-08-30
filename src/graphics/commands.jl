@@ -5,7 +5,7 @@ import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, nth
 
-function pool(config, system)
+function pool(system, config)
   hashmap(
     :pool,
     vk.unwrap(vk.create_command_pool(
@@ -16,7 +16,7 @@ function pool(config, system)
   )
 end
 
-function syncsetup(config, system)
+function syncsetup(system, config)
   hashmap(
     :locks,
     (
@@ -35,16 +35,16 @@ function syncsetup(config, system)
 end
 
 
-function buffers(config, system)
+function buffers(system, config)
   buffers = hw.commandbuffers(system, get(config, :concurrent_frames))
 
   hashmap(
     :commandbuffers,
-    map(x -> merge(syncsetup(config, system), hashmap(:commandbuffer, x)), buffers)
+    map(x -> merge(syncsetup(system, config), hashmap(:commandbuffer, x)), buffers)
   )
 end
 
-function recorder(config, system, n, cmd)
+function recorder(system, n, cmd)
   # REVIEW: This can probably be sped up a lot by moving all of the lookups out
   # of the body.
   #
@@ -102,7 +102,7 @@ function recorder(config, system, n, cmd)
   vk.unwrap(vk.end_command_buffer(cmdbuf))
 end
 
-function draw(config, system, cmd)
+function draw(system, cmd)
   dev = get(system, :device)
   timeout = typemax(Int64)
   (imagesem, rendersem, fence) = get(cmd, :locks)
@@ -125,7 +125,7 @@ function draw(config, system, cmd)
     #  Don't record over unsubmitted buffer
     vk.reset_fences(dev, [fence])
 
-    recorder(config, system, image + 1, cmd)
+    recorder(system, image + 1, cmd)
 
     submission = vk.SubmitInfo(
       [imagesem],

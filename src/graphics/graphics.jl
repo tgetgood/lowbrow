@@ -57,10 +57,10 @@ function staticinit(config)
     commands.buffers
   ]
 
-  ds.reduce((s, f) -> merge(s, f(config, s)), emptymap, steps)
+  ds.reduce((s, f) -> merge(s, f(s, config)), emptymap, steps)
 end
 
-function dynamicinit(config, system)
+function dynamicinit(system, config)
   vk.device_wait_idle(get(system, :device))
 
   steps = [
@@ -71,7 +71,7 @@ function dynamicinit(config, system)
     vertex.buffer,
   ]
 
-  ds.reduce((s, f) -> merge(s, f(config, s)), system, steps)
+  ds.reduce((s, f) -> merge(s, f(s, config)), system, steps)
 end
 
 # FIXME: These should be inside `main`, but it's convenient for repl purposes to
@@ -79,11 +79,11 @@ end
 
 config = configure()
 system = staticinit(config)
-system = dynamicinit(config, system)
+system = dynamicinit(system, config)
 
 @info "Ready"
 
-function main(config, system)
+function main(system, config)
   sigkill = Channel()
 
   handle = Threads.@spawn begin
@@ -96,12 +96,12 @@ function main(config, system)
       window.poll()
 
       if !window.minimised(get(system, :window))
-        res = commands.draw(config, system, buffers[i+1])
+        res = commands.draw(system, buffers[i+1])
 
         if res == vk.ERROR_OUT_OF_DATE_KHR ||
           res == vk.SUBOPTIMAL_KHR ||
           get(system, :resizecb)()
-          system = dynamicinit(config, system)
+          system = dynamicinit(system, config)
         end
         i = (i + 1) % get(config, :concurrent_frames)
       end
@@ -126,4 +126,4 @@ function main(config, system)
   end
 end
 
-repl_teardown = main(config, system)
+repl_teardown = main(system, config)

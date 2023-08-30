@@ -70,7 +70,7 @@ function configure(config)
   assoc(config, :debuginfo, debuginfo(config))
 end
 
-function debugmsgr(config, system)
+function debugmsgr(system, config)
   assoc(system, :debugmsgr,
     vk.unwrap(
       vk.create_debug_utils_messenger_ext(

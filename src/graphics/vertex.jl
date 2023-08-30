@@ -17,7 +17,7 @@ function verticies(xs)::Vector{Vertex}
   ds.into([], map(x -> vert(x...)), xs)
 end
 
-function buffer(config, system)
+function buffer(system, config)
   data = get(config, :vertex_data)
 
   staging = hw.buffer(

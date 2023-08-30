@@ -9,7 +9,7 @@ function containsall(needles, hay)::Bool
   return [nothing] == indexin([nothing], indexin(needles, hay))
 end
 
-function instance(config, _)
+function instance(_, config)
   ic = get(config, :instance)
   validationlayers = get(ic, :validation)
   extensions = get(ic, :extensions)
@@ -83,7 +83,7 @@ function swapchainsupport(system)
 end
 
 
-function checkdevice(config, system)
+function checkdevice(system, config)
   pdev = get(system, :physicaldevice)
   # props = vk.get_physical_device_properties(pdev)
   # features = vk.get_physical_device_features(pdev)
@@ -106,7 +106,7 @@ function checkdevice(config, system)
          )
 end
 
-function findformat(config, system)
+function findformat(system, config)
   formats = vk.unwrap(vk.get_physical_device_surface_formats_khr(
     get(system, :physicaldevice);
     surface=get(system, :surface)
@@ -125,7 +125,7 @@ function findformat(config, system)
   end
 end
 
-function findextent(config, system)
+function findextent(system, config)
   sc = vk.unwrap(vk.get_physical_device_surface_capabilities_khr(
     get(system, :physicaldevice),
     get(system, :surface)
@@ -139,7 +139,7 @@ function findextent(config, system)
   )
 end
 
-function findpresentmode(config, system)
+function findpresentmode(system, config)
   modes = vk.unwrap(
     vk.get_physical_device_surface_present_modes_khr(
       get(system, :physicaldevice);
@@ -160,14 +160,14 @@ function findqueues(system, device)
   )
 end
 
-function pdevice(config, system)
+function pdevice(system, config)
   potential = into(
     emptyvector,
     map(x -> merge(system, hashmap(
       :physicaldevice, x,
       :queues, findqueues(system, x)
-    ))) ∘
-    filter(x -> checkdevice(config, x)),
+    )))
+    ∘ filter(system -> checkdevice(system, config)),
     vk.unwrap(vk.enumerate_physical_devices(get(system, :instance)))
   )
 
@@ -186,8 +186,8 @@ function getqueue(system, queue, index=0)
   )
 end
 
-function createdevice(config, system)
-  system = pdevice(config, system)
+function createdevice(system, config)
+  system = pdevice(system, config)
   queues = get(system, :queues)
   pdev = get(system, :physicaldevice)
 
@@ -205,9 +205,9 @@ function createdevice(config, system)
   assoc(system, :device, vk.unwrap(vk.create_device(pdev, dci)))
 end
 
-function createswapchain(config, system)
-  format = findformat(config, system)
-  extent = findextent(config, system)
+function createswapchain(system, config)
+  format = findformat(system, config)
+  extent = findextent(system, config)
 
   sc = vk.create_swapchain_khr(
     get(system, :device),
@@ -222,7 +222,7 @@ function createswapchain(config, system)
     [],
     vk.SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
     vk.COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-    findpresentmode(config, system),
+    findpresentmode(system, config),
     true;
     old_swapchain=get(system, :swapchain, C_NULL)
   )
@@ -230,7 +230,7 @@ function createswapchain(config, system)
   hashmap(:swapchain, vk.unwrap(sc), :extent, extent, :format, format)
 end
 
-function createimageviews(config, system)
+function createimageviews(system, config)
   dev = get(system, :device)
   images = vk.unwrap(vk.get_swapchain_images_khr(dev, get(system, :swapchain)))
 
@@ -242,7 +242,7 @@ function createimageviews(config, system)
         dev,
         image,
         vk.IMAGE_VIEW_TYPE_2D,
-        findformat(config, system).format,
+        findformat(system, config).format,
         vk.ComponentMapping(
           vk.COMPONENT_SWIZZLE_IDENTITY,
           vk.COMPONENT_SWIZZLE_IDENTITY,
@@ -263,7 +263,7 @@ function createimageviews(config, system)
   )
 end
 
-function findmemtype(config, system)
+function findmemtype(system, config)
   properties = vk.get_physical_device_memory_properties(
     get(system, :physicaldevice)
   )
@@ -303,7 +303,7 @@ function buffer(system, config)
     :flags, get(config, :memoryflags)
   )
 
-  memtype = findmemtype(req, system)
+  memtype = findmemtype(system, req)
 
   memory = vk.unwrap(vk.allocate_memory(dev, memreq.size, memtype[2]))
 

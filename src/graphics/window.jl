@@ -44,7 +44,7 @@ function resizecb(ch)
   end
 end
 
-function createwindow(config, system)
+function createwindow(system, config)
   glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
   glfw.WindowHint(glfw.RESIZABLE, true)
   glfw.WindowHint(glfw.REFRESH_RATE, glfw.DONT_CARE)
@@ -62,7 +62,7 @@ function createwindow(config, system)
   hashmap(:window, window, :resizecb, resized(ch))
 end
 
-function createsurface(config, system)
+function createsurface(system, config)
   instance = get(system, :instance)
   surface = glfw.CreateWindowSurface(
     instance,
