@@ -178,9 +178,12 @@ function pdevice(config, system)
   end
 end
 
-function getqueue(system, queue)
-  i = getin(system, [:queues, queue])
-  return vk.get_device_queue(get(system, :device), i, 0)
+function getqueue(system, queue, index=0)
+  vk.get_device_queue(
+    get(system, :device),
+    getin(system, [:queues, queue]),
+    index
+  )
 end
 
 function createdevice(config, system)
@@ -260,14 +263,13 @@ function createimageviews(config, system)
   )
 end
 
-function findmemtype(config, system, req)
+function findmemtype(config, system)
   properties = vk.get_physical_device_memory_properties(
     get(system, :physicaldevice)
   )
 
-  mask = get(req, :typemask)
-  flags = get(req, :flags)
-
+  mask = get(config, :typemask)
+  flags = get(config, :flags)
 
   mt = into(
     [],
@@ -283,36 +285,56 @@ function findmemtype(config, system, req)
   mt[1]
 end
 
-function buffer(config, system)
+function buffer(system, config)
+  dev = get(system, :device)
+
   buffer = vk.unwrap(vk.create_buffer(
-    get(system, :device),
+    dev,
     get(config, :size),
     get(config, :usage),
     get(config, :mode),
     [ds.getin(system, [:queues, get(config, :queue)])]
   ))
 
-  memreq = vk.get_buffer_memory_requirements(
-    get(system, :device),
-    buffer
-  )
+  memreq = vk.get_buffer_memory_requirements(dev, buffer)
 
   req = ds.hashmap(
     :typemask, memreq.memory_type_bits,
     :flags, get(config, :memoryflags)
   )
 
-  memtype = findmemtype(config, system, req)
+  memtype = findmemtype(req, system)
 
-  memory = vk.unwrap(vk.allocate_memory(
+  memory = vk.unwrap(vk.allocate_memory(dev, memreq.size, memtype[2]))
+
+  vk.unwrap(vk.bind_buffer_memory(dev, buffer, memory, 0))
+
+  hashmap(:buffer, buffer, :memory, memory, :size, memreq.size)
+end
+
+function commandbuffers(system, n::Int, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
+  buffers = vk.unwrap(vk.allocate_command_buffers(
     get(system, :device),
-    memreq.size,
-    memtype[2]
+    vk.CommandBufferAllocateInfo(get(system, :pool), level, n)
   ))
+end
 
-  vk.unwrap(vk.bind_buffer_memory(get(system, :device), buffer, memory, 0))
+function copybuffer(system, src, dst, size, queuefamily=:transfer)
+  cmds = commandbuffers(system, 1)
+  cmd = cmds[1]
+  queue = getqueue(system, queuefamily)
 
-  hashmap(:buffer, buffer, :memory, memory)
+  vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
+
+  vk.cmd_copy_buffer(cmd, src, dst, [vk.BufferCopy(0,0,size)])
+
+  vk.end_command_buffer(cmd)
+
+  vk.queue_submit(queue, [vk.SubmitInfo([],[],[cmd],[])])
+
+  vk.queue_wait_idle(queue)
+
+  vk.free_command_buffers(get(system, :device), get(system, :pool), cmds)
 end
 
 end

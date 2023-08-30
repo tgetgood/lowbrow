@@ -34,15 +34,9 @@ function syncsetup(config, system)
   )
 end
 
+
 function buffers(config, system)
-  buffers = vk.unwrap(vk.allocate_command_buffers(
-    get(system, :device),
-    vk.CommandBufferAllocateInfo(
-      get(system, :pool),
-      vk.COMMAND_BUFFER_LEVEL_PRIMARY,
-      get(config, :concurrent_frames)
-    )
-  ))
+  buffers = hw.commandbuffers(system, get(config, :concurrent_frames))
 
   hashmap(
     :commandbuffers,

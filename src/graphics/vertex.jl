@@ -19,20 +19,22 @@ end
 
 function buffer(config, system)
   data = get(config, :vertex_data)
-  buffer = hw.buffer(
+
+  staging = hw.buffer(
+    system,
     ds.assoc(
       config,
       :size, sizeof(data),
-      :usage, vk.BUFFER_USAGE_VERTEX_BUFFER_BIT,
+      :usage, vk.BUFFER_USAGE_TRANSFER_SRC_BIT,
       :mode, vk.SHARING_MODE_EXCLUSIVE,
       :queue, :graphics,
       :memoryflags, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT |
                     vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
-    ),
-    system)
+    )
+  )
 
   memptr::Ptr{eltype(data)} = vk.unwrap(vk.map_memory(
-    get(system, :device), get(buffer, :memory), 0, sizeof(data)
+    get(system, :device), get(staging, :memory), 0, sizeof(data)
   ))
 
   unsafe_copyto!(memptr, pointer(data), length(data))
@@ -43,7 +45,27 @@ function buffer(config, system)
   #   memptr, pointer(data), sizeof(data)
   # )
 
-  vk.unmap_memory(get(system, :device), get(buffer, :memory))
+  vk.unmap_memory(get(system, :device), get(staging, :memory))
+
+  buffer = hw.buffer(
+    system,
+    ds.hashmap(
+      :size, sizeof(data),
+      :usage, vk.BUFFER_USAGE_VERTEX_BUFFER_BIT |
+              vk.BUFFER_USAGE_TRANSFER_DST_BIT,
+      :mode, vk.SHARING_MODE_EXCLUSIVE,
+      :queue, :graphics,
+      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    )
+  )
+
+  hw.copybuffer(
+    system,
+    get(staging, :buffer),
+    get(buffer, :buffer),
+    get(staging, :size),
+    :graphics
+  )
 
   ds.hashmap(:vertexbuffer, ds.assoc(buffer, :verticies, length(data)))
 end
