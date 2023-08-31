@@ -71,10 +71,6 @@ function conj(x)
   x
 end
 
-function conj(x, n::Nothing)
-  x
-end
-
 function concat(xs, ys)
   into(xs, ys)
 end
@@ -184,6 +180,16 @@ function interpose(delim)
     return inner
   end
 end
+
+# Interleave is a higher order form of transducer (as is map in general). The
+# current implementation only works for a single argument at each step, which is
+# wrong, but whenever I try to generalise I quickly wind up with a mess.
+
+# function interleave()
+#   i = 1
+#   function inner(emit)
+#   end
+# end
 
 function partition(n)
   acc = emptyvector

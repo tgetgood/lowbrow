@@ -48,8 +48,12 @@ function fullp(v::VectorNode)
 end
 
 """ Returns `true` iff the collection `x` contains no elements. """
-function emptyp(x)
+function emptyp(x::Sequential)
   count(x) == 0
+end
+
+function emptyp(x)
+  length(x) == 0
 end
 
 function conj(v::Base.Vector, x)

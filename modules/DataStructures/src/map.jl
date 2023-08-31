@@ -72,8 +72,18 @@ function emptyp(m::Map)
   count(m) == 0
 end
 
+function conj(m::Map, x::Nothing)
+  m
+end
+
 function conj(m::Map, e::MapEntry)
   assoc(m, e.key, e.value)
+end
+
+function conj(m::Map, v::Union{Vector, Base.Vector, Tuple})
+  @assert length(v) == 2 "Can only create map entry from pair of values"
+
+  assoc(m, v[1], v[2])
 end
 
 # Clojure uses 8 and I don't want to dig into it just yet.
@@ -384,4 +394,9 @@ end
 
 function rest(m::OrderedMap)
   rest(seq(m))
+end
+
+function zipmap(x, y)
+  i = min(count(x), count(y))
+  reduce((a, i) -> assoc(a, x[i], y[i]), emptymap, 1:i)
 end
