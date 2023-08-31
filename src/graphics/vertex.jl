@@ -27,7 +27,7 @@ function buffer(system, config)
       :size, sizeof(data),
       :usage, vk.BUFFER_USAGE_TRANSFER_SRC_BIT,
       :mode, vk.SHARING_MODE_EXCLUSIVE,
-      :queue, :graphics,
+      :queues, [:transfer],
       :memoryflags, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT |
                     vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
     )
@@ -53,8 +53,8 @@ function buffer(system, config)
       :size, sizeof(data),
       :usage, vk.BUFFER_USAGE_VERTEX_BUFFER_BIT |
               vk.BUFFER_USAGE_TRANSFER_DST_BIT,
-      :mode, vk.SHARING_MODE_EXCLUSIVE,
-      :queue, :graphics,
+      :mode, vk.SHARING_MODE_CONCURRENT,
+      :queues, [:graphics, :transfer],
       :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     )
   )
@@ -64,7 +64,7 @@ function buffer(system, config)
     get(staging, :buffer),
     get(buffer, :buffer),
     get(staging, :size),
-    :graphics
+    :transfer
   )
 
   ds.hashmap(:vertexbuffer, ds.assoc(buffer, :verticies, length(data)))

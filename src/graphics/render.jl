@@ -1,4 +1,4 @@
-module draw
+module render
 
 import hardware as hw
 import Vulkan as vk
@@ -25,7 +25,7 @@ end
 
 
 function commandbuffers(system, config)
-  buffers = hw.commandbuffers(system, get(config, :concurrent_frames))
+  buffers = hw.commandbuffers(system, get(config, :concurrent_frames), :graphics)
 
   hashmap(
     :commandbuffers,

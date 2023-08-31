@@ -69,6 +69,37 @@ function findpresentationqueue(system, device)
   )
 end
 
+function findtransferqueue(device)
+  families = ds.mapindexed(
+    (x, i) -> (x, i),
+    vk.get_physical_device_queue_family_properties(device)
+  )
+
+  dedicated = filter(
+    x -> (x[1].queue_flags & vk.QUEUE_TRANSFER_BIT) > 0 &&
+    (x[1].queue_flags & vk.QUEUE_GRAPHICS_BIT | vk.QUEUE_COMPUTE_BIT).val == 0,
+    families
+  )
+
+  if length(dedicated) > 0
+    return first(dedicated)[2]
+  else
+
+    nongraphics = filter(
+    x -> (x[1].queue_flags & vk.QUEUE_TRANSFER_BIT) > 0 &&
+      (x[1].queue_flags & vk.QUEUE_GRAPHICS_BIT).val == 0,
+    families
+    )
+
+    if length(nongraphics) > 0
+      return first(nongraphics)[2]
+    else
+      return findgraphicsqueue(device)
+    end
+  end
+end
+
+
 function swapchainsupport(system)
   dev = get(system, :physicaldevice)
   surface = get(system, :surface)
@@ -156,7 +187,8 @@ end
 function findqueues(system, device)
   hashmap(
     :graphics, findgraphicsqueue(device),
-    :presentation, findpresentationqueue(system, device)
+    :presentation, findpresentationqueue(system, device),
+    :transfer, findtransferqueue(device)
   )
 end
 
@@ -263,6 +295,29 @@ function createimageviews(system, config)
   )
 end
 
+function createpools(system, config)
+  qfs = collect(Set(ds.vals(get(system, :queues))))
+
+  hashmap(
+    :pools,
+    ds.zipmap(qfs, map(qfs ->
+        vk.unwrap(vk.create_command_pool(
+          get(system, :device),
+          getin(system, [:queues, :graphics]);
+          flags=vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
+        )),
+      qfs
+    ))
+  )
+end
+
+"""
+Returns command pool to use for given queue family `qf`.
+"""
+function getpool(system, qf)
+  getin(system, [:pools, getin(system, [:queues, qf])])
+end
+
 function findmemtype(system, config)
   properties = vk.get_physical_device_memory_properties(
     get(system, :physicaldevice)
@@ -273,7 +328,7 @@ function findmemtype(system, config)
 
   mt = into(
     [],
-    ds.mapindex((x, i) -> (x, i-1))
+    ds.mapindexed((x, i) -> (x, i-1))
     ∘ filter(x -> (mask & (1 << x[2])) > 0)
     ∘ filter(x -> (x[1].property_flags & flags) == flags)
     ,
@@ -288,13 +343,14 @@ end
 function buffer(system, config)
   dev = get(system, :device)
 
-  buffer = vk.unwrap(vk.create_buffer(
-    dev,
+  bci = vk.BufferCreateInfo(
     get(config, :size),
     get(config, :usage),
     get(config, :mode),
-    [ds.getin(system, [:queues, get(config, :queue)])]
-  ))
+    into([], map(x -> getin(system, [:queues, x]), get(config, :queues)))
+  )
+
+  buffer = vk.unwrap(vk.create_buffer(dev, bci))
 
   memreq = vk.get_buffer_memory_requirements(dev, buffer)
 
@@ -312,17 +368,21 @@ function buffer(system, config)
   hashmap(:buffer, buffer, :memory, memory, :size, memreq.size)
 end
 
-function commandbuffers(system, n::Int, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
+function commandbuffers(system, n::Int, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
   buffers = vk.unwrap(vk.allocate_command_buffers(
     get(system, :device),
-    vk.CommandBufferAllocateInfo(get(system, :pool), level, n)
+    vk.CommandBufferAllocateInfo(getpool(system, qf), level, n)
   ))
 end
 
 function copybuffer(system, src, dst, size, queuefamily=:transfer)
-  cmds = commandbuffers(system, 1)
-  cmd = cmds[1]
+  pool = getpool(system, queuefamily)
   queue = getqueue(system, queuefamily)
+
+  cmds = commandbuffers(system, 1, queuefamily)
+  cmd = cmds[1]
+
+  @info queuefamily, queue, pool, cmd
 
   vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
 
@@ -334,7 +394,7 @@ function copybuffer(system, src, dst, size, queuefamily=:transfer)
 
   vk.queue_wait_idle(queue)
 
-  vk.free_command_buffers(get(system, :device), get(system, :pool), cmds)
+  vk.free_command_buffers(get(system, :device), pool, cmds)
 end
 
 end
