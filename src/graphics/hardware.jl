@@ -120,16 +120,17 @@ function checkdevice(system, config)
   # features = vk.get_physical_device_features(pdev)
 
   return getin(system, [:queues, :graphics]) !== nothing &&
-    getin(system, [:queues, :presentation]) !== nothing &&
-    getin(system, [:queues, :transfer]) !== nothing &&
-    swapchainsupport(system) &&
-    containsall(
+         getin(system, [:queues, :presentation]) !== nothing &&
+         getin(system, [:queues, :transfer]) !== nothing &&
+         swapchainsupport(system) &&
+         containsall(
            getin(config, [:device, :extensions]),
            map(
              x -> x.extension_name,
              vk.unwrap(vk.enumerate_device_extension_properties(pdev))
            )
-         ) && containsall(
+         ) &&
+         containsall(
            getin(config, [:device, :validation]),
            map(
              x -> x.layer_name,
