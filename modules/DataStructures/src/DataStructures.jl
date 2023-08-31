@@ -12,6 +12,7 @@ include("./sequential.jl")
 include("./vector.jl")
 include("./list.jl")
 include("./map.jl")
+# include("./set.jl")
 include("./queue.jl")
 
 # Sequential

@@ -71,6 +71,10 @@ function conj(x)
   x
 end
 
+function conj(x, n::Nothing)
+  x
+end
+
 function concat(xs, ys)
   into(xs, ys)
 end

@@ -72,12 +72,8 @@ function emptyp(m::Map)
   count(m) == 0
 end
 
-function conj(v::Map, e::MapEntry)
-  assoc(v, e.key, e.value)
-end
-
-function conj(v::Map, e::Nothing)
-  v
+function conj(m::Map, e::MapEntry)
+  assoc(m, e.key, e.value)
 end
 
 # Clojure uses 8 and I don't want to dig into it just yet.
