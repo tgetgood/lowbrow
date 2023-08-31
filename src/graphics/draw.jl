@@ -1,20 +1,9 @@
-module commands
+module draw
 
 import hardware as hw
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, nth
-
-function pool(system, config)
-  hashmap(
-    :pool,
-    vk.unwrap(vk.create_command_pool(
-      get(system, :device),
-      getin(system, [:queues, :graphics]);
-      flags=vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-    ))
-  )
-end
 
 function syncsetup(system, config)
   hashmap(
@@ -35,7 +24,7 @@ function syncsetup(system, config)
 end
 
 
-function buffers(system, config)
+function commandbuffers(system, config)
   buffers = hw.commandbuffers(system, get(config, :concurrent_frames))
 
   hashmap(

@@ -1,7 +1,7 @@
 import hardware as hw
 import pipeline as gp
 import vertex
-import commands
+import draw
 import debug
 import window
 import Vulkan as vk
@@ -53,8 +53,8 @@ function staticinit(config)
     window.createsurface,
     hw.createdevice,
     gp.renderpass,
-    commands.pool,
-    commands.buffers
+    hw.createpools,
+    draw.commandbuffers
   ]
 
   ds.reduce((s, f) -> merge(s, f(s, config)), emptymap, steps)
@@ -96,7 +96,7 @@ function main(system, config)
       window.poll()
 
       if !window.minimised(get(system, :window))
-        res = commands.draw(system, buffers[i+1])
+        res = draw.draw(system, buffers[i+1])
 
         if res == vk.ERROR_OUT_OF_DATE_KHR ||
           res == vk.SUBOPTIMAL_KHR ||
