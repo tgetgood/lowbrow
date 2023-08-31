@@ -121,6 +121,7 @@ function checkdevice(system, config)
 
   return getin(system, [:queues, :graphics]) !== nothing &&
     getin(system, [:queues, :presentation]) !== nothing &&
+    getin(system, [:queues, :transfer]) !== nothing &&
     swapchainsupport(system) &&
     containsall(
            getin(config, [:device, :extensions]),
@@ -296,14 +297,15 @@ function createimageviews(system, config)
 end
 
 function createpools(system, config)
+  dev = get(system, :device)
   qfs = collect(Set(ds.vals(get(system, :queues))))
 
   hashmap(
     :pools,
-    ds.zipmap(qfs, map(qfs ->
+    ds.zipmap(qfs, map(qf ->
         vk.unwrap(vk.create_command_pool(
-          get(system, :device),
-          getin(system, [:queues, :graphics]);
+          dev,
+          qf,
           flags=vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
         )),
       qfs
@@ -369,9 +371,11 @@ function buffer(system, config)
 end
 
 function commandbuffers(system, n::Int, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
+  pool = getpool(system, qf)
+
   buffers = vk.unwrap(vk.allocate_command_buffers(
     get(system, :device),
-    vk.CommandBufferAllocateInfo(getpool(system, qf), level, n)
+    vk.CommandBufferAllocateInfo(pool, level, n)
   ))
 end
 
@@ -381,8 +385,6 @@ function copybuffer(system, src, dst, size, queuefamily=:transfer)
 
   cmds = commandbuffers(system, 1, queuefamily)
   cmd = cmds[1]
-
-  @info queuefamily, queue, pool, cmd
 
   vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
 
