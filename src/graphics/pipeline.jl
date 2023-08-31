@@ -4,7 +4,7 @@ import window
 import hardware as hw
 import Vulkan as vk
 import DataStructures as ds
-import DataStructures: getin, emptymap, hashmap, emptyvector, into, mapindex
+import DataStructures: getin, emptymap, hashmap, emptyvector, into, mapindexed
 
 function glslc(src, out)
   run(`glslc $(@__DIR__)/../../shaders/$src -o $out`)
@@ -110,7 +110,7 @@ function vertex_input_state(T)
     )],
     into(
       [],
-      mapindex(
+      mapindexed(
         (field, i) -> vk.VertexInputAttributeDescription(
           i - 1,
           0,

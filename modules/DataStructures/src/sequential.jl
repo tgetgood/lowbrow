@@ -116,7 +116,7 @@ function map(f, xs::Sequential)
   into(empty(xs), map(f), xs)
 end
 
-function mapindex(f::Function)
+function mapindexed(f::Function)
   index = 0
   function (emit)
     function inner()
@@ -133,8 +133,8 @@ function mapindex(f::Function)
   end
 end
 
-function mapindex(f::Function, xs::Union{Base.Vector, Sequential})
-  into(empty(xs), mapindex(f), xs)
+function mapindexed(f::Function, xs::Union{Base.Vector, Sequential})
+  into(empty(xs), mapindexed(f), xs)
 end
 
 function filter(p::Function)
