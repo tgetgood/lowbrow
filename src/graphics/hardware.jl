@@ -71,13 +71,13 @@ end
 
 function findtransferqueue(device)
   families = ds.mapindexed(
-    (x, i) -> (x, i),
+    (x, i) -> (x, i - 1),
     vk.get_physical_device_queue_family_properties(device)
   )
 
   dedicated = filter(
     x -> (x[1].queue_flags & vk.QUEUE_TRANSFER_BIT) > 0 &&
-    (x[1].queue_flags & vk.QUEUE_GRAPHICS_BIT | vk.QUEUE_COMPUTE_BIT).val == 0,
+    (x[1].queue_flags & (vk.QUEUE_GRAPHICS_BIT | vk.QUEUE_COMPUTE_BIT)).val == 0,
     families
   )
 
@@ -86,9 +86,9 @@ function findtransferqueue(device)
   else
 
     nongraphics = filter(
-    x -> (x[1].queue_flags & vk.QUEUE_TRANSFER_BIT) > 0 &&
-      (x[1].queue_flags & vk.QUEUE_GRAPHICS_BIT).val == 0,
-    families
+      x -> (x[1].queue_flags & vk.QUEUE_TRANSFER_BIT) > 0 &&
+        (x[1].queue_flags & vk.QUEUE_GRAPHICS_BIT).val == 0,
+      families
     )
 
     if length(nongraphics) > 0
@@ -116,12 +116,15 @@ end
 
 function checkdevice(system, config)
   pdev = get(system, :physicaldevice)
-  # props = vk.get_physical_device_properties(pdev)
-  # features = vk.get_physical_device_features(pdev)
+  features = vk.get_physical_device_features(pdev)
 
   return getin(system, [:queues, :graphics]) !== nothing &&
          getin(system, [:queues, :presentation]) !== nothing &&
          getin(system, [:queues, :transfer]) !== nothing &&
+         all(
+           map(x -> getproperty(features, x),
+             ds.getin(config, [:device, :features]))
+         ) &&
          swapchainsupport(system) &&
          containsall(
            getin(config, [:device, :extensions]),
@@ -233,7 +236,9 @@ function createdevice(system, config)
   dci = vk.DeviceCreateInfo(
     qcis,
     getin(config, [:device, :validation], []),
-    getin(config, [:device, :extensions], [])
+    getin(config, [:device, :extensions], []);
+    enabled_features=
+    vk.PhysicalDeviceFeatures(ds.getin(config, [:device, :features])...)
   )
 
   assoc(system, :device, vk.unwrap(vk.create_device(pdev, dci)))
@@ -264,45 +269,47 @@ function createswapchain(system, config)
   hashmap(:swapchain, vk.unwrap(sc), :extent, extent, :format, format)
 end
 
+function imageview(system, image, format)
+  vk.unwrap(vk.create_image_view(
+    get(system, :device),
+    image,
+    vk.IMAGE_VIEW_TYPE_2D,
+    format,
+    vk.ComponentMapping(
+      vk.COMPONENT_SWIZZLE_IDENTITY,
+      vk.COMPONENT_SWIZZLE_IDENTITY,
+      vk.COMPONENT_SWIZZLE_IDENTITY,
+      vk.COMPONENT_SWIZZLE_IDENTITY
+    ),
+    vk.ImageSubresourceRange(
+      vk.IMAGE_ASPECT_COLOR_BIT,
+      0,
+      1,
+      0,
+      1
+    )
+  ))
+end
+
 function createimageviews(system, config)
   dev = get(system, :device)
-  images = vk.unwrap(vk.get_swapchain_images_khr(dev, get(system, :swapchain)))
 
   hashmap(
-  :imageviews,
+    :imageviews,
     into(
       emptyvector,
-      map(image -> vk.create_image_view(
-        dev,
-        image,
-        vk.IMAGE_VIEW_TYPE_2D,
-        findformat(system, config).format,
-        vk.ComponentMapping(
-          vk.COMPONENT_SWIZZLE_IDENTITY,
-          vk.COMPONENT_SWIZZLE_IDENTITY,
-          vk.COMPONENT_SWIZZLE_IDENTITY,
-          vk.COMPONENT_SWIZZLE_IDENTITY
-        ),
-        vk.ImageSubresourceRange(
-          vk.IMAGE_ASPECT_COLOR_BIT,
-          0,
-          1,
-          0,
-          1
-        )
-      )) ∘
-      map(vk.unwrap),
-      images
+      map(image -> imageview(system, image, findformat(system, config).format)),
+      vk.unwrap(vk.get_swapchain_images_khr(dev, get(system, :swapchain)))
     )
   )
 end
 
-function createpools(system, config)
+function createcommandpools(system, config)
   dev = get(system, :device)
   qfs = collect(Set(ds.vals(get(system, :queues))))
 
   hashmap(
-    :pools,
+    :commandpools,
     ds.zipmap(qfs, map(qf ->
         vk.unwrap(vk.create_command_pool(
           dev,
@@ -314,11 +321,27 @@ function createpools(system, config)
   )
 end
 
+function createdescriptorpools(system, config)
+  n = get(config, :concurrent_frames)
+
+  hashmap(
+    :descriptorpool,
+    vk.unwrap(vk.create_descriptor_pool(
+      get(system, :device),
+      2 * n,
+      [
+        vk.DescriptorPoolSize(vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER, n),
+        vk.DescriptorPoolSize(vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, n)
+      ]
+    ))
+  )
+end
+
 """
 Returns command pool to use for given queue family `qf`.
 """
 function getpool(system, qf)
-  getin(system, [:pools, getin(system, [:queues, qf])])
+  getin(system, [:commandpools, getin(system, [:queues, qf])])
 end
 
 function findmemtype(system, config)
@@ -371,6 +394,20 @@ function buffer(system, config)
   hashmap(:buffer, buffer, :memory, memory, :size, memreq.size)
 end
 
+function transferbuffer(system, size)
+  buffer(
+    system,
+    ds.hashmap(
+      :size, size,
+      :usage, vk.BUFFER_USAGE_TRANSFER_SRC_BIT,
+      :mode, vk.SHARING_MODE_EXCLUSIVE,
+      :queues, [:transfer],
+      :memoryflags, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT |
+                    vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
+    )
+  )
+end
+
 function commandbuffers(system, n::Int, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
   pool = getpool(system, qf)
 
@@ -380,16 +417,16 @@ function commandbuffers(system, n::Int, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMAR
   ))
 end
 
-function copybuffer(system, src, dst, size, queuefamily=:transfer)
-  pool = getpool(system, queuefamily)
-  queue = getqueue(system, queuefamily)
+function commands(body, system, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
+  pool = getpool(system, qf)
+  queue = getqueue(system, qf)
 
-  cmds = commandbuffers(system, 1, queuefamily)
+  cmds = commandbuffers(system, 1, qf, level)
   cmd = cmds[1]
 
   vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
 
-  vk.cmd_copy_buffer(cmd, src, dst, [vk.BufferCopy(0,0,size)])
+  body(cmd)
 
   vk.end_command_buffer(cmd)
 
@@ -398,6 +435,150 @@ function copybuffer(system, src, dst, size, queuefamily=:transfer)
   vk.queue_wait_idle(queue)
 
   vk.free_command_buffers(get(system, :device), pool, cmds)
+end
+
+function copybuffer(system, src, dst, size, queuefamily=:transfer)
+  commands(system, queuefamily) do cmd
+    vk.cmd_copy_buffer(cmd, src, dst, [vk.BufferCopy(0,0,size)])
+  end
+end
+
+function copybuffertoimage(system, src, dst, size, qf=:transfer)
+  commands(system, qf) do cmd
+    vk.cmd_copy_buffer_to_image(
+      cmd,
+      src,
+      dst,
+      vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      [vk.BufferImageCopy(
+        0, 0, 0,
+        vk.ImageSubresourceLayers(vk.IMAGE_ASPECT_COLOR_BIT, 0, 0, 1),
+        vk.Offset3D(0,0,0),
+        vk.Extent3D(size..., 1)
+      )]
+    )
+  end
+end
+
+accessmasks = hashmap(
+  [vk.IMAGE_LAYOUT_UNDEFINED, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL],
+  hashmap(
+    :srcam, vk.AccessFlag(0),
+    :dstam, vk.ACCESS_TRANSFER_WRITE_BIT,
+    :srcstage, vk.PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+    :dststage, vk.PIPELINE_STAGE_TRANSFER_BIT
+  ),
+  [
+    vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+  ],
+  hashmap(
+    :srcam, vk.ACCESS_TRANSFER_WRITE_BIT,
+    :dstam, vk.ACCESS_SHADER_READ_BIT,
+    :srcstage, vk.PIPELINE_STAGE_TRANSFER_BIT,
+    :dststage, vk.PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+  ),
+    [
+    vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+  ],
+  hashmap(
+    :srcam, vk.ACCESS_TRANSFER_WRITE_BIT,
+    :dstam, vk.ACCESS_TRANSFER_WRITE_BIT,
+    :srcstage, vk.PIPELINE_STAGE_TRANSFER_BIT,
+    :dststage, vk.PIPELINE_STAGE_TRANSFER_BIT,
+  )
+
+)
+
+function transitionimage(system, config)
+  masks = get(accessmasks, [get(config, :srclayout), get(config, :dstlayout)])
+
+  barrier = vk.unwrap(vk.ImageMemoryBarrier(
+    get(masks, :srcam, vk.AccessFlag(0)),
+    get(masks, :dstam, vk.AccessFlag(0)),
+    get(config, :srclayout),
+    get(config, :dstlayout),
+    get(config, :srcqueue, vk.QUEUE_FAMILY_IGNORED),
+    get(config, :dstqueue, vk.QUEUE_FAMILY_IGNORED),
+    get(config, :image),
+    vk.ImageSubresourceRange(vk.IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1)
+  ))
+
+  commands(system, get(config, :qf, :transfer)) do cmd
+    vk.cmd_pipeline_barrier(
+      cmd, [], [], [barrier];
+      src_stage_mask=get(masks, :srcstage, 0),
+      dst_stage_mask=get(masks, :dststage, 0)
+    )
+  end
+
+end
+
+function createimage(system, config)
+  dev = get(system, :device)
+
+  queues::Vector{UInt32} = ds.into(
+    [], map(x -> ds.getin(system, [:queues, x])), get(config, :queues)
+  )
+
+  sharingmode = get(config, :sharingmode,
+    length(queues) == 1 ? vk.SHARING_MODE_EXCLUSIVE : vk.SHARING_MODE_CONCURRENT
+  )
+
+  image = vk.unwrap(vk.create_image(
+    dev,
+    vk.IMAGE_TYPE_2D,
+    get(config, :format),
+    vk.Extent3D(get(config, :size)..., 1),
+    1,
+    1,
+    vk.SAMPLE_COUNT_1_BIT,
+    get(config, :tiling, vk.IMAGE_TILING_OPTIMAL),
+    get(config, :usage),
+    sharingmode,
+    queues,
+    get(config, :layout, vk.IMAGE_LAYOUT_UNDEFINED)
+  ))
+
+  memreq = vk.get_image_memory_requirements(dev, image)
+
+  memory = vk.unwrap(vk.allocate_memory(
+    dev,
+    memreq.size,
+    findmemtype(system, ds.hashmap(
+      :typemask, memreq.memory_type_bits,
+      :flags, get(config, :memoryflags)
+    ))[2]
+  ))
+
+  vk.unwrap(vk.bind_image_memory(dev, image, memory, 0))
+
+  hashmap(:image, image, :memory, memory, :size, memreq.size)
+end
+
+function texturesampler(system, config)
+  props = vk.get_physical_device_properties(get(system, :physicaldevice))
+  anis = props.limits.max_sampler_anisotropy
+
+  vk.unwrap(vk.create_sampler(
+    get(system, :device),
+    vk.FILTER_LINEAR,
+    vk.FILTER_LINEAR,
+    vk.SAMPLER_MIPMAP_MODE_LINEAR,
+    vk.SAMPLER_ADDRESS_MODE_REPEAT,
+    vk.SAMPLER_ADDRESS_MODE_REPEAT,
+    vk.SAMPLER_ADDRESS_MODE_REPEAT,
+    0,
+    true,
+    anis,
+    false,
+    vk.COMPARE_OP_ALWAYS,
+    0,
+    0,
+    vk.BORDER_COLOR_INT_OPAQUE_BLACK,
+    false
+  ))
 end
 
 end

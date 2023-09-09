@@ -123,6 +123,20 @@ function vertex_input_state(T)
   )
 end
 
+function writedescriptorsets(system, config)
+  #TODO: move this and use config to build aggregate
+  vk.update_descriptor_sets(
+    get(system, :device),
+    ds.getin(system, [:ubo, :writes]),
+    []
+  )
+  ds.emptymap
+end
+
+function aggregatedsets(system, config)
+  [ds.getin(system, [:ubo, :descriptorsetlayout])]
+end
+
 function createpipelines(system, config)
   dynamic_state = vk.PipelineDynamicStateCreateInfo([
     vk.DYNAMIC_STATE_SCISSOR,
@@ -173,7 +187,11 @@ function createpipelines(system, config)
     NTuple{4, Float32}((0,0,0,0))
   )
 
-  layout = vk.unwrap(vk.create_pipeline_layout(get(system, :device), [], []))
+  layout = vk.unwrap(vk.create_pipeline_layout(
+    get(system, :device),
+    aggregatedsets(system, config),
+    []
+  ))
 
   ps = vk.unwrap(vk.create_graphics_pipelines(
     get(system, :device),
@@ -187,7 +205,7 @@ function createpipelines(system, config)
         false,
         0.0, 0.0, 0.0,
         1.0;
-        cull_mode=vk.CULL_MODE_BACK_BIT
+        cull_mode=vk.CULL_MODE_NONE
       ),
       layout,
       0,
@@ -202,7 +220,8 @@ function createpipelines(system, config)
     )]
   ))
 
-  hashmap(:pipeline, ps[1][1], :viewports, viewports, :scissors, scissors)
+  hashmap(:pipeline, ps[1][1], :viewports, viewports, :scissors, scissors,
+          :pipelinelayout, layout)
 end
 
 function createframebuffers(system, config)

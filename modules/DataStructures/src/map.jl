@@ -96,6 +96,10 @@ function get(m::Nothing, k)
   nil
 end
 
+function get(m::Nothing, k, default)
+  default
+end
+
 function get(m::Map, k, default)
   v = get(m, k)
   if v === nothing

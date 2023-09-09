@@ -1,9 +1,11 @@
 import hardware as hw
 import pipeline as gp
+import uniform
 import vertex
 import render as draw
 import debug
 import window
+import textures
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: hashmap, emptymap
@@ -12,10 +14,13 @@ function configure()
   staticconfig = hashmap(
     :shaders, hashmap(:vert, "ex1.vert", :frag, "ex1.frag"),
     :instance, hashmap(
-      :extensions, ["VK_EXT_debug_utils"],
+      :extensions, [
+        "VK_EXT_debug_utils"
+      ],
       :validation, ["VK_LAYER_KHRONOS_validation"]
     ),
     :device, hashmap(
+      :features, [:sampler_anisotropy],
       :extensions, ["VK_KHR_swapchain"],
       :validation, ["VK_LAYER_KHRONOS_validation"]
     ),
@@ -32,16 +37,36 @@ function configure()
       [[0, -0.5], [1, 1, 1]],
       [[0.5, 0.5], [0, 1, 0]],
       [[-0.5, 0.5], [0, 0, 1]],
-      [[-0.5,-0.5], [1,0,0]],
-      [[-0.6, 1.0], [1,0,1]],
-      [[-1,0], [1,1,0]],
-    ]
+      [[-1, -0.5], [1,0,0]],
+    ],
+    :indicies, [0, 1, 2, 2, 3, 0],
+    :ubo, hashmap(
+      :model, [
+        1 0 0 0
+        0 1 0 0
+        0 0 1 0
+        0 0 0 1
+      ],
+      :view, [
+        1 0 0 0
+        0 1 0 0
+        0 0 1 0
+        0 0 0 1
+      ],
+      :projection, [
+        1 0 0 0
+        0 1 0 0
+        0 0 1 0
+        0 0 0 1
+      ]
+    )
   )
 
   ds.reduce((s, f) -> f(s), staticconfig, [
     window.configure,
     debug.configure,
-    vertex.configure
+    vertex.configure,
+    uniform.configure
   ])
 end
 
@@ -53,8 +78,17 @@ function staticinit(config)
     window.createsurface,
     hw.createdevice,
     gp.renderpass,
-    hw.createpools,
-    draw.commandbuffers
+    hw.createcommandpools,
+    hw.createdescriptorpools,
+    draw.commandbuffers,
+    vertex.vertexbuffer,
+    vertex.indexbuffer,
+    uniform.allocatebuffers,
+    uniform.allocatesets,
+    # textures.textureimage,
+    # textures.allocatesets,
+    gp.writedescriptorsets,
+
   ]
 
   ds.reduce((s, f) -> merge(s, f(s, config)), emptymap, steps)
@@ -68,7 +102,6 @@ function dynamicinit(system, config)
     hw.createimageviews,
     gp.createpipelines,
     gp.createframebuffers,
-    vertex.buffer,
   ]
 
   ds.reduce((s, f) -> merge(s, f(s, config)), system, steps)
@@ -83,29 +116,40 @@ system = dynamicinit(system, config)
 
 @info "Ready"
 
+function dsets(system, config, i)
+  ubuff = get(system, :uniformbuffers)[i+1]
+  dset = ds.getin(system, [:ubo, :descriptorsets])[i+1]
+
+  (ubuff, dset)
+end
+
 function main(system, config)
   sigkill = Channel()
 
   handle = Threads.@spawn begin
-    @info "starting main loop"
-    buffers = get(system, :commandbuffers)
-    i = 0
-    frames = 0
-    t = time()
-    while !window.closep(get(system, :window)) && !isready(sigkill)
-      window.poll()
+    try
+      @info "starting main loop"
+      buffers = get(system, :commandbuffers)
+      i = 0
+      frames = 0
+      t = time()
+      while !window.closep(get(system, :window)) && !isready(sigkill)
+        window.poll()
 
-      if !window.minimised(get(system, :window))
-        res = draw.draw(system, buffers[i+1])
+        (ubuff, dset) = dsets(system, config, i)
 
-        if res == vk.ERROR_OUT_OF_DATE_KHR ||
-          res == vk.SUBOPTIMAL_KHR ||
-          get(system, :resizecb)()
-          system = dynamicinit(system, config)
+        if !window.minimised(get(system, :window))
+          uniform.setubo!(config, ubuff)
+          res = draw.draw(system, buffers[i+1], dset)
+
+          if res == vk.ERROR_OUT_OF_DATE_KHR ||
+             res == vk.SUBOPTIMAL_KHR ||
+             get(system, :resizecb)()
+            system = dynamicinit(system, config)
+          end
+          i = (i + 1) % get(config, :concurrent_frames)
         end
-        i = (i + 1) % get(config, :concurrent_frames)
       end
-   end
 
     @info "finished main loop; cleaning up"
     vk.device_wait_idle(get(system, :device))
@@ -116,6 +160,10 @@ function main(system, config)
     end
 
     @info "done"
+    catch e
+      showerror(stderr, e)
+      show(stderr, "text/plain", stacktrace(catch_backtrace()))
+    end
   end
 
   @info "returning control"
@@ -126,4 +174,4 @@ function main(system, config)
   end
 end
 
-repl_teardown = main(system, config)
+ repl_teardown = main(system, config)
