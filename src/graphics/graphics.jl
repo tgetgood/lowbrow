@@ -10,6 +10,7 @@ import Vulkan as vk
 import DataStructures as ds
 import DataStructures: hashmap, emptymap
 
+
 function configure()
   staticconfig = hashmap(
     :shaders, hashmap(:vert, "ex1.vert", :frag, "ex1.frag"),
@@ -84,11 +85,9 @@ function staticinit(config)
     vertex.vertexbuffer,
     vertex.indexbuffer,
     uniform.allocatebuffers,
-    uniform.allocatesets,
+    # uniform.allocatesets,
     textures.textureimage,
     textures.allocatesets,
-    # This needs to be after all descriptor sets are initialised.
-    gp.writedescriptorsets,
   ]
 
   ds.reduce((s, f) -> merge(s, f(s, config)), emptymap, steps)
@@ -119,8 +118,7 @@ system = dynamicinit(system, config)
 function dsets(system, config, i)
   ubuff = get(system, :uniformbuffers)[i+1]
   dset = [
-    ds.getin(system, [:ubo, :descriptorsets])[i+1],
-    first(ds.getin(system, [:textures, :descriptorsets]))
+    ds.getin(system, [:dsets, :descriptorsets])[i+1],
   ]
 
   (ubuff, dset)
@@ -177,4 +175,4 @@ function main(system, config)
   end
 end
 
-# repl_teardown = main(system, config)
+repl_teardown = main(system, config)

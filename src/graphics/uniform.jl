@@ -94,9 +94,9 @@ function setubo!(config, buffer)
   u = get(config, :ubo)
   t = time()
   p::Matrix{Float32} = [
-    1 0 0 0
-    0 cos(t) -sin(t) 0
-    0 sin(t) cos(t) 0
+    cos(t) -sin(t) 0 0
+    sin(t) cos(t) 0 0
+    0 0 1 0
     0 0 0 1
   ]
 

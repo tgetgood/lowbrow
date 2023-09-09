@@ -77,14 +77,16 @@ function textureimage(system, config)
     :qf, :graphics
   ))
 
-  return ds.hashmap(:texture, vkim)
-end
+  view =  hw.imageview(
+      system,
+      get(vkim, :image),
+      hw.findformat(system, config).format
+    )
 
-function textureimageview(system, config)
-  hw.imageview(
-    system,
-    ds.getin(system, [:texture, :image]),
-    hw.findformat(system, config).format
+  return ds.hashmap(
+    :texture, vkim,
+    :textureimageview, view,
+    :sampler, hw.texturesampler(system, config)
   )
 end
 
@@ -94,40 +96,59 @@ function allocatesets(system, config)
   layout = vk.unwrap(vk.create_descriptor_set_layout(
     dev,
     [vk.DescriptorSetLayoutBinding(
-      1,
-      vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      vk.SHADER_STAGE_FRAGMENT_BIT;
-      descriptor_count=1
-    )]
+        0,
+        vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        vk.SHADER_STAGE_VERTEX_BIT;
+        descriptor_count=1
+      ),
+      vk.DescriptorSetLayoutBinding(
+        1,
+        vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        vk.SHADER_STAGE_FRAGMENT_BIT;
+        descriptor_count=1
+      )]
   ))
-
-  @info layout
 
   dsets = vk.unwrap(vk.allocate_descriptor_sets(
     dev,
-    vk.DescriptorSetAllocateInfo(get(system, :descriptorpool), [layout])
+    vk.DescriptorSetAllocateInfo(get(system, :descriptorpool), [layout, layout])
   ))
 
-  sam = hw.texturesampler(system, config)
-  image = textureimageview(system, config)
+  sam = get(system, :sampler)
+  image = get(system, :textureimageview)
 
-  writes = [vk.WriteDescriptorSet(
-      dsets[1],
-      1,
-      0,
-      vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      [vk.DescriptorImageInfo(
-        sam, image, vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-      )],
-      [],
-      []
-    )]
+   map(x -> vk.update_descriptor_sets(
+    dev,
+    [vk.WriteDescriptorSet(
+        x[1],
+        0,
+        0,
+        vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        [],
+        [vk.DescriptorBufferInfo(0, get(x[2], :size); buffer=get(x[2], :buffer))],
+        []
+      ),
+      vk.WriteDescriptorSet(
+        x[1],
+        1,
+        0,
+        vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        [vk.DescriptorImageInfo(
+          sam, image, vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        )],
+        [],
+        []
+      )
+    ],
+    []
+  ),
+  zip(dsets, get(system, :uniformbuffers))
+  )
 
   ds.hashmap(
-    :textures, ds.hashmap(
+    :dsets, ds.hashmap(
       :descriptorsetlayout, layout,
-      :descriptorsets, dsets,
-      :writes, writes
+      :descriptorsets, dsets
     )
   )
 end
