@@ -21,7 +21,7 @@ function textureimage(system, config)
 
   rgb::Vector{UInt8} = reduce(vcat,
     map(p -> [
-        reinterpret(UInt8, p.r), reinterpret(UInt8, p.g), reinterpret(UInt8, p.b),
+        reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
         0xff
       ],
       image

@@ -102,7 +102,7 @@ function setubo!(config, buffer)
 
   u2 = MVP(u.model, u.view, tuple(p...))
 
-  unsafe_copyto!(get(buffer, :memptr), pointer(pack(u2)), 64)
+  unsafe_copyto!(get(buffer, :memptr), pointer(pack(u)), 64)
 end
 
 end

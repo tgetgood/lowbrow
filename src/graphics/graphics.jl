@@ -55,8 +55,8 @@ function configure()
         0 0 0 1
       ],
       :projection, [
-        1 0 0 0
-        0 1 0 0
+        -1 0 0 0
+        0 -1 0 0
         0 0 1 0
         0 0 0 1
       ]
