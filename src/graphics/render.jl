@@ -5,60 +5,6 @@ import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, nth
 
-# REVIEW: Should this live here? It isn't a hardware abstraction.
-# It's more of a nexus for all of the application specific bits and bobs that
-# need to be collected.
-function descriptorsets(system, config)
-  ubolayout = vk.unwrap(vk.create_descriptor_set_layout(
-    get(system, :device),
-    [vk.DescriptorSetLayoutBinding(
-      0,
-      vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      vk.SHADER_STAGE_VERTEX_BIT;
-      descriptor_count=1
-    )]
-  ))
-
-  samplerlayout = vk.unwrap(vk.create_descriptor_set_layout(
-    get(system, :device),
-    [vk.DescriptorSetLayoutBinding(
-      1,
-      vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      vk.SHADER_STAGE_FRAGMENT_BIT;
-      descriptor_count=1
-    )]
-  ))
-
-  dsets = vk.unwrap(vk.allocate_descriptor_sets(
-    get(system, :device),
-    vk.DescriptorSetAllocateInfo(
-      get(system, :descriptorpool),
-      vcat(
-        repeat([ubolayout], outer=get(config, :concurrent_frames)),
-        repeat([samplerlayout], outer=get(config, :concurrent_frames)),
-      )
-    )
-  ))
-
-  vk.update_descriptor_sets(
-    get(system, :device),
-    map(x -> vk.WriteDescriptorSet(
-        x[1],
-        0,
-        0,
-        vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        [],
-        [vk.DescriptorBufferInfo(0, sizeof(MVP); buffer=x[2])],
-        []
-      ),
-      zip(dsets, map(x -> get(x, :buffer), get(system, :uniformbuffers)))
-    ),
-    []
-  )
-
-  ds.hashmap(:descriptorsetlayout, layout, :descriptorsets, dsets)
-end
-
 function syncsetup(system, config)
   hashmap(
     :locks,
@@ -87,7 +33,7 @@ function commandbuffers(system, config)
   )
 end
 
-function recorder(system, n, cmd, descriptor)
+function recorder(system, n, cmd, descriptors)
   # REVIEW: This can probably be sped up a lot by moving all of the lookups out
   # of the body.
   #
@@ -146,7 +92,7 @@ function recorder(system, n, cmd, descriptor)
     vk.PIPELINE_BIND_POINT_GRAPHICS,
     get(system, :pipelinelayout),
     0,
-    [descriptor],
+    descriptors,
     []
   )
 
@@ -157,7 +103,7 @@ function recorder(system, n, cmd, descriptor)
   vk.unwrap(vk.end_command_buffer(cmdbuf))
 end
 
-function draw(system, cmd, descriptor)
+function draw(system, cmd, descriptors)
   dev = get(system, :device)
   timeout = typemax(Int64)
   (imagesem, rendersem, fence) = get(cmd, :locks)
@@ -180,7 +126,7 @@ function draw(system, cmd, descriptor)
     #  Don't record over unsubmitted buffer
     vk.reset_fences(dev, [fence])
 
-    recorder(system, image + 1, cmd, descriptor)
+    recorder(system, image + 1, cmd, descriptors)
 
     submission = vk.SubmitInfo(
       [imagesem],

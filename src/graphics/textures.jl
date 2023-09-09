@@ -5,6 +5,13 @@ import hardware as hw
 import DataStructures as ds
 import Vulkan as vk
 
+# REVIEW: This import automagically allows us to read the bytes out of the
+# image. *Do not remove it*!
+#
+# N.B.: Find a different jpg library. The nested opaque abstractions here are
+# shitty to work with.
+import ColorTypes.FixedPointNumbers
+
 function textureimage(system, config)
   dev = get(system, :device)
 
@@ -94,6 +101,8 @@ function allocatesets(system, config)
     )]
   ))
 
+  @info layout
+
   dsets = vk.unwrap(vk.allocate_descriptor_sets(
     dev,
     vk.DescriptorSetAllocateInfo(get(system, :descriptorpool), [layout])
@@ -104,18 +113,20 @@ function allocatesets(system, config)
 
   writes = [vk.WriteDescriptorSet(
       dsets[1],
-      0,
+      1,
       0,
       vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      [vk.DescriptorImageInfo(
+        sam, image, vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+      )],
       [],
-      [vk.DescriptorImageInfo(sam, image, layout)],
       []
     )]
 
   ds.hashmap(
     :textures, ds.hashmap(
       :descriptorsetlayout, layout,
-      :descriptorsets, dsets
+      :descriptorsets, dsets,
       :writes, writes
     )
   )

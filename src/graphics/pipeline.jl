@@ -127,14 +127,20 @@ function writedescriptorsets(system, config)
   #TODO: move this and use config to build aggregate
   vk.update_descriptor_sets(
     get(system, :device),
-    ds.getin(system, [:ubo, :writes]),
+    vcat(
+      ds.getin(system, [:ubo, :writes]),
+      ds.getin(system, [:textures, :writes])
+    ),
     []
   )
   ds.emptymap
 end
 
 function aggregatedsets(system, config)
-  [ds.getin(system, [:ubo, :descriptorsetlayout])]
+  [
+    ds.getin(system, [:ubo, :descriptorsetlayout]),
+    ds.getin(system, [:textures, :descriptorsetlayout])
+   ]
 end
 
 function createpipelines(system, config)

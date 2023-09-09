@@ -7,10 +7,11 @@ import Vulkan as vk
 struct Vertex
   position::NTuple{2, Float32}
   colour::NTuple{3, Float32}
+  texuture_coordinates::NTuple{2, Float32}
 end
 
-function vert(pos, colour)
-  Vertex(tuple(pos...), tuple(colour...))
+function vert(pos, colour, tex)
+  Vertex(tuple(pos...), tuple(colour...), tuple(tex...))
 end
 
 function verticies(xs)::Vector{Vertex}

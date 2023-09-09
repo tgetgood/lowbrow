@@ -34,10 +34,10 @@ function configure()
     ),
     :concurrent_frames, 2,
     :vertex_data, [
-      [[0, -0.5], [1, 1, 1]],
-      [[0.5, 0.5], [0, 1, 0]],
-      [[-0.5, 0.5], [0, 0, 1]],
-      [[-1, -0.5], [1,0,0]],
+      [[0, -0.5], [1, 1, 1], [1, 0]],
+      [[0.5, 0.5], [0, 1, 0], [0, 0]],
+      [[-0.5, 0.5], [0, 0, 1], [0, 1]],
+      [[-1, -0.5], [1,0,0], [1, 1]],
     ],
     :indicies, [0, 1, 2, 2, 3, 0],
     :ubo, hashmap(
@@ -85,10 +85,10 @@ function staticinit(config)
     vertex.indexbuffer,
     uniform.allocatebuffers,
     uniform.allocatesets,
-    # textures.textureimage,
-    # textures.allocatesets,
+    textures.textureimage,
+    textures.allocatesets,
+    # This needs to be after all descriptor sets are initialised.
     gp.writedescriptorsets,
-
   ]
 
   ds.reduce((s, f) -> merge(s, f(s, config)), emptymap, steps)
@@ -118,7 +118,10 @@ system = dynamicinit(system, config)
 
 function dsets(system, config, i)
   ubuff = get(system, :uniformbuffers)[i+1]
-  dset = ds.getin(system, [:ubo, :descriptorsets])[i+1]
+  dset = [
+    ds.getin(system, [:ubo, :descriptorsets])[i+1],
+    first(ds.getin(system, [:textures, :descriptorsets]))
+  ]
 
   (ubuff, dset)
 end
@@ -174,4 +177,4 @@ function main(system, config)
   end
 end
 
- repl_teardown = main(system, config)
+# repl_teardown = main(system, config)

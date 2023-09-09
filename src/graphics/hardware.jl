@@ -328,7 +328,7 @@ function createdescriptorpools(system, config)
     :descriptorpool,
     vk.unwrap(vk.create_descriptor_pool(
       get(system, :device),
-      2 * n,
+      2*n,
       [
         vk.DescriptorPoolSize(vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER, n),
         vk.DescriptorPoolSize(vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, n)
