@@ -41,29 +41,48 @@ function renderpass(system, config)
     :renderpass,
     vk.unwrap(vk.create_render_pass(
       get(system, :device),
-      [vk.AttachmentDescription(
-        getin(config, [:swapchain, :format]),
-        vk.SAMPLE_COUNT_1_BIT,
-        vk.ATTACHMENT_LOAD_OP_CLEAR,
-        vk.ATTACHMENT_STORE_OP_STORE,
-        vk.ATTACHMENT_LOAD_OP_DONT_CARE,
-        vk.ATTACHMENT_STORE_OP_DONT_CARE,
-        vk.IMAGE_LAYOUT_UNDEFINED,
-        vk.IMAGE_LAYOUT_PRESENT_SRC_KHR
-      )],
+      [
+        vk.AttachmentDescription(
+          getin(config, [:swapchain, :format]),
+          vk.SAMPLE_COUNT_1_BIT,
+          vk.ATTACHMENT_LOAD_OP_CLEAR,
+          vk.ATTACHMENT_STORE_OP_STORE,
+          vk.ATTACHMENT_LOAD_OP_DONT_CARE,
+          vk.ATTACHMENT_STORE_OP_DONT_CARE,
+          vk.IMAGE_LAYOUT_UNDEFINED,
+          vk.IMAGE_LAYOUT_PRESENT_SRC_KHR
+        ),
+        vk.AttachmentDescription(
+          hw.optdepthformat(system),
+          vk.SAMPLE_COUNT_1_BIT,
+          vk.ATTACHMENT_LOAD_OP_CLEAR,
+          vk.ATTACHMENT_STORE_OP_DONT_CARE,
+          vk.ATTACHMENT_LOAD_OP_DONT_CARE,
+          vk.ATTACHMENT_STORE_OP_DONT_CARE,
+          vk.IMAGE_LAYOUT_UNDEFINED,
+          vk.IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        )
+      ],
       [vk.SubpassDescription(
         vk.PIPELINE_BIND_POINT_GRAPHICS,
         [],
         [vk.AttachmentReference(0, vk.IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)],
-        []
+        [];
+        depth_stencil_attachment=vk.AttachmentReference(
+          1,
+          vk.IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        )
       )],
       [vk.SubpassDependency(
         vk.SUBPASS_EXTERNAL,
         0;
-        src_stage_mask=vk.PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        src_stage_mask=vk.PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                       vk.PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
         src_access_mask=0,
-        dst_stage_mask=vk.PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        dst_access_mask=vk.ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+        dst_stage_mask=vk.PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                       vk.PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+        dst_access_mask=vk.ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                        vk.ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
       )]
     ))
   )
@@ -185,6 +204,27 @@ function createpipelines(system, config)
     []
   ))
 
+  stencil_stub = vk.StencilOpState(
+    vk.StencilOp(0),
+    vk.StencilOp(0),
+    vk.StencilOp(0),
+    vk.COMPARE_OP_LESS,
+    0,
+    0,
+    0
+  )
+  depth_stencil_state = vk.PipelineDepthStencilStateCreateInfo(
+    true,
+    true,
+    vk.COMPARE_OP_LESS,
+    false,
+    false,
+    stencil_stub,
+    stencil_stub,
+    0,
+    1
+  )
+
   ps = vk.unwrap(vk.create_graphics_pipelines(
     get(system, :device),
     [vk.GraphicsPipelineCreateInfo(
@@ -208,6 +248,7 @@ function createpipelines(system, config)
       multisample_state,
       color_blend_state,
       dynamic_state,
+      depth_stencil_state,
       render_pass=get(system, :renderpass)
     )]
   ))
@@ -221,6 +262,7 @@ function createframebuffers(system, config)
   images = get(system, :imageviews)
   pass = get(system, :renderpass)
   extent = get(system, :extent)
+  depthview = ds.getin(system, [:depth, :view])
 
   hashmap(
     :framebuffers,
@@ -229,7 +271,7 @@ function createframebuffers(system, config)
       map(image -> vk.create_framebuffer(
         dev,
         pass,
-        [image],
+        [image, depthview],
         extent.width,
         extent.height,
         1

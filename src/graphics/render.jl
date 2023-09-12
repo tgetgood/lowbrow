@@ -61,9 +61,10 @@ function recorder(system, n, cmd, descriptors)
       render_pass,
       framebuffers[n],
       scissors[1],
-      [vk.ClearValue(
-        vk.ClearColorValue((Float32(0), Float32(0), Float32(0), Float32(1)))
-      )]
+      [
+        vk.ClearValue(vk.ClearColorValue((0f0, 0f0, 0f0, 1f0))),
+        vk.ClearValue(vk.ClearDepthStencilValue(1, 0)),
+      ]
     ),
     vk.SUBPASS_CONTENTS_INLINE
   )

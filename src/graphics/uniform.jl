@@ -98,7 +98,7 @@ function setubo!(config, buffer)
   p::Matrix{Float32} = [
     c 0 s 0
     0 1 0 0
-    -s 0 c 0.4
+    -s 0 c 0.6
     0 0 0 1
 
     # cos(t) -sin(t) 0 0
