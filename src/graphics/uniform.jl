@@ -93,16 +93,23 @@ end
 function setubo!(config, buffer)
   u = get(config, :ubo)
   t = time()
+  c = cos(t)
+  s = sin(t)
   p::Matrix{Float32} = [
-    cos(t) -sin(t) 0 0
-    sin(t) cos(t) 0 0
-    0 0 1 0
+    c 0 s 0
+    0 1 0 0
+    -s 0 c 0.4
     0 0 0 1
+
+    # cos(t) -sin(t) 0 0
+    # sin(t) cos(t) 0 0
+    # 0 0 1 0.4
+    # 0 0 0 1
   ]
 
   u2 = MVP(u.model, u.view, tuple(p...))
 
-  unsafe_copyto!(get(buffer, :memptr), pointer(pack(u)), 64)
+  unsafe_copyto!(get(buffer, :memptr), pointer(pack(u2)), 64)
 end
 
 end

@@ -269,12 +269,12 @@ function createswapchain(system, config)
   hashmap(:swapchain, vk.unwrap(sc), :extent, extent, :format, format)
 end
 
-function imageview(system, image, format)
+function imageview(system, config, image)
   vk.unwrap(vk.create_image_view(
     get(system, :device),
     image,
     vk.IMAGE_VIEW_TYPE_2D,
-    format,
+    get(config, :format),
     vk.ComponentMapping(
       vk.COMPONENT_SWIZZLE_IDENTITY,
       vk.COMPONENT_SWIZZLE_IDENTITY,
@@ -282,26 +282,13 @@ function imageview(system, image, format)
       vk.COMPONENT_SWIZZLE_IDENTITY
     ),
     vk.ImageSubresourceRange(
-      vk.IMAGE_ASPECT_COLOR_BIT,
+      get(config, :aspect, vk.IMAGE_ASPECT_COLOR_BIT),
       0,
       1,
       0,
       1
     )
   ))
-end
-
-function createimageviews(system, config)
-  dev = get(system, :device)
-
-  hashmap(
-    :imageviews,
-    into(
-      emptyvector,
-      map(image -> imageview(system, image, findformat(system, config).format)),
-      vk.unwrap(vk.get_swapchain_images_khr(dev, get(system, :swapchain)))
-    )
-  )
 end
 
 function createcommandpools(system, config)
@@ -417,104 +404,6 @@ function commandbuffers(system, n::Int, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMAR
   ))
 end
 
-function commands(body, system, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
-  pool = getpool(system, qf)
-  queue = getqueue(system, qf)
-
-  cmds = commandbuffers(system, 1, qf, level)
-  cmd = cmds[1]
-
-  vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
-
-  body(cmd)
-
-  vk.end_command_buffer(cmd)
-
-  vk.queue_submit(queue, [vk.SubmitInfo([],[],[cmd],[])])
-
-  vk.queue_wait_idle(queue)
-
-  vk.free_command_buffers(get(system, :device), pool, cmds)
-end
-
-function copybuffer(system, src, dst, size, queuefamily=:transfer)
-  commands(system, queuefamily) do cmd
-    vk.cmd_copy_buffer(cmd, src, dst, [vk.BufferCopy(0,0,size)])
-  end
-end
-
-function copybuffertoimage(system, src, dst, size, qf=:transfer)
-  commands(system, qf) do cmd
-    vk.cmd_copy_buffer_to_image(
-      cmd,
-      src,
-      dst,
-      vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-      [vk.BufferImageCopy(
-        0, 0, 0,
-        vk.ImageSubresourceLayers(vk.IMAGE_ASPECT_COLOR_BIT, 0, 0, 1),
-        vk.Offset3D(0,0,0),
-        vk.Extent3D(size..., 1)
-      )]
-    )
-  end
-end
-
-accessmasks = hashmap(
-  [vk.IMAGE_LAYOUT_UNDEFINED, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL],
-  hashmap(
-    :srcam, vk.AccessFlag(0),
-    :dstam, vk.ACCESS_TRANSFER_WRITE_BIT,
-    :srcstage, vk.PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-    :dststage, vk.PIPELINE_STAGE_TRANSFER_BIT
-  ),
-  [
-    vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-  ],
-  hashmap(
-    :srcam, vk.ACCESS_TRANSFER_WRITE_BIT,
-    :dstam, vk.ACCESS_SHADER_READ_BIT,
-    :srcstage, vk.PIPELINE_STAGE_TRANSFER_BIT,
-    :dststage, vk.PIPELINE_STAGE_FRAGMENT_SHADER_BIT
-  ),
-    [
-    vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-  ],
-  hashmap(
-    :srcam, vk.ACCESS_TRANSFER_WRITE_BIT,
-    :dstam, vk.ACCESS_TRANSFER_WRITE_BIT,
-    :srcstage, vk.PIPELINE_STAGE_TRANSFER_BIT,
-    :dststage, vk.PIPELINE_STAGE_TRANSFER_BIT,
-  )
-
-)
-
-function transitionimage(system, config)
-  masks = get(accessmasks, [get(config, :srclayout), get(config, :dstlayout)])
-
-  barrier = vk.unwrap(vk.ImageMemoryBarrier(
-    get(masks, :srcam, vk.AccessFlag(0)),
-    get(masks, :dstam, vk.AccessFlag(0)),
-    get(config, :srclayout),
-    get(config, :dstlayout),
-    get(config, :srcqueue, vk.QUEUE_FAMILY_IGNORED),
-    get(config, :dstqueue, vk.QUEUE_FAMILY_IGNORED),
-    get(config, :image),
-    vk.ImageSubresourceRange(vk.IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1)
-  ))
-
-  commands(system, get(config, :qf, :transfer)) do cmd
-    vk.cmd_pipeline_barrier(
-      cmd, [], [], [barrier];
-      src_stage_mask=get(masks, :srcstage, 0),
-      dst_stage_mask=get(masks, :dststage, 0)
-    )
-  end
-
-end
-
 function createimage(system, config)
   dev = get(system, :device)
 
@@ -579,6 +468,89 @@ function texturesampler(system, config)
     vk.BORDER_COLOR_INT_OPAQUE_BLACK,
     false
   ))
+end
+
+function finddepthformats(system, config)
+  pdev = get(system, :physicaldevice)
+  reqs = get(config, :features)
+
+  function getfeats(x)
+    t = get(config, :tiling)
+    if t == vk.IMAGE_TILING_LINEAR
+      x.linear_tiling_features
+    elseif t == vk.IMAGE_TILING_OPTIMAL
+      x.optimal_tiling_features
+    end
+  end
+
+  candidates = ds.into(
+    [],
+    map(x -> (x, vk.get_physical_device_format_properties(pdev, x)))
+    ∘
+    filter(x -> (reqs & getfeats(x[2])) > 0),
+    get(config, :formats)
+  )
+
+  @assert length(candidates) > 0
+
+  return first(candidates)[1]
+end
+
+optdepthformat(system) = finddepthformats(
+  system,
+  hashmap(
+    :tiling, vk.IMAGE_TILING_OPTIMAL,
+    :features, vk.FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    :formats, [
+      vk.FORMAT_D32_SFLOAT,
+      vk.FORMAT_D24_UNORM_S8_UINT,
+      vk.FORMAT_D32_SFLOAT_S8_UINT,
+    ]
+  )
+)
+
+function depthresources(system, config)
+  format = optdepthformat(system)
+
+  ex = get(system, :extent)
+  image = createimage(system,
+    hashmap(
+      :tiling, vk.IMAGE_TILING_OPTIMAL,
+      :format, format,
+      :size, [ex.width, ex.height],
+      :usage, vk.IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+      :queues, [:graphics],
+      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    )
+  )
+
+  view = imageview(
+    system,
+    hashmap(
+      :format, format,
+      :aspect, vk.IMAGE_ASPECT_DEPTH_BIT
+    ),
+    get(image, :image)
+  )
+
+  assoc(image, :view, view)
+end
+
+function createimageviews(system, config)
+  dev = get(system, :device)
+
+  hashmap(
+    :imageviews, into(
+      emptyvector,
+      map(image -> imageview(
+        system,
+        hashmap(:format, findformat(system, config).format),
+        image
+      )),
+      vk.unwrap(vk.get_swapchain_images_khr(dev, get(system, :swapchain)))
+    ),
+    :depth, depthresources(system, config)
+  )
 end
 
 end

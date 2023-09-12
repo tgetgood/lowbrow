@@ -4,6 +4,7 @@ import FileIO: load
 import hardware as hw
 import DataStructures as ds
 import Vulkan as vk
+import commands
 
 # REVIEW: This import automagically allows us to read the bytes out of the
 # image. *Do not remove it*!
@@ -50,37 +51,48 @@ function textureimage(system, config)
     :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
   ))
 
-  # TODO: Combine the 4 commands into 1 buffer.
+  commands.cmdseq(system, :transfer) do cmd
+    commands.transitionimage(cmd, system, ds.hashmap(
+      :image, get(vkim, :image),
+      :srclayout, vk.IMAGE_LAYOUT_UNDEFINED,
+      :dstlayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      :dstaccess, vk.ACCESS_TRANSFER_WRITE_BIT,
+      :srcstage, vk.PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      :dststage, vk.PIPELINE_STAGE_TRANSFER_BIT
+    ))
 
-  hw.transitionimage(system, ds.hashmap(
-    :image, get(vkim, :image),
-    :srclayout, vk.IMAGE_LAYOUT_UNDEFINED,
-    :dstlayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-  ))
+    commands.copybuffertoimage(
+      cmd, system, get(staging, :buffer), get(vkim, :image), size(image)
+    )
 
-  hw.copybuffertoimage(
-    system, get(staging, :buffer), get(vkim, :image), size(image)
-  )
+    commands.transitionimage(cmd, system, ds.hashmap(
+      :image, get(vkim, :image),
+      :srclayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      :dstlayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      :srcaccess, vk.ACCESS_TRANSFER_WRITE_BIT,
+      :dstaccess, vk.ACCESS_TRANSFER_WRITE_BIT,
+      :srcstage, vk.PIPELINE_STAGE_TRANSFER_BIT,
+      :dststage, vk.PIPELINE_STAGE_TRANSFER_BIT,
+      :srcqueue, ds.getin(system, [:queues, :transfer]),
+      :dstqueue, ds.getin(system, [:queues, :graphics])
+    ))
+  end
 
-  hw.transitionimage(system, ds.hashmap(
-    :image, get(vkim, :image),
-    :srclayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    :dstlayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    :srcqueue, ds.getin(system, [:queues, :transfer]),
-    :dstqueue, ds.getin(system, [:queues, :graphics])
-  ))
-
-  hw.transitionimage(system, ds.hashmap(
+  commands.transitionimage(system, ds.hashmap(
     :image, get(vkim, :image),
     :srclayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
     :dstlayout, vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    :srcaccess, vk.ACCESS_TRANSFER_WRITE_BIT,
+    :dstaccess, vk.ACCESS_SHADER_READ_BIT,
+    :srcstage, vk.PIPELINE_STAGE_TRANSFER_BIT,
+    :dststage, vk.PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
     :qf, :graphics
   ))
 
-  view =  hw.imageview(
+  view = hw.imageview(
       system,
+      ds.hashmap(:format, hw.findformat(system, config).format),
       get(vkim, :image),
-      hw.findformat(system, config).format
     )
 
   return ds.hashmap(
