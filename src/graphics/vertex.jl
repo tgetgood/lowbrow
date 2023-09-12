@@ -2,10 +2,11 @@ module vertex
 
 import DataStructures as ds
 import hardware as hw
+import commands
 import Vulkan as vk
 
 struct Vertex
-  position::NTuple{2, Float32}
+  position::NTuple{3, Float32}
   colour::NTuple{3, Float32}
   texuture_coordinates::NTuple{2, Float32}
 end
@@ -43,7 +44,7 @@ function vertexbuffer(system, config)
     )
   )
 
-  hw.copybuffer(
+  commands.copybuffer(
     system,
     get(staging, :buffer),
     get(buffer, :buffer),
@@ -79,7 +80,7 @@ function indexbuffer(system, config)
     )
   )
 
-  hw.copybuffer(
+  commands.copybuffer(
     system,
     get(staging, :buffer), get(buffer, :buffer), get(buffer, :size)
   )
