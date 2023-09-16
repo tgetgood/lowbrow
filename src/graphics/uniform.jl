@@ -92,7 +92,8 @@ end
 
 function setubo!(config, buffer)
   u = get(config, :ubo)
-  t = time()
+  t = time()/2
+  # t = 2*pi/3
   c = cos(t)
   s = sin(t)
   p::Matrix{Float32} = [

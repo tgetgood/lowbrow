@@ -11,6 +11,8 @@ import commands
 #
 # N.B.: Find a different jpg library. The nested opaque abstractions here are
 # shitty to work with.
+#
+# png and jpg load as transposes of each other. Is that my fault?
 import ColorTypes.FixedPointNumbers
 
 function textureimage(system, config)

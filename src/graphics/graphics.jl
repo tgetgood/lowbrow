@@ -2,7 +2,7 @@ import hardware as hw
 import pipeline as gp
 import uniform
 import vertex
-# import model
+import model
 import render as draw
 import debug
 import window
@@ -66,6 +66,7 @@ function scale(x::Real)
 end
 
 
+x = pi/3
 function configure()
   staticconfig = hashmap(
     :shaders, hashmap(:vert, "ex1.vert", :frag, "ex1.frag"),
@@ -81,7 +82,7 @@ function configure()
       :validation, ["VK_LAYER_KHRONOS_validation"]
     ),
     :debuglevel, vk.DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
-    :window, hashmap(:width, 800, :height, 600),
+    :window, hashmap(:width, 1600, :height, 1200),
     :swapchain, hashmap(
       :format, vk.FORMAT_B8G8R8A8_SRGB,
       :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
@@ -109,8 +110,8 @@ function configure()
     :ubo, hashmap(
       :model, [
         1 0 0 0
-        0 1 0 0
-        0 0 1 0
+        0 cos(x) -sin(x) 0
+        0 sin(x) cos(x) 0
         0 0 0 1
       ],
       :view, [
@@ -142,9 +143,9 @@ function staticinit(config)
     hw.createcommandpools,
     hw.createdescriptorpools,
     draw.commandbuffers,
-    (x, y) -> vertex.vertexbuffer(x, get(y, :vertex_data)),
-    (x, y) -> vertex.indexbuffer(x, get(y, :indicies)),
-    # model.load,
+    # (x, y) -> vertex.vertexbuffer(x, get(y, :vertex_data)),
+    # (x, y) -> vertex.indexbuffer(x, get(y, :indicies)),
+    model.load,
     uniform.allocatebuffers,
     # uniform.allocatesets,
     textures.textureimage,

@@ -36,9 +36,9 @@ function tofloat(v)
 end
 
 function triplev(f, vs, ts)
-  t = map(x -> parse(UInt, x), split(f, "/"))
-  tex = ts[t[2](1 - tex[1], 1 - tex[2]))]
-  vert(vs[t[1]], tex)
+  t = map(x -> parse(Int, x), split(f, "/"))
+  tex = ts[t[2]]
+  vert(vs[t[1]], (1f0-tex[2], tex[1]))
 end
 
 function load(system, config)
