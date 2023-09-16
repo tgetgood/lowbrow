@@ -2,6 +2,7 @@ import hardware as hw
 import pipeline as gp
 import uniform
 import vertex
+# import model
 import render as draw
 import debug
 import window
@@ -10,11 +11,60 @@ import Vulkan as vk
 import DataStructures as ds
 import DataStructures: hashmap, emptymap
 
-a = -pi/6
-c = cos(a)
-s = sin(a)
+function rotateX(a)
+  c = cos(a)
+  s = sin(a)
 
-z = -pi/4
+  return [
+    1 0 0 0
+    0 c -s 0
+    0 s c 0
+    0 0 0 1
+  ]
+end
+
+function rotateY(a)
+  c = cos(a)
+  s = sin(a)
+
+  return [
+    c 0 s 0
+    0 1 0 0
+   -s 0 c 0
+    0 0 0 1
+  ]
+end
+
+function rotateZ(a)
+  c = cos(a)
+  s = sin(a)
+
+  return [
+    c -s 0 0
+    s c 0 0
+    0 0 1 0
+    0 0 0 1
+  ]
+end
+
+function translate(v)
+  [
+    1 0 0 v[1]
+    0 1 0 v[2]
+    0 0 1 v[3]
+    0 0 0 1
+  ]
+end
+
+function scale(x::Real)
+  [
+    1 0 0 0
+    0 1 0 0
+    0 0 1 0
+    0 0 0 1/x
+  ]
+end
+
 
 function configure()
   staticconfig = hashmap(
@@ -40,24 +90,26 @@ function configure()
     ),
     :concurrent_frames, 2,
     :vertex_data, [
-      [[-0.5, -0.5, 0.1], [1, 0, 0], [0, 0]],
-      [[0.5, -0.5, 0.1], [0, 1, 0], [1, 0]],
-      [[0.5, 0.5, 0.1], [0, 0, 1], [1, 1]],
-      [[-0.5, 0.5, 0.1], [1, 1, 1], [0, 1]],
+      [[-0.5, -0.5, 0.3], [1, 0, 0], [0, 0]],
+      [[0.5, -0.5, 0.3], [0, 1, 0], [1, 0]],
+      [[0.5, 0.5, 0.3], [0, 0, 1], [1, 1]],
+      [[-0.5, 0.5, 0.3], [1, 1, 1], [0, 1]],
 
-      [[-0.5, -0.5, 0.5], [1, 1, 1], [0, 0]],
-      [[0.5, -0.5, 0.5], [0, 1, 0], [1, 0]],
-      [[0.5, 0.5, 0.5], [0, 1, 0], [1, 1]],
-      [[-0.5, 0.5, 0.5], [0, 0, 1], [0, 1]],
+      [[-0.5, -0.5, 0.7], [1, 1, 1], [0, 0]],
+      [[0.5, -0.5, 0.7], [0, 1, 0], [1, 0]],
+      [[0.5, 0.5, 0.7], [0, 1, 0], [1, 1]],
+      [[-0.5, 0.5, 0.7], [0, 0, 1], [0, 1]],
     ],
     :indicies, [
       0, 1, 2, 2, 3, 0,
       4, 5, 6, 6, 7, 4,
     ],
+    :texture_file, *(@__DIR__, "/../../assets/viking_room.png"),
+    :model_file, *(@__DIR__, "/../../assets/viking_room.obj"),
     :ubo, hashmap(
       :model, [
-        -s c 0 0
-        c s 0 0
+        1 0 0 0
+        0 1 0 0
         0 0 1 0
         0 0 0 1
       ],
@@ -66,17 +118,8 @@ function configure()
         0 1 0 0
         0 0 1 0
         0 0 0 1
-        # c 0 -s 0
-        # s^2 c -s*c 0
-        # -s*c s c^2 0
-        # 0 0 0 1
       ],
-      :projection, [
-        cos(z) -sin(z) 0 0
-        sin(z) cos(z) 0 0
-        0 0 1 0.4
-        0 0 0 1
-      ]
+      :projection, rotateY(pi/3)
     )
   )
 
@@ -99,8 +142,9 @@ function staticinit(config)
     hw.createcommandpools,
     hw.createdescriptorpools,
     draw.commandbuffers,
-    vertex.vertexbuffer,
-    vertex.indexbuffer,
+    (x, y) -> vertex.vertexbuffer(x, get(y, :vertex_data)),
+    (x, y) -> vertex.indexbuffer(x, get(y, :indicies)),
+    # model.load,
     uniform.allocatebuffers,
     # uniform.allocatesets,
     textures.textureimage,
@@ -144,6 +188,10 @@ end
 function main(system, config)
   sigkill = Channel()
 
+  # The number of some types of Vulkan objects that can be created is
+  # limited. Make sure finalisers run to clean up between iterations.
+  GC.gc()
+
   handle = Threads.@spawn begin
     try
       @info "starting main loop"
@@ -169,15 +217,15 @@ function main(system, config)
         end
       end
 
-    @info "finished main loop; cleaning up"
-    vk.device_wait_idle(get(system, :device))
-    window.shutdown()
+      @info "finished main loop; cleaning up"
+      vk.device_wait_idle(get(system, :device))
+      window.shutdown()
 
-    if isready(sigkill)
-      take!(sigkill)
-    end
+      if isready(sigkill)
+        take!(sigkill)
+      end
 
-    @info "done"
+      @info "done"
     catch e
       showerror(stderr, e)
       show(stderr, "text/plain", stacktrace(catch_backtrace()))

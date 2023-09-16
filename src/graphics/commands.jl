@@ -43,7 +43,6 @@ function copybuffertoimage(cmd, system, src, dst, size, qf=:transfer)
 end
 
 function transitionimage(cmd, system::ds.Map, config)
-  masks = get(accessmasks, [get(config, :srclayout), get(config, :dstlayout)])
   aspect = get(config, :aspect, vk.IMAGE_ASPECT_COLOR_BIT)
 
   barrier = vk.unwrap(vk.ImageMemoryBarrier(

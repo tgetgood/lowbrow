@@ -98,6 +98,7 @@ function recorder(system, n, cmd, descriptors)
   )
 
   vk.cmd_draw_indexed(cmdbuf, getin(system, [:indexbuffer, :verticies]), 1, 0, 0, 0)
+  # vk.cmd_draw(cmdbuf, ds.getin(system, [:vertexbuffer, :size]), 1, 0, 0)
 
   vk.cmd_end_render_pass(cmdbuf)
 

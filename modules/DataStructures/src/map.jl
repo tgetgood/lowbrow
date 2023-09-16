@@ -307,6 +307,10 @@ function hashmap(args...)
   return out
 end
 
+function merge(x::Map)
+  x
+end
+
 function merge(x::Map, y::Map)
   into(x, y)
 end

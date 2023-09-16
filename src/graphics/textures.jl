@@ -16,7 +16,8 @@ import ColorTypes.FixedPointNumbers
 function textureimage(system, config)
   dev = get(system, :device)
 
-  image = load(*(@__DIR__, "/../../assets/texture.jpg"))
+
+  image = load(get(config, :texture_file))
 
   pixels = reduce(*, size(image))
 
@@ -102,6 +103,9 @@ function textureimage(system, config)
   )
 end
 
+# TODO: The uniform and texture sampler are confounded here. They need to be
+# allocated together, so that should happen around pipeline creation from specs
+# created elsewhere.
 function allocatesets(system, config)
   dev = get(system, :device)
 

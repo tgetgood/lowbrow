@@ -199,7 +199,7 @@ function partition(n)
     end
     function inner(result)
       if count(acc) > 0
-        emit(result, acc)
+        emit(emit(result, acc))
       else
         emit(result)
       end
@@ -211,7 +211,7 @@ function partition(n)
         acc = emptyvector
         emit(result, t)
       else
-        emit(result)
+        result
       end
     end
     return inner

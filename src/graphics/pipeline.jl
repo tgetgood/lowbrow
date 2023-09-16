@@ -233,11 +233,11 @@ function createpipelines(system, config)
         false,
         false,
         vk.POLYGON_MODE_FILL,
-        vk.FRONT_FACE_COUNTER_CLOCKWISE,
+        vk.FRONT_FACE_CLOCKWISE,
         false,
         0.0, 0.0, 0.0,
         1.0;
-        cull_mode=vk.CULL_MODE_NONE
+        cull_mode=vk.CULL_MODE_BACK_BIT
       ),
       layout,
       0,

@@ -19,9 +19,7 @@ function verticies(xs)::Vector{Vertex}
   ds.into([], map(x -> vert(x...)), xs)
 end
 
-function vertexbuffer(system, config)
-  data = get(config, :vertex_data)
-
+function vertexbuffer(system, data)
   staging = hw.transferbuffer(system, sizeof(data))
 
   memptr::Ptr{eltype(data)} = vk.unwrap(vk.map_memory(
@@ -55,8 +53,14 @@ function vertexbuffer(system, config)
   ds.hashmap(:vertexbuffer, ds.assoc(buffer, :verticies, length(data)))
 end
 
-function indexbuffer(system, config)
-  indicies = convert(Vector{UInt16}, get(config, :indicies))
+function indexbuffer(system, xs)
+  if length(xs) < typemax(UInt16)
+    T = UInt16
+  else
+    T = UInt32
+  end
+
+  indicies = convert(Vector{T}, xs)
   bytes = sizeof(indicies)
 
   staging = hw.transferbuffer(system, bytes)
@@ -64,7 +68,7 @@ function indexbuffer(system, config)
   dev = get(system, :device)
   mem = get(staging, :memory)
 
-  memptr::Ptr{UInt16} = vk.unwrap(vk.map_memory(dev, mem, 0, bytes))
+  memptr::Ptr{T} = vk.unwrap(vk.map_memory(dev, mem, 0, bytes))
   unsafe_copyto!(memptr, pointer(indicies), length(indicies))
   vk.unmap_memory(dev, mem)
 
@@ -82,14 +86,14 @@ function indexbuffer(system, config)
 
   commands.copybuffer(
     system,
-    get(staging, :buffer), get(buffer, :buffer), get(buffer, :size)
+    get(staging, :buffer), get(buffer, :buffer), bytes
   )
 
   ds.hashmap(
     :indexbuffer,
     ds.assoc(buffer,
       :verticies, length(indicies),
-      :type, vk.INDEX_TYPE_UINT16)
+      :type, T == UInt16 ? vk.INDEX_TYPE_UINT16 : vk.INDEX_TYPE_UINT32)
   )
 end
 
