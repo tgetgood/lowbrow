@@ -5,6 +5,14 @@ struct MapEntry
   value::Any
 end
 
+function key(x::MapEntry)
+  x.key
+end
+
+function val(x::MapEntry)
+  x.value
+end
+
 struct PersistentArrayMap <: Map
   kvs::Vector
 end
@@ -237,8 +245,8 @@ function nodewalkupdate(m::MapEntry, entry::MapEntry, hs, level)
   if m.key == entry.key
     return entry, 0
   elseif first(mh) == first(hs)
-    child = nodewalkupdate(emptyhashnode, m, hashseq(m.key), level + 1)
-    child = nodewalkupdate(child, entry, hs, level + 1)
+    childnode, _ = nodewalkupdate(emptyhashnode, m, hashseq(m.key), level + 1)
+    child, _ = nodewalkupdate(childnode, entry, hs, level + 1)
 
     parent = assoc(emptyhashnode.ht, first(mh) + 1, child)
 
