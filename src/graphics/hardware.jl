@@ -272,7 +272,7 @@ end
 function imageview(system, config, image)
   vk.unwrap(vk.create_image_view(
     get(system, :device),
-    image,
+    get(image, :image),
     vk.IMAGE_VIEW_TYPE_2D,
     get(config, :format),
     vk.ComponentMapping(
@@ -284,7 +284,7 @@ function imageview(system, config, image)
     vk.ImageSubresourceRange(
       get(config, :aspect, vk.IMAGE_ASPECT_COLOR_BIT),
       0,
-      1,
+      get(image, :mips, 1),
       0,
       1
     )
@@ -406,6 +406,7 @@ end
 
 function createimage(system, config)
   dev = get(system, :device)
+  mips = get(config, :mips, 1)
 
   queues::Vector{UInt32} = ds.into(
     [], map(x -> ds.getin(system, [:queues, x])), get(config, :queues)
@@ -420,7 +421,7 @@ function createimage(system, config)
     vk.IMAGE_TYPE_2D,
     get(config, :format),
     vk.Extent3D(get(config, :size)..., 1),
-    1,
+    mips,
     1,
     vk.SAMPLE_COUNT_1_BIT,
     get(config, :tiling, vk.IMAGE_TILING_OPTIMAL),
@@ -443,7 +444,7 @@ function createimage(system, config)
 
   vk.unwrap(vk.bind_image_memory(dev, image, memory, 0))
 
-  hashmap(:image, image, :memory, memory, :size, memreq.size)
+  hashmap(:image, image, :memory, memory, :size, memreq.size, :mips, mips)
 end
 
 function texturesampler(system, config)
@@ -530,7 +531,7 @@ function depthresources(system, config)
       :format, format,
       :aspect, vk.IMAGE_ASPECT_DEPTH_BIT
     ),
-    get(image, :image)
+    image
   )
 
   assoc(image, :view, view)
@@ -545,7 +546,7 @@ function createimageviews(system, config)
       map(image -> imageview(
         system,
         hashmap(:format, findformat(system, config).format),
-        image
+        hashmap(:image, image)
       )),
       vk.unwrap(vk.get_swapchain_images_khr(dev, get(system, :swapchain)))
     ),

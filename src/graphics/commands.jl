@@ -52,9 +52,8 @@ function transitionimage(cmd, system::ds.Map, config)
     get(config, :dstlayout),
     get(config, :srcqueue, vk.QUEUE_FAMILY_IGNORED),
     get(config, :dstqueue, vk.QUEUE_FAMILY_IGNORED),
-    get(config, :image),
-    vk.ImageSubresourceRange(aspect, 0, 1, 0, 1)
-  ))
+    ds.getin(config, [:image, :image]),
+    vk.ImageSubresourceRange(aspect, 0, ds.getin(config, [:image, :mips]), 0, 1)))
 
   vk.cmd_pipeline_barrier(
     cmd, [], [], [barrier];

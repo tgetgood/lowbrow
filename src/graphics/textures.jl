@@ -15,27 +15,14 @@ import commands
 # png and jpg load as transposes of each other. Is that my fault?
 import ColorTypes.FixedPointNumbers
 
-# function tt(x)
-#   print(string(x) * ": ")
-#   @time rgb = ds.into(
-#     ds.emptyvector,
-#     map(p -> [
-#         reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
-#         0xff
-#       ])
-#     ∘
-#     ds.cat(),
-#     ds.take(x, image)
-#   )
-#   nothing
-# end
-
 function textureimage(system, config)
   dev = get(system, :device)
 
   image = load(get(config, :texture_file))
 
   pixels = reduce(*, size(image))
+
+  mips = Int(1 + floor(log2(max(size(image)...))))
 
   rgb::Vector{UInt8} = reduce(vcat,
     map(p -> [
@@ -63,6 +50,7 @@ function textureimage(system, config)
     :format, vk.FORMAT_B8G8R8A8_SRGB,
     :queues, [:transfer, :graphics],
     :size, size(image),
+    :mips, mips,
     :sharingmode, vk.SHARING_MODE_EXCLUSIVE,
     :usage, vk.IMAGE_USAGE_TRANSFER_DST_BIT | vk.IMAGE_USAGE_SAMPLED_BIT,
     :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
@@ -70,7 +58,7 @@ function textureimage(system, config)
 
   commands.cmdseq(system, :transfer) do cmd
     commands.transitionimage(cmd, system, ds.hashmap(
-      :image, get(vkim, :image),
+      :image, vkim,
       :srclayout, vk.IMAGE_LAYOUT_UNDEFINED,
       :dstlayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       :dstaccess, vk.ACCESS_TRANSFER_WRITE_BIT,
@@ -83,7 +71,7 @@ function textureimage(system, config)
     )
 
     commands.transitionimage(cmd, system, ds.hashmap(
-      :image, get(vkim, :image),
+      :image, vkim,
       :srclayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       :dstlayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       :srcaccess, vk.ACCESS_TRANSFER_WRITE_BIT,
@@ -96,7 +84,7 @@ function textureimage(system, config)
   end
 
   commands.transitionimage(system, ds.hashmap(
-    :image, get(vkim, :image),
+    :image, vkim,
     :srclayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
     :dstlayout, vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     :srcaccess, vk.ACCESS_TRANSFER_WRITE_BIT,
@@ -109,7 +97,7 @@ function textureimage(system, config)
   view = hw.imageview(
       system,
       ds.hashmap(:format, hw.findformat(system, config).format),
-      get(vkim, :image),
+      vkim,
     )
 
   return ds.hashmap(
