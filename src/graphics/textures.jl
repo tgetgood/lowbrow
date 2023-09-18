@@ -15,9 +15,23 @@ import commands
 # png and jpg load as transposes of each other. Is that my fault?
 import ColorTypes.FixedPointNumbers
 
+# function tt(x)
+#   print(string(x) * ": ")
+#   @time rgb = ds.into(
+#     ds.emptyvector,
+#     map(p -> [
+#         reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
+#         0xff
+#       ])
+#     ∘
+#     ds.cat(),
+#     ds.take(x, image)
+#   )
+#   nothing
+# end
+
 function textureimage(system, config)
   dev = get(system, :device)
-
 
   image = load(get(config, :texture_file))
 

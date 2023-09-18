@@ -2,14 +2,14 @@ abstract type Vector <: Sequential end
 
 abstract type PersistentVector <: Vector end
 
-struct VectorLeaf <: PersistentVector
-  elements::Base.Vector{Any}
+struct VectorLeaf{T} <: PersistentVector
+  elements::Base.Vector{T}
 end
 
 Base.convert(::Type{Base.Vector}, xs::VectorLeaf) = xs.elements
 
-struct VectorNode <: PersistentVector
-  elements::Base.Vector{Any}
+struct VectorNode{T} <: PersistentVector
+  elements::Base.Vector{T}
   count::Unsigned
 end
 

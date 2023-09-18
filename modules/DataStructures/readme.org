@@ -1,0 +1,66 @@
+* Performance notes [2023-09-18 Mon]
+  For normal use these datastructures seem to perform adequately.
+
+  However, when trying to load textures with the following code:
+
+#+BEGIN_SRC julia
+  @time rgb = ds.into(
+    ds.emptyvector,
+    map(p -> [
+        reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
+        0xff
+      ])
+    ∘
+    ds.cat(),
+    ds.take(x, image)
+  )
+#+END_SRC
+
+Where =image= is an array of pixels, I get some fun results. For x = 2-2^15:
+
+2:   0.031788 seconds (46.67 k allocations: 9.054 MiB, 98.30% compilation time)
+4:   0.006815 seconds (84 allocations: 12.007 MiB, 85.72% gc time)
+8:   0.001803 seconds (164 allocations: 24.023 MiB)
+16:   0.021166 seconds (3.82 k allocations: 48.276 MiB, 23.66% gc time, 40.25% compilation time)
+32:   0.016689 seconds (866 allocations: 96.120 MiB, 41.37% gc time)
+64:   0.065319 seconds (48.74 k allocations: 195.433 MiB, 15.55% gc time, 58.27% compilation time)
+128:   0.044260 seconds (4.05 k allocations: 384.511 MiB, 38.96% gc time)
+256:   0.075904 seconds (8.30 k allocations: 769.056 MiB, 31.04% gc time)
+512:   0.143548 seconds (18.83 k allocations: 1.502 GiB, 32.47% gc time)
+1024:   0.288988 seconds (39.91 k allocations: 3.005 GiB, 32.32% gc time)
+2048:   0.570507 seconds (84.10 k allocations: 6.012 GiB, 32.30% gc time)
+4096:   1.138775 seconds (172.48 k allocations: 12.030 GiB, 32.34% gc time)
+8192:   2.278270 seconds (349.25 k allocations: 24.086 GiB, 32.43% gc time)
+16384:   4.563693 seconds (702.79 k allocations: 48.270 GiB, 32.32% gc time)
+32768:   9.203719 seconds (1.48 M allocations: 96.883 GiB, 32.35% gc time)
+
+Which extrapolated up to the full 1M pixels of the image in question, this would
+require 20M allocations and 3TB of allocated memory. Of course my machine runs
+out of ram long before that can be tested.
+
+The naive jl code:
+
+#+BEGIN_SRC julia
+  rgb::Vector{UInt8}  = reduce(vcat,
+    map(p -> [
+        reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
+        0xff
+      ],
+      image
+    )
+  )
+#+END_SRC
+
+0.577784 seconds (2.15 M allocations: 2.243 GiB, 25.86% gc time, 5.11% compilation
+
+So the number of allocations in the persistent case is is ~10x higher and the
+memory allocated and collected is >1000x higher.
+
+10x on both counts would actually be acceptable for my exploratory use case, but
+the 1000-1500x doesn't fly.
+
+Curiously, if I use Base.Vector, it takes longer and uses more ram. It also seg
+faults at 2^15 which I think is actually a stack overflow.
+
+The idea was to use Base.Vector and Base.reduce and have better performace. That
+needs a redesign.
