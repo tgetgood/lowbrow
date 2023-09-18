@@ -8,12 +8,11 @@ import Vulkan as vk
 
 struct Vertex
   position::NTuple{3, Float32}
-  colour::NTuple{3, Float32}
   texuture_coordinates::NTuple{2, Float32}
 end
 
 function vert(pos, tex)
-  Vertex(tuple(pos...), (1,1,1), tuple(tex...))
+  Vertex(tuple(pos...), tuple(tex...))
 end
 
 function typesort(lines)

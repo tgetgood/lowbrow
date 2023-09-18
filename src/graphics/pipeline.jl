@@ -242,7 +242,7 @@ function createpipelines(system, config)
       layout,
       0,
       -1;
-      vertex_input_state=vertex_input_state(eltype(get(config, :vertex_data))),
+      vertex_input_state=vertex_input_state(ds.getin(system, [:vertexbuffer, :type])),
      input_assembly_state,
       viewport_state,
       multisample_state,

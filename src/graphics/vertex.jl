@@ -50,7 +50,10 @@ function vertexbuffer(system, data)
     :transfer
   )
 
-  ds.hashmap(:vertexbuffer, ds.assoc(buffer, :verticies, length(data)))
+  ds.hashmap(:vertexbuffer, ds.assoc(buffer,
+    :verticies, length(data),
+    :type, eltype(data)
+  ))
 end
 
 function indexbuffer(system, xs)

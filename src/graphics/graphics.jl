@@ -127,7 +127,7 @@ function configure()
   ds.reduce((s, f) -> f(s), staticconfig, [
     window.configure,
     debug.configure,
-    vertex.configure,
+    # vertex.configure,
     uniform.configure
   ])
 end
@@ -139,13 +139,13 @@ function staticinit(config)
     window.createwindow,
     window.createsurface,
     hw.createdevice,
-    gp.renderpass,
     hw.createcommandpools,
     hw.createdescriptorpools,
+    model.load,
+    gp.renderpass,
     draw.commandbuffers,
     # (x, y) -> vertex.vertexbuffer(x, get(y, :vertex_data)),
     # (x, y) -> vertex.indexbuffer(x, get(y, :indicies)),
-    model.load,
     uniform.allocatebuffers,
     # uniform.allocatesets,
     textures.textureimage,
