@@ -48,15 +48,31 @@ function load(system, config)
   vs = tofloat(get(objs, "v"))
   ts = tofloat(get(objs, "vt"))
 
-  verticies::Vector{Vertex} = []
+  vmap::ds.Map = ds.emptymap
+  indicies::ds.Vector = ds.emptyvector
+
 
   for facet in get(objs, "f")
-    append!(verticies, map(x -> triplev(x, vs, ts), facet))
+    fs = map(x -> triplev(x, vs, ts), facet)
+    for f in fs
+      if ds.containsp(vmap, f)
+        indicies = ds.conj(indicies, get(vmap, f))
+      else
+        n = ds.count(vmap)
+        vmap = ds.assoc(vmap, f, n)
+        indicies = ds.conj(indicies, n)
+      end
+    end
+  end
+
+  verticies = Vector{Vertex}(undef, ds.count(vmap))
+  for e in ds.seq(vmap)
+    verticies[ds.val(e)+1] = ds.key(e)
   end
 
   ds.merge(
     vertex.vertexbuffer(system, verticies),
-    vertex.indexbuffer(system, 0:length(verticies) - 1)
+    vertex.indexbuffer(system, ds.into(Vector{UInt}(), indicies))
   )
 end
 
