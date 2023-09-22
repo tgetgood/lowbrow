@@ -1,6 +1,6 @@
 module DataStructures
 
-import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, rest, map, filter, getindex
+import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, rest, map, filter, getindex, eltype, ==
 
 # How many bits of hash are used at each level of the HAMT?
 hashbits = 5
@@ -35,7 +35,7 @@ export Queue, queue, emptyqueue, closedp, emptystream, put!, Stream, stream
 export conj, count, empty, emptyp, nil, keyword, name, symbol, withmeta, meta
 
 # Types
-export Keyword, Symbol, Map, Vector, MapEntry, List
+export Keyword, Map, Vector, MapEntry, List
 
 ## Julia conventions vs my tendency to use clojure names...
 values(m::Map) = vals(m)

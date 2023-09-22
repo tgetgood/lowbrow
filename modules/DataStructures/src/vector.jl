@@ -2,18 +2,25 @@ abstract type Vector <: Sequential end
 
 abstract type PersistentVector <: Vector end
 
-struct VectorLeaf{T} <: PersistentVector
-  elements::Base.Vector{T}
+struct VectorLeaf <: PersistentVector
+  elements::Tuple
 end
 
 Base.convert(::Type{Base.Vector}, xs::VectorLeaf) = xs.elements
 
-struct VectorNode{T} <: PersistentVector
-  elements::Base.Vector{T}
+struct VectorNode{N} <: PersistentVector
+  elements::NTuple{N, PersistentVector}
   count::Unsigned
 end
 
-emptyvector = VectorLeaf([])
+function eltype(v::VectorLeaf)
+  eltype(v.elements)
+end
+
+struct EmptyVector <: PersistentVector
+end
+
+const emptyvector = EmptyVector()
 
 function empty(x::Vector)
   emptyvector
@@ -35,16 +42,20 @@ function count(v::VectorNode)
   v.count
 end
 
+function count(v::EmptyVector)
+  0
+end
+
 function length(v::Vector)
   count(v)
 end
 
 function fullp(v::VectorLeaf)
-  count(v) == nodelength
+  count(v) >= nodelength
 end
 
 function fullp(v::VectorNode)
-  count(v) == nodelength && fullp(v.elements[end])
+  count(v.elements) >= nodelength && fullp(v.elements[end])
 end
 
 """ Returns `true` iff the collection `x` contains no elements. """
@@ -60,31 +71,26 @@ function conj(v::Base.Vector, x)
   vcat(v, [x])
 end
 
+function conj(v::EmptyVector, x)
+  VectorLeaf((x,))
+end
+
 function conj(v::VectorLeaf, x)
   if fullp(v)
-    return VectorNode([v, VectorLeaf([x])], nodelength + 1)
+    VectorNode((v, VectorLeaf((x,))), UInt(count(v) + 1))
   else
-    e = copy(v.elements)
-    push!(e, x)
-    return VectorLeaf(e)
+    VectorLeaf(tuple(v.elements..., x))
   end
 end
 
 function conj(v::VectorNode, x)
+  c = UInt(v.count + 1)
   if fullp(v)
-    return VectorNode([v, VectorLeaf([x])], v.count + 1)
-  end
-
-  elements = copy(v.elements)
-  tail = v.elements[end]
-
-  if fullp(tail)
-    push!(elements, VectorLeaf([x]))
-    return VectorNode(elements, v.count + 1)
+    VectorNode((v, VectorLeaf((x,))), c)
+  elseif fullp(v.elements[end])
+    VectorNode(tuple(v.elements..., VectorLeaf((x,))), c)
   else
-    newtail = conj(tail, x)
-    elements[end] = newtail
-    return VectorNode(elements, v.count + 1)
+    VectorNode(tuple(v.elements[begin:end-1]..., conj(tail, x)), c)
   end
 end
 
@@ -94,6 +100,14 @@ end
 
 function last(v::VectorNode)
   last(v.elements[end])
+end
+
+function last(v::EmptyVector)
+  nothing
+end
+
+function first(v::EmptyVector)
+  nothing
 end
 
 function first(v::VectorLeaf)
@@ -142,17 +156,26 @@ function nth(v::VectorNode, n)
   end
 end
 
-function assoc(v::VectorLeaf, i, val)
-  @assert 1 <= i && i <= nodelength "Index out of bounds"
+function assoc(v::Base.Vector, i, val)
+  v2 = copy(v)
+  v2[i] = val
+  return v2
+end
 
-  e = copy(v.elements)
-  e[i] = val
-  return VectorLeaf(e)
+function assoc(v::EmptyVector, i, val)
+  @assert false "Index out of bounds"
+end
+
+function assoc(v::VectorLeaf, i, val)
+  @assert 1 <= i && i <= count(v) "Index out of bounds"
+
+  return VectorLeaf(tuple(v.elements[begin:i-1]..., val, v.elements[i+1:end]...))
 end
 
 function assoc(v::VectorNode, i, val)
   @assert 1 <= i && i <= count(v) "Index out of bounds"
 
+  @assert false "Not implemented"
 end
 
 function zip(v1::Vector, v2::Vector)
@@ -167,7 +190,7 @@ end
 # collected and so will use more memory than expected when used in idiomatic
 # lisp fashion. That should be fixed.
 struct VectorSeq <: Vector
-  v
+  v::Vector
   i
 end
 
@@ -184,11 +207,15 @@ function rest(v::Base.Vector)
 end
 
 function rest(v::Vector)
-  if count(v) < 2
+  if count(v) <= 1
     return emptyvector
   else
     return VectorSeq(v, 2)
   end
+end
+
+function rest(v::UnitRange)
+  rest(Base.Vector(v))
 end
 
 function first(v::VectorSeq)
@@ -209,6 +236,14 @@ end
 
 function get(v::Vector, i)
   nth(v, i)
+end
+
+function get(v::Base.Vector, i)
+  if isdefined(v, Int(i))
+    v[i]
+  else
+    nothing
+  end
 end
 
 function reduce(f, init::Vector, coll::VectorLeaf)
@@ -235,6 +270,10 @@ function vec(v::Vector)
   v
 end
 
+function reverse(v::EmptyVector)
+  v
+end
+
 function reverse(v::Vector)
   r = emptyvector
   for i = count(v):-1:1
@@ -242,8 +281,6 @@ function reverse(v::Vector)
   end
   r
 end
-
-
 
 function string(v::Vector)
   "[" * transduce(interpose(" ") ∘ map(string), *, "", v) * "]"

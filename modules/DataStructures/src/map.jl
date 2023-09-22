@@ -14,25 +14,22 @@ function val(x::MapEntry)
 end
 
 struct PersistentArrayMap <: Map
-  kvs::Vector
+  kvs::Base.Vector
 end
 
-emptymap = PersistentArrayMap(emptyvector)
+const emptymap = PersistentArrayMap([])
 
 struct PersistentHashMap <: Map
-  ht::Vector
+  ht::Base.Vector
   count::Unsigned
 end
 
 function emptyhashnodef()
-  v = emptyvector
-  for i in 1:32
-    v = conj(v, nil)
-  end
+  v = Base.Vector(undef, 32)
   PersistentHashMap(v, 0)
 end
 
-emptyhashnode = emptyhashnodef()
+const emptyhashnode = emptyhashnodef()
 
 struct HashSeq
   hash
@@ -209,7 +206,7 @@ function nodewalk(node::PersistentHashMap, target, hash)
   # And here I thought I didn't need cardinal indicies...
   i = first(hash) + 1
   n = get(node.ht, i)
-  if n === nothing || n == undef
+  if n === nothing
     nothing
   else
     nodewalk(n, target, rest(hash))
