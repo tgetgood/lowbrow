@@ -13,23 +13,37 @@ function val(x::MapEntry)
   x.value
 end
 
-struct PersistentArrayMap <: Map
-  kvs::Base.Vector
+struct EmptyMap <: Map
 end
 
-const emptymap = PersistentArrayMap([])
+const emptymap = EmptyMap()
 
-struct PersistentHashMap <: Map
-  ht::Base.Vector
+# Clojure uses 8 and I don't want to dig into it just yet.
+# TODO: Analysis
+arraymapsizethreashold = 8
+
+struct PersistentArrayMap <: Map
+  kvs::Tuple
+end
+
+abstract type HashNode end
+
+const HT = Union{HashNode, MapEntry, Nothing}
+
+struct PersistentHashNode <: HashNode
+  ht::NTuple{Int(nodelength), HT}
+  level::Unsigned
   count::Unsigned
 end
 
-function emptyhashnodef()
-  v = Base.Vector(undef, 32)
-  PersistentHashMap(v, 0)
+struct PersistentHashMap <: Map
+  root::PersistentHashNode
+  count::Unsigned
 end
 
-const emptyhashnode = emptyhashnodef()
+const emptyhash = NTuple{Int(nodelength), HT}(map(x -> nothing, 1:nodelength))
+
+empyhashnode(level) = PersistentHashNode(emptyhash, level, 0)
 
 struct HashSeq
   hash
@@ -85,17 +99,12 @@ function conj(m::Map, e::MapEntry)
   assoc(m, e.key, e.value)
 end
 
-function conj(m::Map, v::Union{Vector, Base.Vector, Tuple})
+function conj(m::Map, v::Vector)
   @assert length(v) == 2 "Can only create map entry from pair of values"
 
   assoc(m, v[1], v[2])
 end
 
-# Clojure uses 8 and I don't want to dig into it just yet.
-# Well actually, clojure uses alternating keys and values instead of an array of
-# MapEntries which avoids an extra memory indirection. I should do that.
-# TODO: Analysis
-arraymapsizethreashold = 8
 
 function get(m::Nothing, k)
   nil
@@ -142,7 +151,7 @@ function assoc(x::Nothing, k, v)
   assoc(emptymap, k, v)
 end
 
-function associn(m::Map, ks::Union{Vector,Base.Vector}, v)
+function associn(m::Map, ks::Vector, v)
   if count(ks) == 1
     assoc(m, first(ks), v)
   else

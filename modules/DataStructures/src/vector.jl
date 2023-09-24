@@ -1,134 +1,137 @@
 abstract type Vector <: Sequential end
 
+"""
+N-ary (where N == nodelength) trees with values stored only in the leaves.
+
+A PersistentVector is either empty, a complete tree, or all children but the
+rightmost are complete trees. This invariant keeps the trees balanced, resulting
+in log_{32}(N) lookup, append, and element update operations, both in time and
+memory.
+
+It also lets us statically calculate the lookup path for a given index, which
+could theoretically lead to constant time lookup if the compiler can inline
+nodes. I don't know that it can, but it doesn't seem impossible if the element
+types are well behaved.
+"""
 abstract type PersistentVector <: Vector end
+
+struct EmptyVector <: PersistentVector
+end
 
 struct VectorLeaf <: PersistentVector
   elements::Tuple
 end
 
-Base.convert(::Type{Base.Vector}, xs::VectorLeaf) = xs.elements
+# Tuple calls convert when passed a Tuple... Why is that?
+vectorleaf(args::Tuple) = VectorLeaf(args)
+vectorleaf(args) = VectorLeaf(Tuple(args))
 
 struct VectorNode{N} <: PersistentVector
-  elements::NTuple{N, PersistentVector}
-  count::Unsigned
+  elements::Union{NTuple{N, VectorLeaf}, NTuple{N, VectorNode}}
+  # FIXME: This shouldn't be fixed size, but memory indirection is killing me.
+  count::UInt64
+  # max depth is log(nodelength, typemax(typeof(count))). 4 bits would suffice.
+  depth::UInt8
 end
 
+function vectornode(els::Tuple, count, depth)
+  VectorNode(els, UInt64(count), UInt8(depth))
+end
+
+function vectornode(els, count, depth)
+  vectornode(Tuple(els), count, depth)
+end
+
+function reduce(f, init, coll::VectorLeaf)
+  Base.reduce(f, coll.elements, init=init)
+end
+
+function reduce(f, init, coll::VectorNode)
+  Base.reduce(
+    (acc, x) -> reduce(f, acc, x),
+    coll.elements,
+    init=init
+  )
+end
+
+depth(v::EmptyVector) = 0
+depth(v::VectorLeaf) = 1
+depth(v::VectorNode) = v.depth
+
+emptyp(v::EmptyVector) = true
+emptyp(v::PersistentVector) = false
+
+completep(v::EmptyVector) = true
+completep(v::VectorLeaf) = count(v) == nodelength
+
+function completep(v::VectorNode)
+  count(v) == nodelength^v.depth
+end
+
+# If a vector is homogeneous, this may help with code generation. I don't
+# actually know though
 function eltype(v::VectorLeaf)
   eltype(v.elements)
 end
 
-struct EmptyVector <: PersistentVector
-end
-
 const emptyvector = EmptyVector()
 
-function empty(x::Vector)
-  emptyvector
-end
-
-function empty(x::Base.Vector)
-  []
-end
-
-function count(v::Base.Vector)
-  length(v)
-end
-
-function count(v::VectorLeaf)
-  length(v.elements)
-end
-
-function count(v::VectorNode)
-  v.count
-end
-
-function count(v::EmptyVector)
-  0
-end
+empty(x::Vector) = emptyvector
+count(v::VectorLeaf) = length(v.elements)
+count(v::VectorNode) = v.count
+count(v::EmptyVector) = 0
 
 function length(v::Vector)
   count(v)
 end
 
-function fullp(v::VectorLeaf)
-  count(v) >= nodelength
-end
-
-function fullp(v::VectorNode)
-  count(v.elements) >= nodelength && fullp(v.elements[end])
-end
-
-""" Returns `true` iff the collection `x` contains no elements. """
-function emptyp(x::Sequential)
-  count(x) == 0
-end
-
-function emptyp(x)
-  length(x) == 0
-end
-
-function conj(v::Base.Vector, x)
-  vcat(v, [x])
-end
-
 function conj(v::EmptyVector, x)
-  VectorLeaf((x,))
+  vectorleaf((x,))
 end
 
 function conj(v::VectorLeaf, x)
-  if fullp(v)
-    VectorNode((v, VectorLeaf((x,))), UInt(count(v) + 1))
+  if completep(v)
+    vectornode((v, vectorleaf((x,))), count(v) + 1, 2)
   else
-    VectorLeaf(tuple(v.elements..., x))
+    vectorleaf((v.elements..., x))
   end
+end
+
+function sibling(x, depth)
+  if depth == 1
+    vectorleaf((x,))
+  else
+    vectornode(tuple(sibling(x, depth - 1)), 1, depth)
+  end
+end
+
+function join(els::NTuple, v::Vector)
+  @assert every(x -> depth(v) == depth(x), els)
+  vectornode((els..., v), sum(map(count, els); init=0) + count(v), depth(v) + 1)
+end
+
+function join(v1::VectorNode, v2::VectorNode)
+  @assert depth(v1) == depth(v2)
+  vectornode((v1, v2), count(v1) + count(v2), depth(v1) + 1)
 end
 
 function conj(v::VectorNode, x)
-  c = UInt(v.count + 1)
-  if fullp(v)
-    VectorNode((v, VectorLeaf((x,))), c)
-  elseif fullp(v.elements[end])
-    VectorNode(tuple(v.elements..., VectorLeaf((x,))), c)
+  if completep(v)
+    join(v, sibling(x, depth(v)))
+  elseif completep(v.elements[end])
+    join(v.elements, sibling(x, depth(v) - 1))
   else
-    VectorNode(tuple(v.elements[begin:end-1]..., conj(tail, x)), c)
+    join(v.elements[1:end-1], conj(v.elements[end], x))
   end
 end
 
-function last(v::VectorLeaf)
-  v.elements[end]
-end
+last(v::VectorLeaf) = v.elements[end]
+last(v::VectorNode) = last(v.elements[end])
+last(v::EmptyVector) = nothing
 
-function last(v::VectorNode)
-  last(v.elements[end])
-end
-
-function last(v::EmptyVector)
-  nothing
-end
-
-function first(v::EmptyVector)
-  nothing
-end
-
-function first(v::VectorLeaf)
-  if count(v) > 0
-    v.elements[begin]
-  else
-    nothing
-  end
-end
-
-function first(v::VectorNode)
-  if count(v) > 0
-    first(v.elements[begin])
-  else
-    nothing
-  end
-end
-
-function getindex(v::Vector, n)
-  nth(v, n)
-end
+first(v::EmptyVector) = nothing
+first(v::VectorLeaf) = v.elements[begin]
+first(v::VectorNode) = first(v.elements[begin])
 
 function nth(v::VectorLeaf, n)
   if n > count(v) || n < 1
@@ -156,20 +159,18 @@ function nth(v::VectorNode, n)
   end
 end
 
-function assoc(v::Base.Vector, i, val)
-  v2 = copy(v)
-  v2[i] = val
-  return v2
+function getindex(v::Vector, n)
+  nth(v, n)
 end
 
 function assoc(v::EmptyVector, i, val)
-  @assert false "Index out of bounds"
+  throw("Index out of bounds")
 end
 
 function assoc(v::VectorLeaf, i, val)
   @assert 1 <= i && i <= count(v) "Index out of bounds"
 
-  return VectorLeaf(tuple(v.elements[begin:i-1]..., val, v.elements[i+1:end]...))
+  return VectorLeaf((v.elements[begin:i-1]..., val, v.elements[i+1:end]...))
 end
 
 function assoc(v::VectorNode, i, val)
@@ -202,20 +203,12 @@ function seq(v::Vector)
   VectorSeq(v, 1)
 end
 
-function rest(v::Base.Vector)
-  v[2:end]
-end
-
 function rest(v::Vector)
   if count(v) <= 1
-    return emptyvector
+    emptyvector
   else
-    return VectorSeq(v, 2)
+    VectorSeq(v, 2)
   end
-end
-
-function rest(v::UnitRange)
-  rest(Base.Vector(v))
 end
 
 function first(v::VectorSeq)
@@ -230,49 +223,50 @@ function rest(v::VectorSeq)
   end
 end
 
-function string(v::VectorSeq)
-  "[" * transduce(map(string) ∘ interpose(" "), *, "", v) * "]"
-end
+get(v::Vector, i) = nth(v, i)
 
-function get(v::Vector, i)
-  nth(v, i)
-end
+vector(args...) = vec(args)
+vector() = emptyvector
 
-function get(v::Base.Vector, i)
-  if isdefined(v, Int(i))
-    v[i]
+vec() = emptyvector
+vec(v::Vector) = v
+
+function nodeify(nodes, depth)
+  if length(nodes) == 1
+    nodes[1]
   else
-    nothing
+    # TODO: This repetition is an ideal use of transducers, but that begs the
+    # question. How to bootstrap it efficiently?
+    len = length(nodes)
+    next = []
+    i = 1
+    while i < length(nodes)
+      push!(next, vectornode(
+        nodes[i:min(i+nodelength-1, len)],
+        nodelength^depth,
+        depth))
+      i += nodelength
+    end
+    nodeify(next, depth+1)
   end
 end
 
-function reduce(f, init::Vector, coll::VectorLeaf)
-  Base.reduce(f, coll.elements, init=init)
-end
-
-function reduce(f, init::Vector, coll::VectorNode)
-  Base.reduce(
-    (acc, x) -> reduce(f, acc, x),
-    coll.elements,
-    init=init
-  )
-end
-
-function vector(args...)
-  vec(args)
-end
-
 function vec(args)
-  Base.reduce(conj, args, init=emptyvector)
+  if length(args) <= nodelength
+    vectorleaf(args)
+  else
+    len = length(args)
+    nodes = []
+    i = 1
+    while i < length(args)
+      push!(nodes, vectorleaf(args[i:min(i + nodelength - 1, len)]))
+      i += nodelength
+    end
+    nodeify(nodes, 2)
+  end
 end
 
-function vec(v::Vector)
-  v
-end
-
-function reverse(v::EmptyVector)
-  v
-end
+reverse(v::EmptyVector) = v
 
 function reverse(v::Vector)
   r = emptyvector
@@ -284,6 +278,30 @@ end
 
 function string(v::Vector)
   "[" * transduce(interpose(" ") ∘ map(string), *, "", v) * "]"
+end
+
+function takelast(n, v::Vector)
+  c = count(v)
+  if n >= c
+    v
+  else
+    into(emptyvector, map(i -> nth(v, i)), c-n+1:c)
+  end
+end
+
+function show(io::IO, mime::MIME"text/plain", v::Vector)
+  # REVIEW: Why 65? Because it had to be something...
+  if count(v) > 65
+    elements =
+      transduce(interpose("\n ") ∘ map(string), *, "", take(32, v)) *
+      "\n ...\n " *
+      transduce(interpose("\n ") ∘ map(string), *, "", takelast(32, v))
+  else
+    elements = transduce(interpose("\n ") ∘ map(string), *, "", v)
+  end
+
+  str = string(count(v)) * "-element DataStructures.Vector:\n " * elements
+  print(io, str)
 end
 
 function iterate(v::Vector)

@@ -2,7 +2,7 @@ using Test
 
 using DataStructures
 import DataStructures as ds
-import DataStructures: conj, count, nodelength, vec
+import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, EmptyVector, Vector, sibling, vectornode, vectorleaf, depth
 
 # FIXME: This should be doable with modules with a standard function. The
 # support structure to let the runtime find all of these modules is ugly though.
@@ -17,6 +17,6 @@ import DataStructures: conj, count, nodelength, vec
 # Of course one of the primary design choices of julia is that every function
 # symbol is a global mutable variable. The "can't modify without explicit
 # import" property helps but is a bit of a kludge.
-include("./vectortests.jl")
 
+include("./vectortests.jl")
 include("./maptests.jl")

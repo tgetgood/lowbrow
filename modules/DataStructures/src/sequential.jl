@@ -1,5 +1,9 @@
 abstract type Sequential end
 
+""" Returns `true` iff the collection `x` contains no elements. """
+emptyp(x::Sequential) = count(x) == 0
+emptyp(x) = length(x) == 0
+
 function reduce(f, coll)
   reduce(f, f(), coll)
 end
@@ -24,21 +28,10 @@ function transduce(xform, f, from)
   g(reduce(g, g(), from))
 end
 
-function into()
-  emptyvector
-end
-
-function into(x)
-  x
-end
-
-function into(to, from)
-  reduce(conj, to, from)
-end
-
-function into(to, xform, from)
-  transduce(xform, conj, to, from)
-end
+into() = emptyvector
+into(x) = x
+into(to, from) = reduce(conj, to, from)
+into(to, xform, from) = transduce(xform, conj, to, from)
 
 function drop(n, coll)
   if n == 0
@@ -63,21 +56,13 @@ function take(n, coll)
   return out
 end
 
-function conj()
-  emptyvector
-end
 
-function conj(x)
-  x
-end
+conj() = emptyvector
+conj(x) = x
 
-function concat(xs, ys)
-  into(xs, ys)
-end
+concat(xs, ys) = into(xs, ys)
 
-function every(p, xs)
-  reduce((x, y) -> x && y, true, map(p, xs))
-end
+every(p, xs) = reduce((x, y) -> x && y, true, map(p, xs))
 
 function cat()
   function (emit)
@@ -180,6 +165,8 @@ function interpose(delim)
     return inner
   end
 end
+
+# FIXME: What's going on here?
 
 # Interleave is a higher order form of transducer (as is map in general). The
 # current implementation only works for a single argument at each step, which is

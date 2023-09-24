@@ -1,6 +1,6 @@
 module DataStructures
 
-import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, rest, map, filter, getindex, eltype, ==
+import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex, eltype, show, display
 
 # How many bits of hash are used at each level of the HAMT?
 hashbits = 5
@@ -14,6 +14,8 @@ include("./list.jl")
 include("./map.jl")
 # include("./set.jl")
 include("./queue.jl")
+
+include("./juliatypes.jl")
 
 # Sequential
 export first, rest, take, drop, reduce, transduce, into, map, filter, interpose, dup, cat, partition
