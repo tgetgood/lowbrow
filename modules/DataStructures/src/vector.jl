@@ -151,29 +151,15 @@ first(v::VectorLeaf) = v.elements[begin]
 first(v::VectorNode) = first(v.elements[begin])
 
 function nth(v::VectorLeaf, n)
-  if n > count(v) || n < 1
-    throw("Index out of bounds")
-  else
-    return v.elements[n]
-  end
+  v.elements[n]
 end
 
 """
 Returns the nth element (starting at 1) of vector v.
 """
 function nth(v::VectorNode, n)
-  if n > count(v) || n < 1
-    throw("Index out of bounds")
-  else
-    # FIXME: This should be binary search.
-    for e in v.elements
-      if count(e) >= n
-        return nth(e, n)
-      else
-        n = n - count(e)
-      end
-    end
-  end
+  (d, r) = divrem(n, nodelength^(depth(v) - 1))
+  nth(v.elements[d+1], r)
 end
 
 function getindex(v::Vector, n)
