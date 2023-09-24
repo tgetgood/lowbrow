@@ -35,7 +35,8 @@
 
   @test first(b.elements) === a
 
-  @test vec(1:33) == into(emptyvec, 1:33)
+  @test vec(1:nodelength+1) == into(emptyvector, 1:nodelength+1)
+  @test vec(1:nodelength^2+1) == into(emptyvector, 1:nodelength^2+1)
 
 end
 
@@ -57,9 +58,9 @@ end
 
   @test count(long) == nodelength^3 + 2
   @test depth(long) == 4
-  @test every(x -> isa(VectorNode, x), long.elements)
-  @test every(x -> isa(VectorNode, x), last(long).elements)
-  @test every(x -> isa(VectorLeaf, x), last(first(long)).elements)
+  @test every(x -> isa(x, VectorNode), long.elements)
+  @test every(x -> isa(x, VectorNode), last(long.elements).elements)
+  @test every(x -> isa(x, VectorLeaf), last(first(long.elements).elements).elements)
 
   @test count(long) == sum(map(count, long.elements))
 

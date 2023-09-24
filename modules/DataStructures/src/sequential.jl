@@ -179,7 +179,7 @@ end
 # end
 
 function partition(n)
-  acc = emptyvector
+  acc = []
   function (emit)
     function inner()
       emit()
@@ -192,10 +192,10 @@ function partition(n)
       end
     end
     function inner(result, next)
-      acc = conj(acc, next)
+      push!(acc, next)
       if count(acc) == n
-        t = acc
-        acc = emptyvector
+        t = vec(acc)
+        acc = []
         emit(result, t)
       else
         result

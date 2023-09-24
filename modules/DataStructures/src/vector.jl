@@ -1,5 +1,20 @@
 abstract type Vector <: Sequential end
 
+abstract type Transient end
+"""
+N.B.: I think it's a mistake to make transients subtypes of the types the
+mirror. We don't want to accidentally substitute a transient type for a
+persistent type.
+"""
+abstract type TransientVector <: Transient end
+
+struct TransientVectorLeaf <: TransientVector
+  elements::Base.Vector
+end
+
+struct TransientVectorNode <: TransientVector
+end
+
 """
 N-ary (where N == nodelength) trees with values stored only in the leaves.
 
@@ -54,6 +69,7 @@ function reduce(f, init, coll::VectorNode)
   )
 end
 
+depth(x::Nothing) = 0
 depth(v::EmptyVector) = 0
 depth(v::VectorLeaf) = 1
 depth(v::VectorNode) = v.depth
@@ -77,6 +93,7 @@ end
 const emptyvector = EmptyVector()
 
 empty(x::Vector) = emptyvector
+
 count(v::VectorLeaf) = length(v.elements)
 count(v::VectorNode) = v.count
 count(v::EmptyVector) = 0
@@ -231,39 +248,49 @@ vector() = emptyvector
 vec() = emptyvector
 vec(v::Vector) = v
 
-function nodeify(nodes, depth)
-  if length(nodes) == 1
-    nodes[1]
-  else
-    # TODO: This repetition is an ideal use of transducers, but that begs the
-    # question. How to bootstrap it efficiently?
-    len = length(nodes)
-    next = []
-    i = 1
-    while i < length(nodes)
-      push!(next, vectornode(
-        nodes[i:min(i+nodelength-1, len)],
-        nodelength^depth,
-        depth))
-      i += nodelength
+function leafpartition()
+  acc = []
+  function (emit)
+    function inner()
+      emit()
     end
-    nodeify(next, depth+1)
+    function inner(result)
+      if count(acc) > 0
+        emit(emit(result, acc))
+      else
+        emit(result)
+      end
+    end
+    function inner(result, next)
+      push!(acc, next)
+      if length(acc) == nodelength
+        t = acc
+        acc = []
+        emit(result, t)
+      else
+        result
+      end
+    end
+    return inner
   end
 end
 
+function incompletevectornode(nodes)
+   vectornode(
+    nodes,
+    sum(map(count, nodes); init = 0),
+    depth(nodes[1]) + 1
+  )
+end
+
 function vec(args)
-  if length(args) <= nodelength
-    vectorleaf(args)
-  else
-    len = length(args)
-    nodes = []
-    i = 1
-    while i < length(args)
-      push!(nodes, vectorleaf(args[i:min(i + nodelength - 1, len)]))
-      i += nodelength
-    end
-    nodeify(nodes, 2)
+  xf = [leafpartition(), map(vectorleaf)]
+
+  for i = 2:ceil(log(nodelength, length(args)))
+    append!(xf, [leafpartition(), map(incompletevectornode)])
   end
+
+  first(into(emptyvector, ∘(xf...) , args))
 end
 
 reverse(v::EmptyVector) = v

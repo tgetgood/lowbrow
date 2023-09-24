@@ -15,6 +15,7 @@ end
 
 rest(v::Base.Vector) = v[2:end]
 rest(v::UnitRange) = rest(Base.Vector(v))
+rest(v::Tuple) = v[2:end]
 
 function get(v::Base.Vector, i)
   if isdefined(v, Int(i))
@@ -23,6 +24,11 @@ function get(v::Base.Vector, i)
     nothing
   end
 end
+
+reduce(f, init, coll::UnitRange) = Base.reduce(f, coll; init)
+reduce(f, init, coll::Base.Vector) = Base.reduce(f, coll; init)
+reduce(f, init, coll::Tuple) = Base.reduce(f, coll; init)
+
 
 Base.convert(::Type{Base.Vector}, xs::VectorLeaf) = [i for i in xs.elements]
 Base.convert(::Type{Vector}, xs::Tuple) = vec(xs)
