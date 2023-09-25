@@ -28,7 +28,7 @@ export emptyvector, nth, vec, vector, zip
 export list, tolist
 
 # Maps
-export emptymap, assoc, update, dissoc, containsp, hashmap, vals
+export emptymap, assoc, update, dissoc, containsp, hashmap, vals, associn, updatein, getin
 
 # Queues
 export Queue, queue, emptyqueue, closedp, emptystream, put!, Stream, stream

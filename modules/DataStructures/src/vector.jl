@@ -23,14 +23,22 @@ rightmost are complete trees. This invariant keeps the trees balanced, resulting
 in log_{32}(N) lookup, append, and element update operations, both in time and
 memory.
 
-It also lets us statically calculate the lookup path for a given index, which
-could theoretically lead to constant time lookup if the compiler can inline
-nodes. I don't know that it can, but it doesn't seem impossible if the element
-types are well behaved.
+It also simplifies lookup.
 """
 abstract type PersistentVector <: Vector end
 
 struct EmptyVector <: PersistentVector
+end
+
+# TODO: Can I improve code generation by making these NTuples? It's a pain to
+# manually deal with type upgrades without covariance, so it would need to be
+# worth it. As is, the `elements` Tuple can't be inlined into the struct the way
+# an fixed NTuple can be.
+#
+# Maybe something like
+
+struct BitsVectorLeaf{N, T}
+  elements::NTuple{N, T}
 end
 
 struct VectorLeaf <: PersistentVector
@@ -171,14 +179,10 @@ function assoc(v::EmptyVector, i, val)
 end
 
 function assoc(v::VectorLeaf, i, val)
-  @assert 1 <= i && i <= count(v) "Index out of bounds"
-
-  return VectorLeaf((v.elements[begin:i-1]..., val, v.elements[i+1:end]...))
+  vectorleaf((v.elements[begin:i-1]..., val, v.elements[i+1:end]...))
 end
 
 function assoc(v::VectorNode, i, val)
-  @assert 1 <= i && i <= count(v) "Index out of bounds"
-
   @assert false "Not implemented"
 end
 
@@ -220,9 +224,9 @@ end
 
 function rest(v::VectorSeq)
   if v.i == count(v.v)
-    return emptyvector
+    emptyvector
   else
-    return VectorSeq(v.v, v.i + 1)
+    VectorSeq(v.v, v.i + 1)
   end
 end
 

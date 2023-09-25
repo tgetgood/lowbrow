@@ -17,6 +17,9 @@ rest(v::Base.Vector) = v[2:end]
 rest(v::UnitRange) = rest(Base.Vector(v))
 rest(v::Tuple) = v[2:end]
 
+conj(m::Map, v::Base.Vector) = assoc(m, v[1], v[2])
+conj(m::Map, e::NTuple{2, Any}) = assoc(m, e[1], e[2])
+
 function get(v::Base.Vector, i)
   if isdefined(v, Int(i))
     v[i]

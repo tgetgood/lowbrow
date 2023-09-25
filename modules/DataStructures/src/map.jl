@@ -1,6 +1,8 @@
 abstract type Map <: Sequential end
 
-struct MapEntry
+abstract type MapNode end
+
+struct MapEntry <: MapNode
   key::Any
   value::Any
 end
@@ -26,24 +28,35 @@ struct PersistentArrayMap <: Map
   kvs::Tuple
 end
 
-abstract type HashNode end
-
-const HT = Union{HashNode, MapEntry, Nothing}
-
-struct PersistentHashNode <: HashNode
-  ht::NTuple{Int(nodelength), HT}
-  level::Unsigned
-  count::Unsigned
+struct EmptyMarker <: MapNode
 end
 
+const emptymarker = EmptyMarker()
+
+# N.B.: It's important that nodes not be maps themselves since nodes with
+# different levels cannot be merged sensibly and so passing subnodes around as
+# full fledged maps is bound to end in disaster.
+struct PersistentHashNode <: MapNode
+  ht::NTuple{Int(nodelength), MapNode}
+  level::UInt
+  count::UInt
+end
+
+const emptyhash = NTuple{Int(nodelength), MapNode}(
+  map(x -> emptymarker, 1:nodelength)
+)
+
+emptyhashnode(level) = PersistentHashNode(emptyhash, level, 0)
+
+# REVIEW: One extra memory indirection makes all the ensuing code cleaner. I'll
+# consider it worth it until proven otherwise.
 struct PersistentHashMap <: Map
   root::PersistentHashNode
-  count::Unsigned
+  # ht::NTuple{Int(nodelength), Union{PersistentHashNode, MapEntry, Nothing}}
+  # count::UInt
 end
 
-const emptyhash = NTuple{Int(nodelength), HT}(map(x -> nothing, 1:nodelength))
-
-empyhashnode(level) = PersistentHashNode(emptyhash, level, 0)
+const emptyhashmap = PersistentHashMap(emptyhashnode(1))
 
 struct HashSeq
   hash
@@ -53,9 +66,7 @@ end
 """Returns a seq of chunks of `hashbits` bits.
 Should be an infinite seq, but in the present implementation runs out after 64
 bits."""
-function hashseq(x)
-  HashSeq(hash(x), 1)
-end
+hashseq(x) = HashSeq(hash(x), 1)
 
 function first(s::HashSeq)
   if s.current > 14
@@ -67,89 +78,72 @@ function first(s::HashSeq)
   end
 end
 
-function rest(s::HashSeq)
-  HashSeq(s.hash, s.current + 1)
-end
+rest(s::HashSeq) = HashSeq(s.hash, s.current + 1)
 
-function empty(m::PersistentArrayMap)
-  emptymap
-end
+# This is a kludge. These hashes need to be cached somehow or they'll kill all
+# hope of performance.
+nth(h::HashSeq, n) = first(HashSeq(h.hash, h.current+n))
 
-function empty(m::PersistentHashMap)
-  emptyhashnode
-end
+empty(m::Map) = emptymap
 
-function count(m::PersistentArrayMap)
-  count(m.kvs)
-end
+count(m::EmptyMarker) = 0
+count(m::PersistentHashNode) = m.count
+count(m::MapEntry) = 1
+count(m::EmptyMap) = 0
+count(m::PersistentArrayMap) = length(m.kvs) >> 1 # inline kvs
+count(m::PersistentHashMap) = m.root.count
 
-function count(m::PersistentHashMap)
-  m.count
-end
+emptyp(m::Map) = count(m) == 0
 
-function emptyp(m::Map)
-  count(m) == 0
-end
+conj(m::Map, x::Nothing) = m
+conj(m::Map, e::MapEntry) = assoc(m, e.key, e.value)
+conj(m::Map, v::Vector) = assoc(m, v[1], v[2])
 
-function conj(m::Map, x::Nothing)
-  m
-end
+# FIXME: This boxing is only necessary because `cat` can't tell sequences
+# from scalars.
+seq(e::MapEntry) = vector(e)
+seq(x::Nothing) = emptyvector
 
-function conj(m::Map, e::MapEntry)
-  assoc(m, e.key, e.value)
-end
+# Defer to `seq` for concrete type unless overridden.
+first(m::Map) = first(seq(m))
+rest(m::Map) = rest(seq(m))
 
-function conj(m::Map, v::Vector)
-  @assert length(v) == 2 "Can only create map entry from pair of values"
+get(m::Nothing, k) = nil
+get(m::Nothing, k, default) = default
+get(m::EmptyMap, x) = get(m, x, nothing)
+get(m::EmptyMap, x, default) = default
 
-  assoc(m, v[1], v[2])
-end
+"""
+Returns (v, i) where `v` is the value associated with key `k` in `m` and `i` is
+an index of `k` in `m` (what that means depends on the concrete type of `m`).
 
-
-function get(m::Nothing, k)
-  nil
-end
-
-function get(m::Nothing, k, default)
-  default
-end
-
-function get(m::Map, k, default)
-  v = get(m, k)
-  if v === nothing
-    default
-  else
-    v
-  end
-end
-
-function getin(m::Map, ks)
-  getin(m, ks, nothing)
-end
-
-function getin(m::Map, ks, default)
-  reduce((m, k) -> get(m, k, default), m, ks)
-end
-
-
-function get(m::PersistentArrayMap, k)
-  for e in m.kvs
-    if e != nil && e.key == k
-      return e.value
+i == :notfound if k is not a key in m.
+"""
+function getindexed(m::PersistentArrayMap, k, default=nil)
+  i = 1
+  while i < length(m.kvs)
+    if m.kvs[i] == k
+      return m.kvs[i+1], i
     end
+    i += 2
   end
-  return nothing
+  return default, :notfound
 end
 
-function assoc(m::Map, k, v, kvs...)
-  @assert length(kvs) % 2 == 0
+get(m::Map, k, default=nil) = getindexed(m, k, default)[1]
 
-  merge(m, hashmap(k, v, kvs...))
+function getin(m::Map, ks, default=nil)
+  (v, i) = getindexed(m, first(ks))
+  if i === :notfound
+    default
+  elseif count(ks) == 1
+    v
+  else
+    getin(v, rest(ks), default)
+  end
 end
 
-function assoc(x::Nothing, k, v)
-  assoc(emptymap, k, v)
-end
+containsp(m::Map, k) = getindexed(m, k)[2] !== :notfound
 
 function associn(m::Map, ks::Vector, v)
   if count(ks) == 1
@@ -160,116 +154,120 @@ function associn(m::Map, ks::Vector, v)
   end
 end
 
-function assoc(m::PersistentArrayMap, k, v)
-  if count(m) > arraymapsizethreashold - 1
-    return assoc(into(emptyhashnode, m), k, v)
-  end
+function associn(m::Map, ks, v)
+  associn(m, vec(ks), v)
+end
 
-  n = emptyvector
-  found = false
-  for e in m.kvs
-    if e === nil
-      continue
-    elseif e.key == k
-      n = conj(n, MapEntry(k, v))
-      found = true
+function assoc(m::Map, k, v, kvs...)
+  @assert length(kvs) % 2 == 0
+
+  into(assoc(m, k, v), partition(2), kvs)
+end
+
+assoc(m::Map, k::Nothing, v) = throw("nothing is not a valid map key.")
+assoc(x::Nothing, k, v) = PersistentArrayMap((k, v))
+assoc(m::EmptyMap, k, v) = PersistentArrayMap((k, v))
+
+function assoc(m::PersistentArrayMap, k, v)
+  if count(m) >= arraymapsizethreashold
+    assoc(into(emptyhashmap, m), k, v)
+  else
+    (_, i) = getindexed(m, k)
+
+    if i === :notfound
+      PersistentArrayMap((m.kvs...,k,v))
     else
-      n = conj(n, e)
+      PersistentArrayMap((
+        m.kvs[1:i-1]...,
+        m.kvs[i+2:end]...,
+        k,v
+      ))
     end
   end
-
-  if !found
-    n = conj(n, MapEntry(k, v))
-  end
-
-  return PersistentArrayMap(n)
 end
 
 function dissoc(m::PersistentArrayMap, k)
-  out = emptymap
-  for e in m.kvs
-    if e != nil && e.key != k
-      out = conj(out, e)
-    end
+  (_, i) = getindexed(m, k)
+  if i === :notfound
+    m
+  else
+    PersistentArrayMap((m.kvs[1:i-1]..., m.kvs[i+2:end]...))
   end
-  return PersitentArrayMap(out)
 end
 
+function seq(m::PersistentArrayMap)
+  map(i -> MapEntry(m.kvs[i], m.kvs[i+1]), 1:2:length(m.kvs))
+end
+
+
+# REVIEW: Profile and see if first often comes without rest. This isn't useful
+# unless that's the case.
 function first(m::PersistentArrayMap)
-  first(m.kvs)
+  MapEntry(m.kvs[1], m.kvs[2])
 end
 
-function rest(m::PersistentArrayMap)
-  rest(m.kvs)
-end
+##### Hash Maps
 
-function nodewalk(node::MapEntry, target, hash)
-  if node.key == target
-    return node.value
+function getindexed(m::MapEntry, k, default, l)
+  if m.key == k
+    # The level at which an element was found (if found) tells you exactly what
+    # it's effective hash is.
+    m.value, l
   else
-    return nothing
+    default, :notfound
   end
 end
 
-function nodewalk(node::PersistentHashMap, target, hash)
-  # And here I thought I didn't need cardinal indicies...
-  i = first(hash) + 1
-  n = get(node.ht, i)
-  if n === nothing
-    nothing
+function getindexed(m::PersistentHashNode, k, default, l)
+  next = m.ht[nth(hashseq(k), m.level) + 1]
+
+  if next === emptymarker
+    default, :notfound
   else
-    nodewalk(n, target, rest(hash))
+    getindexed(next, k, default, m.level)
   end
 end
 
-function get(m::PersistentHashMap, k)
-  nodewalk(m, k, hashseq(k))
+function getindexed(m::PersistentHashMap, k, default=nil)
+  getindexed(m.root, k, default, 1)
 end
 
-function containsp(m::Map, k)
-  get(m, k) !== nothing
-end
+function assoc(m::PersistentHashNode, k, v, level=nil)
+  h = nth(hashseq(k), m.level) + 1
+  next = m.ht[h]
 
-function nodewalkupdate(m::PersistentHashMap, entry::MapEntry, hash, level)
-  i = first(hash) + 1
-  node, added = nodewalkupdate(get(m.ht, i), entry, rest(hash), level + 1)
-  n = assoc(
-    m.ht,
-    i,
-    node
-  )
-
-  return PersistentHashMap(n, m.count + added), added
-end
-
-function nodewalkupdate(m::Nothing, entry::MapEntry, hash, level)
-  entry, 1
-end
-
-function nodewalkupdate(m::MapEntry, entry::MapEntry, hs, level)
-  mh = drop(level - 1, hashseq(m.key))
-  if m.key == entry.key
-    return entry, 0
-  elseif first(mh) == first(hs)
-    childnode, _ = nodewalkupdate(emptyhashnode, m, hashseq(m.key), level + 1)
-    child, _ = nodewalkupdate(childnode, entry, hs, level + 1)
-
-    parent = assoc(emptyhashnode.ht, first(mh) + 1, child)
-
-    return PersistentHashMap(parent, 2), 1
+  if next === emptymarker
+    # New entry increases size by one.
+    PersistentHashNode(assoc(m.ht, h, MapEntry(k, v)), m.level, m.count + 1)
   else
-    ht = emptyhashnode.ht
-    ht = assoc(ht, first(mh) + 1, m)
-    ht = assoc(ht, first(hs) + 1, entry)
-    return PersistentHashMap(ht, 2), 1
+    submap = assoc(next, k, v, m.level)
+    ht = assoc(m.ht, h, submap)
+    c = sum(map(count, ht); init=0)
+
+    PersistentHashNode(ht, m.level, c)
   end
+end
+
+function assoc(e::MapEntry, k, v, l=0)
+  if e.key == k
+    e
+  else
+    assoc(assoc(emptyhashnode(l+1), e.key, e.value), k, v)
+  end
+end
+
+function assoc(
+  t::NTuple{Int(nodelength),MapNode}, i, v
+)::NTuple{Int(nodelength),MapNode}
+  tuple(t[1:i-1]..., v, t[i+1:end]...)
 end
 
 function assoc(m::PersistentHashMap, k, v)
-  if get(m, k) == v
-    return m
+  (val, i) = getindexed(m, k)
+  if i !== :notfound && val == v
+    m
   else
-    return nodewalkupdate(m, MapEntry(k, v), hashseq(k), 1)[1]
+    PersistentHashMap(assoc(m.root, k, v))
   end
 end
 
@@ -277,32 +275,8 @@ function dissoc(m::PersistentHashMap, k)
   throw("not implemented")
 end
 
-function seq(m::PersistentArrayMap)
-  m.kvs
-end
-
-function seq(m::PersistentHashMap)
-  # Produce VectorSeq of leaves
-  into(emptyvector, map(seq) ∘ cat(), m.ht)
-end
-
-function seq(e::MapEntry)
-  # FIXME: This boxing is only necessary because `cat` can't tell sequences
-  # from scalars.
-  vector(e)
-end
-
-function seq(x::Nothing)
-  []
-end
-
-function first(m::PersistentHashMap)
-  first(seq(m))
-end
-
-function rest(m::PersistentHashMap)
-  rest(seq(m))
-end
+# Produce VectorSeq of leaves
+seq(m::PersistentHashMap) = into(emptyvector, map(seq) ∘ cat(), m.ht)
 
 function update(m::Map, k, f, v...)
   assoc(m, k, f(get(m, k), v...))
@@ -314,17 +288,12 @@ end
 
 function hashmap(args...)
   @assert length(args) % 2 == 0
-  out = emptymap
-  for i in 1:div(length(args), 2)
-    out = assoc(out, args[2*i-1], args[2*i])
-  end
-  return out
+  into(emptymap, partition(2), args)
 end
 
-function merge(x::Map)
-  x
-end
+merge(x::Map) = x
 
+# TODO: Merge can be implemented much more efficiently.
 function merge(x::Map, y::Map)
   into(x, y)
 end
@@ -371,11 +340,7 @@ struct OrderedMap <: Map
   keyseq::Vector
 end
 
-emptyorderedmap = OrderedMap(emptymap, emptyvector)
-
-function get(m::OrderedMap, k)
-  get(m.inner, k)
-end
+const emptyorderedmap = OrderedMap(emptymap, emptyvector)
 
 function assoc(m::OrderedMap, k, v)
   m2 = assoc(m.inner, k, v)
@@ -394,29 +359,15 @@ function dissoc(m::OrderedMap, k)
   )
 end
 
-function seq(m::OrderedMap)
-  map(k -> MapEntry(k, get(m, k)), m.keyseq)
-end
+get(m::OrderedMap, k, default) = get(m.inner, k, default)
 
-function keys(m::OrderedMap)
-  m.keyseq
-end
+seq(m::OrderedMap) = map(k -> MapEntry(k, get(m, k)), m.keyseq)
 
-function vals(m::OrderedMap)
-  map(k -> get(m, k), m.keyseq)
-end
+keys(m::OrderedMap) = m.keyseq
 
-function count(m::OrderedMap)
-  count(m.keyseq)
-end
+vals(m::OrderedMap) = map(k -> get(m, k), m.keyseq)
 
-function first(m::OrderedMap)
-  first(seq(m))
-end
-
-function rest(m::OrderedMap)
-  rest(seq(m))
-end
+count(m::OrderedMap) = count(m.keyseq)
 
 function zipmap(x, y)
   i = min(count(x), count(y))
