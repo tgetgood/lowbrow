@@ -166,6 +166,21 @@ function interpose(delim)
   end
 end
 
+function aftereach(delim)
+  function (emit)
+    function inner()
+      emit()
+    end
+    function inner(res)
+      emit(res)
+    end
+    function inner(res, next)
+      emit(emit(res, next), delim)
+    end
+    return inner
+  end
+end
+
 # FIXME: What's going on here?
 
 # Interleave is a higher order form of transducer (as is map in general). The
