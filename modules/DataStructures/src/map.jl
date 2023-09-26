@@ -22,7 +22,7 @@ const emptymap = EmptyMap()
 
 # Clojure uses 8 and I don't want to dig into it just yet.
 # TODO: Analysis
-arraymapsizethreashold = 8
+const arraymapsizethreashold = 8
 
 struct PersistentArrayMap <: Map
   kvs::Tuple
@@ -35,7 +35,7 @@ const emptymarker = EmptyMarker()
 
 # N.B.: It's important that nodes not be maps themselves since nodes with
 # different levels cannot be merged sensibly and so passing subnodes around as
-# full fledged maps is bound to end in disaster.
+# full fledged maps is bound to end in confusion and disaster.
 struct PersistentHashNode <: MapNode
   ht::NTuple{Int(nodelength), MapNode}
   level::UInt
@@ -52,7 +52,7 @@ emptyhashnode(level) = PersistentHashNode(emptyhash, level, 0)
 # consider it worth it until proven otherwise.
 struct PersistentHashMap <: Map
   root::PersistentHashNode
-  # ht::NTuple{Int(nodelength), Union{PersistentHashNode, MapEntry, Nothing}}
+  # ht::NTuple{Int(nodelength), MapNode}
   # count::UInt
 end
 
@@ -99,9 +99,6 @@ conj(m::Map, x::Nothing) = m
 conj(m::Map, e::MapEntry) = assoc(m, e.key, e.value)
 conj(m::Map, v::Vector) = assoc(m, v[1], v[2])
 
-# FIXME: This boxing is only necessary because `cat` can't tell sequences
-# from scalars.
-seq(e::MapEntry) = vector(e)
 seq(x::Nothing) = emptyvector
 
 # Defer to `seq` for concrete type unless overridden.
@@ -112,6 +109,10 @@ get(m::Nothing, k) = nil
 get(m::Nothing, k, default) = default
 get(m::EmptyMap, x) = get(m, x, nothing)
 get(m::EmptyMap, x, default) = default
+
+function getindexed(m::EmptyMap, k)
+  nothing, :notfound
+end
 
 """
 Returns (v, i) where `v` is the value associated with key `k` in `m` and `i` is
@@ -275,8 +276,13 @@ function dissoc(m::PersistentHashMap, k)
   throw("not implemented")
 end
 
-# Produce VectorSeq of leaves
-seq(m::PersistentHashMap) = into(emptyvector, map(seq) ∘ cat(), m.ht)
+gather(acc, m::EmptyMarker) = acc
+gather(acc, m::MapEntry) = conj(acc, m)
+gather(acc, m::PersistentHashNode) = reduce(gather, acc, m.ht)
+
+function seq(m::PersistentHashMap)
+  gather(emptyvector, m.root)
+end
 
 function update(m::Map, k, f, v...)
   assoc(m, k, f(get(m, k), v...))

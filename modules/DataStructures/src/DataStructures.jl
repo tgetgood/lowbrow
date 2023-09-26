@@ -18,7 +18,7 @@ include("./queue.jl")
 include("./juliatypes.jl")
 
 # Sequential
-export first, rest, take, drop, reduce, transduce, into, map, filter, interpose, dup, cat, partition
+export first, rest, take, drop, reduce, transduce, into, map, filter, interpose, dup, cat, partition, seq
 
 # Vectors
 export emptyvector, nth, vec, vector, zip

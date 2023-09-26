@@ -1,4 +1,4 @@
-@testset "small maps" begin
+@testset "array maps" begin
   @test hashmap() === emptymap
 
   @test begin
@@ -29,10 +29,20 @@ end
 
   @test getin(updatein(m, [:a, :b], x -> x + 1), [:a, :b]) == 6
   @test getin(associn(m, [:a, :c, :b], :sym), [:a, :c]) == hashmap(:b, :sym)
+
+  m2 = into(emptymap, map(i -> (i,i)), 1:65)
+
+  m3 = merge(m, m2)
+
+  @test get(m3, 7) == 7
+  @test getin(m3, [:a, :b]) == 5
+
+  @test updatein(m3, [5, :c], conj, "purple")
 end
 
-@testset "bigger maps" begin
+@testset "hash maps" begin
 
+  #TODO:
   c = hashmap(
     :key, 1,
     "string", complex(1f0, 13f-2),
