@@ -87,11 +87,11 @@ nth(h::HashSeq, n) = first(HashSeq(h.hash, h.current+n))
 empty(m::Map) = emptymap
 
 count(m::EmptyMarker) = 0
-count(m::PersistentHashNode) = m.count
+count(m::PersistentHashNode)::Int = m.count
 count(m::MapEntry) = 1
 count(m::EmptyMap) = 0
 count(m::PersistentArrayMap) = length(m.kvs) >> 1 # inline kvs
-count(m::PersistentHashMap) = m.root.count
+count(m::PersistentHashMap)::Int = m.root.count
 
 emptyp(m::Map) = count(m) == 0
 
@@ -284,12 +284,17 @@ function seq(m::PersistentHashMap)
   gather(emptyvector, m.root)
 end
 
-function update(m::Map, k, f, v...)
+function update(m, k, f, v...)
+  @info (k, get(m, k), f(get(m, k), v...))
   assoc(m, k, f(get(m, k), v...))
 end
 
-function updatein(m::Map, ks, f, v...)
-  associn(m, ks, f(getin(m, ks), v...))
+function updatein(m, ks, f, v...)
+  if emptyp(ks)
+    f(m, v...)
+  else
+    update(m, first(ks), updatein, rest(ks), f, v...)
+  end
 end
 
 function hashmap(args...)
@@ -305,7 +310,7 @@ function merge(x::Map, y::Map)
 end
 
 function string(x::MapEntry)
-  string(x.key) * " " * string(x.value)
+  string(x.key) * ": " * string(x.value)
 end
 
 function string(m::Map)
@@ -316,6 +321,26 @@ function string(m::Map)
     m
   )
   return "{" * inner * "}"
+end
+
+function printmap(io, m)
+  print(io, transduce(interpose("\n ") ∘ map(string), *, "", m))
+end
+
+function show(io::IO, mime::MIME"text/plain", m::Map)
+
+  print(io, string(count(m)) * "-element DataStructures.Map: {\n ")
+  s = seq(m)
+  if count(m) > 33
+    s = seq(m)
+    printmap(io, take(16, s))
+    print(io, "\n ...\n")
+    printmap(io, drop(count(m) - 16, s))
+  else
+    printmap(io, s)
+  end
+
+  print(io, "\n}")
 end
 
 function keys(m::Map)

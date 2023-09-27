@@ -106,13 +106,10 @@ count(v::VectorLeaf) = length(v.elements)
 count(v::VectorNode) = v.count
 count(v::EmptyVector) = 0
 
-function length(v::Vector)
-  count(v)
-end
+length(v::Vector) = count(v)
 
-function conj(v::EmptyVector, x)
-  vectorleaf((x,))
-end
+conj(v::Nothing, x) = vectorleaf((x,))
+conj(v::EmptyVector, x) = vectorleaf((x,))
 
 function conj(v::VectorLeaf, x)
   if completep(v)
@@ -166,8 +163,9 @@ end
 Returns the nth element (starting at 1) of vector v.
 """
 function nth(v::VectorNode, n)
-  (d, r) = divrem(n, nodelength^(depth(v) - 1))
-  nth(v.elements[d+1], r)
+  # REVIEW: Cast to and from 0-indexing. Not pretty.
+  (d, r) = divrem(n-1, nodelength^(depth(v) - 1))
+  nth(v.elements[d+1], r+1)
 end
 
 function getindex(v::Vector, n)
@@ -306,19 +304,24 @@ function takelast(n, v::Vector)
   end
 end
 
+function printvec(io::IO, v)
+  print(io, transduce(interpose("\n ") ∘ map(string), *, "", v))
+end
+
+
 function show(io::IO, mime::MIME"text/plain", v::Vector)
+  print(io, string(count(v)) * "-element DataStructures.Vector: [\n ")
+
   # REVIEW: Why 65? Because it had to be something...
   if count(v) > 65
-    elements =
-      transduce(interpose("\n ") ∘ map(string), *, "", take(32, v)) *
-      "\n ...\n " *
-      transduce(interpose("\n ") ∘ map(string), *, "", takelast(32, v))
+    printvec(io, take(32, v))
+    print(io, "\n ...\n ")
+    printvec(io, takelast(32, v))
   else
-    elements = transduce(interpose("\n ") ∘ map(string), *, "", v)
+    printvec(io, v)
   end
 
-  str = string(count(v)) * "-element DataStructures.Vector:\n " * elements
-  print(io, str)
+  print(io, "\n]")
 end
 
 function iterate(v::Vector)
