@@ -39,6 +39,7 @@
   @test vec(1:nodelength^2+1) == into(emptyvector, 1:nodelength^2+1)
 
   @test nth(vec(1:32^4), 32^3+127) == 32^3+127
+  @test nth(vec(1:32^4), 32) == 32
   @test nth(vec(1:32^4), 32*32*8 + 32*5 + 9) == 32^2*8 + 32*5 + 9
 
 end
