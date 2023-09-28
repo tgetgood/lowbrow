@@ -49,8 +49,8 @@ end
 vectorleaf(args::Tuple) = VectorLeaf(args)
 vectorleaf(args) = VectorLeaf(Tuple(args))
 
-struct VectorNode{N} <: PersistentVector
-  elements::Union{NTuple{N, VectorLeaf}, NTuple{N, VectorNode}}
+struct VectorNode <: PersistentVector
+  elements::Tuple
   # FIXME: This shouldn't be fixed size, but memory indirection is killing me.
   count::UInt64
   # max depth is log(nodelength, typemax(typeof(count))). 4 bits would suffice.

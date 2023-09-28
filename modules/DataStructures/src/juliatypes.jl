@@ -13,7 +13,7 @@ function assoc(v::Base.Vector, i, val)
   return v2
 end
 
-rest(v::Base.Vector) = v[2:end]
+rest(v::Base.Array) = v[2:end]
 rest(v::UnitRange) = rest(Base.Vector(v))
 rest(v::Tuple) = v[2:end]
 
@@ -29,7 +29,7 @@ function get(v::Base.Vector, i)
 end
 
 reduce(f, init, coll::UnitRange) = Base.reduce(f, coll; init)
-reduce(f, init, coll::Base.Vector) = Base.reduce(f, coll; init)
+reduce(f, init, coll::Array) = Base.reduce(f, coll; init)
 reduce(f, init, coll::Tuple) = Base.reduce(f, coll; init)
 
 

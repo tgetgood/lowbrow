@@ -15,6 +15,32 @@ import commands
 # png and jpg load as transposes of each other. Is that my fault?
 import ColorTypes.FixedPointNumbers
 
+function bgr(p)
+  ds.vector(
+    reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r)
+  )
+end
+
+function profile(system, config, k = 10)
+  dev = get(system, :device)
+
+  image = load(get(config, :texture_file))
+
+  for i in 1:k
+    print(string(2^i) * ": ")
+    @time rgb = ds.into(
+      ds.emptyvector,
+      map(bgr)
+      ∘
+      map(x -> ds.conj(x, 0xff))
+      ∘
+      ds.cat(),
+      image[1:2^i]
+    )
+    nothing
+  end
+end
+
 function textureimage(system, config)
   dev = get(system, :device)
 
@@ -23,6 +49,16 @@ function textureimage(system, config)
   pixels = reduce(*, size(image))
 
   mips = Int(1 + floor(log2(max(size(image)...))))
+
+  # @time rgb = ds.into(
+  #   ds.emptyvector,
+  #   map(bgr)
+  #   ∘
+  #   map(x -> ds.conj(x, 0xff))
+  #   ∘
+  #   ds.cat(),
+  #   image
+  # )
 
   rgb::Vector{UInt8} = reduce(vcat,
     map(p -> [
@@ -52,7 +88,9 @@ function textureimage(system, config)
     :size, size(image),
     :mips, mips,
     :sharingmode, vk.SHARING_MODE_EXCLUSIVE,
-    :usage, vk.IMAGE_USAGE_TRANSFER_DST_BIT | vk.IMAGE_USAGE_SAMPLED_BIT,
+    :usage, vk.IMAGE_USAGE_TRANSFER_SRC_BIT |
+            vk.IMAGE_USAGE_TRANSFER_DST_BIT |
+            vk.IMAGE_USAGE_SAMPLED_BIT,
     :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
   ))
 

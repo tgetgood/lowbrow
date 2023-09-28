@@ -64,3 +64,44 @@ faults at 2^15 which I think is actually a stack overflow.
 
 The idea was to use Base.Vector and Base.reduce and have better performace. That
 needs a redesign.
+* Performance improvements [2023-09-28 Thu]
+
+After reimplementing vectors using Tuples instead of arrays (not to mention
+fixing up some blatant errors, we get:
+
+2:   0.037318 seconds (34.10 k allocations: 2.270 MiB)
+4:   0.000030 seconds (147 allocations: 3.234 KiB)
+8:   0.000036 seconds (299 allocations: 6.750 KiB)
+16:   0.012085 seconds (4.31 k allocations: 261.349 KiB)
+32:   0.021579 seconds (7.78 k allocations: 456.428 KiB)
+64:   0.040643 seconds (14.73 k allocations: 852.820 KiB)
+128:   0.079438 seconds (28.61 k allocations: 1.631 MiB)
+256:   0.154938 seconds (56.38 k allocations: 3.331 MiB)
+512:   0.005223 seconds (42.55 k allocations: 1.547 MiB)
+1024:   0.014135 seconds (102.44 k allocations: 4.144 MiB)
+2048:   0.049300 seconds (245.93 k allocations: 13.219 MiB, 25.63% gc time)
+4096:   0.088340 seconds (565.65 k allocations: 33.909 MiB)
+8192:   0.250066 seconds (1.35 M allocations: 76.654 MiB, 5.44% gc time)
+16384:   0.580798 seconds (3.10 M allocations: 166.967 MiB, 4.01% gc time)
+32768:   1.288246 seconds (6.79 M allocations: 368.141 MiB, 3.48% gc time)
+65536:   2.873495 seconds (14.92 M allocations: 894.722 MiB, 3.85% gc time)
+131072:   6.365209 seconds (32.24 M allocations: 1.982 GiB, 4.17% gc time)
+262144:  14.536195 seconds (71.52 M allocations: 4.240 GiB, 3.77% gc time)
+524288:  32.252954 seconds (155.95 M allocations: 8.910 GiB, 3.66% gc time)
+1048576:  68.632605 seconds (330.91 M allocations: 18.891 GiB, 3.62% gc time)
+
+~10x improvement in run time. Huge improvement in allocated space, but number of
+allocations is ~6x higher.
+
+Lesson 1) transients are indispensible. Lesson 2) maybe tuples weren't such a
+hot idea after all.
+
+I'll try out the streamlined design with vectors again. I might be thrashing
+here.
+
+Easy wins are parallel transduction and transients. Maybe I should focus my
+efforts there.
+
+I also massively simplified the implementation of maps, and added some tests to
+convince myself they work (to the extent I've thought to use them). But again
+huge performance regression. They're basically unusable as is.
