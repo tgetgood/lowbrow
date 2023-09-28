@@ -2,7 +2,7 @@ using Test
 
 using DataStructures
 import DataStructures as ds
-import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, EmptyVector, Vector, sibling, vectornode, vectorleaf, depth
+import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, EmptyVector, Vector, sibling, vectornode, vectorleaf, depth, emptyhashmap, reduce, arraymapsizethreashold
 
 # FIXME: This should be doable with modules with a standard function. The
 # support structure to let the runtime find all of these modules is ugly though.

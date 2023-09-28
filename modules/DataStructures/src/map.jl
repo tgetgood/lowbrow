@@ -251,7 +251,7 @@ end
 
 function assoc(e::MapEntry, k, v, l=0)
   if e.key == k
-    e
+    MapEntry(k, v)
   else
     assoc(assoc(emptyhashnode(l+1), e.key, e.value), k, v)
   end
@@ -285,15 +285,17 @@ function seq(m::PersistentHashMap)
 end
 
 function update(m, k, f, v...)
-  @info (k, get(m, k), f(get(m, k), v...))
-  assoc(m, k, f(get(m, k), v...))
+  nv = f(get(m, k), v...)
+  assoc(m, k, nv)
 end
 
 function updatein(m, ks, f, v...)
-  if emptyp(ks)
-    f(m, v...)
+  k = first(ks)
+  if emptyp(rest(ks))
+    update(m, k, f, v...)
   else
-    update(m, first(ks), updatein, rest(ks), f, v...)
+    nv =  updatein(get(m, k), rest(ks), f, v...)
+    assoc(m, k, nv)
   end
 end
 
