@@ -62,7 +62,9 @@ conj(x) = x
 
 concat(xs, ys) = into(xs, ys)
 
+# This is a case where early abort could help. Particularly if `p` is expensive.
 every(p, xs) = reduce((x, y) -> x && y, true, map(p, xs))
+# count(xs) == count(filter(p, xs))
 
 function cat()
   function (emit)

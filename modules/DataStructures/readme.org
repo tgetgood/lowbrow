@@ -105,3 +105,93 @@ efforts there.
 I also massively simplified the implementation of maps, and added some tests to
 convince myself they work (to the extent I've thought to use them). But again
 huge performance regression. They're basically unusable as is.
+
+After reimplementing with (base) vectors instead of tuples, I get:
+2:   0.000036 seconds (68 allocations: 2.328 KiB)
+4:   0.000011 seconds (138 allocations: 4.891 KiB)
+8:   0.000017 seconds (278 allocations: 10.938 KiB)
+16:   0.000050 seconds (930 allocations: 37.641 KiB)
+32:   0.000094 seconds (2.35 k allocations: 95.234 KiB)
+64:   0.000207 seconds (5.57 k allocations: 225.328 KiB)
+128:   0.000493 seconds (13.54 k allocations: 619.172 KiB)
+256:   0.001366 seconds (36.66 k allocations: 1.819 MiB)
+512:   0.003244 seconds (88.02 k allocations: 4.183 MiB)
+1024:   0.015228 seconds (193.80 k allocations: 9.068 MiB, 59.99% gc time)
+2048:   0.012516 seconds (417.67 k allocations: 19.494 MiB)
+4096:   0.036217 seconds (914.55 k allocations: 45.283 MiB, 24.31% gc time)
+8192:   0.079682 seconds (2.10 M allocations: 113.657 MiB, 18.27% gc time)
+16384:   0.158852 seconds (4.74 M allocations: 245.702 MiB, 13.64% gc time)
+32768:   0.338404 seconds (10.12 M allocations: 514.794 MiB, 14.86% gc time)
+65536:   0.701287 seconds (21.26 M allocations: 1.049 GiB, 14.67% gc time)
+131072:   1.523102 seconds (45.11 M allocations: 2.295 GiB, 16.00% gc time)
+262144:   3.396177 seconds (99.11 M allocations: 5.313 GiB, 16.90% gc time)
+524288:   7.134940 seconds (215.47 M allocations: 11.204 GiB, 17.91% gc time)
+1048576:  14.954999 seconds (451.32 M allocations: 23.141 GiB, 19.62% gc time)
+
+With no runtime compiler warmup to speak of, which is an added bonus.
+
+so now we're down to 10x ram, 30x runtime, and 200x allocations. But that's
+without transients. Progress.
+
+And to think I went with tuples because I thought they would optimise better
+being immutable. And they do in terms of allocations and memory usage. But 1.28x
+more RAM for a 4.5x runtime boost seems like a good trade.
+
+[2023-09-29 Fri]
+
+2:   0.000040 seconds (72 allocations: 2.141 KiB)
+4:   0.000011 seconds (142 allocations: 4.453 KiB)
+8:   0.000018 seconds (282 allocations: 10.000 KiB)
+16:   0.000050 seconds (866 allocations: 32.734 KiB)
+32:   0.000095 seconds (2.14 k allocations: 81.078 KiB)
+64:   0.000218 seconds (5.07 k allocations: 189.672 KiB)
+128:   0.000470 seconds (12.47 k allocations: 528.500 KiB)
+256:   0.001161 seconds (33.42 k allocations: 1.561 MiB)
+512:   0.002527 seconds (77.35 k allocations: 3.539 MiB)
+1024:   0.005505 seconds (168.29 k allocations: 7.620 MiB)
+2048:   0.011057 seconds (362.45 k allocations: 16.345 MiB)
+4096:   0.032831 seconds (799.94 k allocations: 38.357 MiB, 28.70% gc time)
+8192:   0.071598 seconds (1.87 M allocations: 97.677 MiB, 23.86% gc time)
+16384:   0.130356 seconds (4.11 M allocations: 209.177 MiB, 12.99% gc time)
+32768:   0.281846 seconds (8.69 M allocations: 436.178 MiB, 16.36% gc time)
+65536:   0.582891 seconds (18.24 M allocations: 908.179 MiB, 16.01% gc time)
+131072:   1.223732 seconds (38.90 M allocations: 1.951 GiB, 16.16% gc time)
+262144:   2.918031 seconds (86.53 M allocations: 4.558 GiB, 17.62% gc time)
+524288:   6.131520 seconds (184.93 M allocations: 9.550 GiB, 18.30% gc time)
+1048576:  12.946524 seconds (384.87 M allocations: 19.658 GiB, 20.43% gc time)
+
+Just by overloading conj with a fast case when the element being added is a
+subtype of the collection type.
+
+I didn't expect reflection (typejoin) to be cheap, but that one call can't
+account for what's going on here. Looking at the LLVM bitcode, the generate code
+is superficially similar, but I'm not familiar enough to compare them without
+great effort which I'd rather allocate elsewhere.
+
+Maybe allowing the possibility of having to box at every step causes all the
+extra work. In any case I've learned to be much more wary of reflection.
+
+And removing the asserts gets us:
+
+2:   0.266746 seconds (696.97 k allocations: 46.322 MiB, 99.87% compilation time)
+4:   0.000036 seconds (142 allocations: 4.453 KiB)
+8:   0.000034 seconds (282 allocations: 10.000 KiB)
+16:   0.188647 seconds (130.75 k allocations: 8.612 MiB, 8.30% gc time, 99.93% compilation time)
+32:   0.000098 seconds (1.85 k allocations: 72.125 KiB)
+64:   0.000166 seconds (3.95 k allocations: 161.656 KiB)
+128:   0.000365 seconds (8.14 k allocations: 438.359 KiB)
+256:   0.000868 seconds (16.52 k allocations: 1.250 MiB)
+512:   0.008639 seconds (42.78 k allocations: 2.864 MiB, 77.68% compilation time)
+1024:   0.003965 seconds (94.47 k allocations: 6.089 MiB)
+2048:   0.008332 seconds (198.40 k allocations: 12.750 MiB)
+4096:   0.033216 seconds (406.25 k allocations: 29.133 MiB, 47.31% gc time)
+8192:   0.049455 seconds (821.97 k allocations: 70.945 MiB, 25.66% gc time)
+16384:   0.100161 seconds (1.98 M allocations: 153.680 MiB, 16.17% gc time)
+32768:   0.188255 seconds (4.29 M allocations: 320.151 MiB, 10.64% gc time)
+65536:   0.394972 seconds (8.92 M allocations: 659.092 MiB, 12.61% gc time)
+131072:   0.855680 seconds (18.18 M allocations: 1.401 GiB, 13.63% gc time)
+262144:   1.972930 seconds (36.69 M allocations: 3.199 GiB, 15.42% gc time)
+524288:   4.259396 seconds (84.20 M allocations: 6.769 GiB, 17.15% gc time)
+1048576:   8.968445 seconds (179.22 M allocations: 13.939 GiB, 18.54% gc time)
+
+Which really oughtn't be surprising...

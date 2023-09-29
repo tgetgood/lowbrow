@@ -1,4 +1,4 @@
-@testset "vectors" begin
+@testset "Vectors" begin
   # There's only one empty vector
   @test emptyvector === vector()
 
@@ -44,7 +44,7 @@
 
 end
 
-@testset "balanced trees" begin
+@testset "Balanced Trees" begin
   # TODO: My vectors are not balanced trees. So long as you're just iterating, I
   # don't think this is a big deal, but the asymptotic lookup behaviour is O(n)
   # instead of O(log(n)) which is a big deal.
@@ -70,6 +70,18 @@ end
 
 end
 
-@testset "vector seqs" begin
+@testset "Transient Vectors" begin
+  t = transient!(emptyvector)
+
+  @test t isa ds.TransientVector
+  @test !(t isa Vector)
+
+  @test persist!(t) === emptyvector
+
+  @test_throws String persist!(t)
+
+end
+
+@testset "Vector Seqs" begin
   #TODO:
 end

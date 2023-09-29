@@ -1,19 +1,5 @@
 abstract type Vector <: Sequential end
 
-abstract type Transient end
-"""
-N.B.: I think it's a mistake to make transients subtypes of the types the
-mirror. We don't want to accidentally substitute a transient type for a
-persistent type.
-"""
-abstract type TransientVector <: Transient end
-
-struct TransientVectorLeaf <: TransientVector
-  elements::Base.Vector
-end
-
-struct TransientVectorNode <: TransientVector
-end
 
 """
 N-ary (where N == nodelength) trees with values stored only in the leaves.
@@ -30,40 +16,40 @@ abstract type PersistentVector <: Vector end
 struct EmptyVector <: PersistentVector
 end
 
-# TODO: Can I improve code generation by making these NTuples? It's a pain to
-# manually deal with type upgrades without covariance, so it would need to be
-# worth it. As is, the `elements` Tuple can't be inlined into the struct the way
-# an fixed NTuple can be.
+struct VectorLeaf{T} <: PersistentVector
+  elements::Base.Vector{T}
+end
+
+# REVIEW: Play with setting nodelength on a per vector basis and set it based on
+# the size of the leaf element type.
 #
-# Maybe something like
+# Actually doing the math, it looks like for very large trees of i8s the savings
+# would approach 18%. That's not all that much. Might be worth it in some
+# specialised settings, but not a priority until one of those come up.
 
-struct BitsVectorLeaf{N, T}
-  elements::NTuple{N, T}
+function vectorleaf(args::Base.Vector)
+  if 0 === length(args)
+    emptyvector
+  else
+    VectorLeaf(args)
+  end
 end
-
-struct VectorLeaf <: PersistentVector
-  elements::Tuple
-end
-
-# Tuple calls convert when passed a Tuple... Why is that?
-vectorleaf(args::Tuple) = VectorLeaf(args)
-vectorleaf(args) = VectorLeaf(Tuple(args))
 
 struct VectorNode <: PersistentVector
-  elements::Tuple
+  elements::Base.Vector{PersistentVector}
   # FIXME: This shouldn't be fixed size, but memory indirection is killing me.
   count::UInt64
   # max depth is log(nodelength, typemax(typeof(count))). 4 bits would suffice.
   depth::UInt8
 end
 
-function vectornode(els::Tuple, count, depth)
+function vectornode(els::Base.Vector, count, depth)
   VectorNode(els, UInt64(count), UInt8(depth))
 end
 
-function vectornode(els, count, depth)
-  vectornode(Tuple(els), count, depth)
-end
+# function vectornode(els::VectorLeaf, count, depth)
+#   vectornode(Tuple(els), count, depth)
+# end
 
 function reduce(f, init, coll::VectorLeaf)
   Base.reduce(f, coll.elements, init=init)
@@ -108,33 +94,60 @@ count(v::EmptyVector) = 0
 
 length(v::Vector) = count(v)
 
-conj(v::Nothing, x) = vectorleaf((x,))
-conj(v::EmptyVector, x) = vectorleaf((x,))
+conj(v::Nothing, x) = vectorleaf([x])
+conj(v::EmptyVector, x) = vectorleaf([x])
 
-function conj(v::VectorLeaf, x)
+# function conj(v::VectorLeaf{T}, x::S) where {T, S <: T}
+#   if completep(v)
+#     vectornode([v, vectorleaf([x])], count(v) + 1, 2)
+#   else
+#     temp = copy(v.elements)
+#     push!(temp, x)
+#     vectorleaf(temp)
+#   end
+# end
+
+function addtoleaf(v::VectorLeaf{T}, x::S) where {T, S}
+  N = typejoin(S, T)
+  temp::Base.Vector{N} = copy(v.elements)
+  push!(temp, x)
+  VectorLeaf{N}(temp)
+end
+
+function addtoleaf(v::VectorLeaf{T}, x::S) where {T, S <: T}
+  temp = copy(v.elements)
+  push!(temp, x)
+  VectorLeaf{T}(temp)
+end
+
+function conj(v::VectorLeaf{T}, x::S) where {T, S}
   if completep(v)
-    vectornode((v, vectorleaf((x,))), count(v) + 1, 2)
+    vectornode([v, vectorleaf([x])], count(v) + 1, 2)
   else
-    vectorleaf((v.elements..., x))
+    addtoleaf(v, x)
   end
 end
 
 function sibling(x, depth)
   if depth == 1
-    vectorleaf((x,))
+    vectorleaf([x])
   else
-    vectornode(tuple(sibling(x, depth - 1)), 1, depth)
+    vectornode([sibling(x, depth - 1)], 1, depth)
   end
 end
 
-function join(els::NTuple, v::Vector)
-  @assert every(x -> depth(v) == depth(x), els)
-  vectornode((els..., v), sum(map(count, els); init=0) + count(v), depth(v) + 1)
+function join(els::Base.Vector, v::Vector)
+  # REVIEW: These asserts *shouldn't* be necessary. Can I prove that?
+  # @assert every(x -> depth(v) == depth(x), els)
+  temp = copy(els)
+  push!(temp, v)
+  vectornode(temp, sum(count, els; init=0) + count(v), depth(v) + 1)
 end
 
 function join(v1::VectorNode, v2::VectorNode)
-  @assert depth(v1) == depth(v2)
-  vectornode((v1, v2), count(v1) + count(v2), depth(v1) + 1)
+  # TODO: Wrap @assert so that it can be disabled in production.
+  # @assert depth(v1) == depth(v2)
+  vectornode([v1, v2], count(v1) + count(v2), depth(v1) + 1)
 end
 
 function conj(v::VectorNode, x)
@@ -177,7 +190,9 @@ function assoc(v::EmptyVector, i, val)
 end
 
 function assoc(v::VectorLeaf, i, val)
-  vectorleaf((v.elements[begin:i-1]..., val, v.elements[i+1:end]...))
+  temp = copy(v.elements)
+  temp[i] = val
+  vectorleaf(temp)
 end
 
 function assoc(v::VectorNode, i, val)
@@ -266,7 +281,7 @@ end
 function incompletevectornode(nodes)
    vectornode(
     nodes,
-    sum(map(count, nodes); init = 0),
+    sum(count, nodes; init = 0),
     depth(nodes[1]) + 1
   )
 end
@@ -334,4 +349,107 @@ function iterate(v::Vector, state)
   else
     first(state), rest(state)
   end
+end
+
+##### Equality
+
+hash(v::VectorLeaf) = hash(v.elements)
+hash(v::VectorNode) = hash(v.elements)
+
+function Base.:(==)(x::VectorLeaf, y::VectorLeaf)
+  x.elements == y.elements
+end
+
+function Base.:(==)(x::VectorNode, y::VectorNode)
+  x.count === y.count &&
+    x.depth === y.depth &&
+    x.elements == y.elements
+end
+
+################################################################################
+# Transients
+################################################################################
+
+# N.B.: I think it's a mistake to make transients subtypes of the types they
+# mirror. We don't want to accidentally substitute a transient type for a
+# persistent type.
+abstract type Transient end
+
+abstract type TransientVector <: Transient end
+
+struct TransientVectorLeaf{T} <: TransientVector
+  elements::Base.Vector{T}
+  active::Ref{Bool}
+  lock::ReentrantLock
+end
+
+struct TransientVectorNode <: TransientVector
+  # TransientVectors and PersistentVectors share no supertype, but can share
+  # nodes (if that part hasn't been changed yet).
+  elements::Base.Vector{Any}
+  active::Ref{Bool}
+  lock::ReentrantLock
+end
+
+count(v::TransientVectorLeaf) = length(v.elements)
+count(v::TransientVectorNode) = sum(count, v.elements; init=0)
+
+depth(v::TransientVectorLeaf) = 1
+depth(v::TransientVectorNode) = 1 + depth(v.elements[1])
+
+function tvl(elements::Base.Vector{T}) where T
+  TransientVectorLeaf{T}(elements, Ref(true), ReentrantLock())
+end
+
+tvn(elements) = TransientVectorLeaf(elements, Ref(true), ReentrantLock())
+
+# REVIEW: Do we need an empty marker for transients?
+transient!(v::EmptyVector) = tvl([])
+transient!(v::VectorLeaf) = tvl(copy(v.elements))
+transient!(v::VectorNode) = tvn(copy(v.elements))
+
+function checktransience(v::TransientVector)
+  if !v.active[]
+    throw("Transient has been peristed. Aborting to prevent memory corruption.")
+  end
+end
+
+function tlwrap(f, v::TransientVector)
+  try
+    lock(v.lock)
+    checktransience(v)
+    f()
+  finally
+    unlock(v.lock)
+  end
+end
+
+function persist!(v::TransientVectorLeaf)
+  tlwrap(v) do
+    v.active[] = false
+    vectorleaf(v.elements)
+  end
+end
+
+function addtoleaf(v::TransientVectorLeaf{T}, x::S) where {T, S}
+  N = typejoin(S, T)
+  v = tvl{N}(copy(v.elements))
+  push!(v.elements, x)
+  return v
+end
+
+function addtoleaf(v::TransientVectorLeaf{T}, x::S) where {T, S <: T}
+  push!(v.elements, x)
+  return v
+end
+
+function conj!(v::TransientVectorLeaf{T}, x::S) where {T, S <: T}
+  if length(v.elements) == nodelength
+    tvn([v, tvl([x])])
+  else
+    addtoleaf(v, x)
+  end
+end
+
+function conj!(v::TransientVectorNode, x)
 end

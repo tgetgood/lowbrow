@@ -39,6 +39,10 @@ export conj, count, empty, emptyp, nil, keyword, name, symbol, withmeta, meta, e
 # Types
 export Keyword, Map, Vector, MapEntry, List
 
+# Transients
+export transient!, persist!, conj!
+
+
 ## Julia conventions vs my tendency to use clojure names...
 values(m::Map) = vals(m)
 
