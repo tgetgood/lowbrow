@@ -137,16 +137,12 @@ function sibling(x, depth)
 end
 
 function join(els::Base.Vector, v::Vector)
-  # REVIEW: These asserts *shouldn't* be necessary. Can I prove that?
-  # @assert every(x -> depth(v) == depth(x), els)
   temp = copy(els)
   push!(temp, v)
   vectornode(temp, sum(count, els; init=0) + count(v), depth(v) + 1)
 end
 
 function join(v1::VectorNode, v2::VectorNode)
-  # TODO: Wrap @assert so that it can be disabled in production.
-  # @assert depth(v1) == depth(v2)
   vectornode([v1, v2], count(v1) + count(v2), depth(v1) + 1)
 end
 
