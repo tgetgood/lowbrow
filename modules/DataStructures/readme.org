@@ -195,3 +195,9 @@ And removing the asserts gets us:
 1048576:   8.968445 seconds (179.22 M allocations: 13.939 GiB, 18.54% gc time)
 
 Which really oughtn't be surprising...
+
+One idea which I ought to look into is preallocating vectorleaves in certain
+contexts. Creating vectors with Vector(undef, 32) and tracking indicies instead
+of using `end` actually caused a substantial regression in performance. I don't
+know why. It took more memory to allocate less? Each node had an extra byte to
+store the index, but that doesn't account for it.

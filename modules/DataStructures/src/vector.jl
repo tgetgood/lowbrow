@@ -47,6 +47,10 @@ function vectornode(els::Base.Vector, count, depth)
   VectorNode(els, UInt64(count), UInt8(depth))
 end
 
+function vectornode(els::Base.Vector)
+  VectorNode(els, UInt(sum(count, els; init=0)), UInt8(depth(els[1]) + 1))
+end
+
 # function vectornode(els::VectorLeaf, count, depth)
 #   vectornode(Tuple(els), count, depth)
 # end
@@ -360,92 +364,4 @@ function Base.:(==)(x::VectorNode, y::VectorNode)
   x.count === y.count &&
     x.depth === y.depth &&
     x.elements == y.elements
-end
-
-################################################################################
-# Transients
-################################################################################
-
-# N.B.: I think it's a mistake to make transients subtypes of the types they
-# mirror. We don't want to accidentally substitute a transient type for a
-# persistent type.
-abstract type Transient end
-
-abstract type TransientVector <: Transient end
-
-struct TransientVectorLeaf{T} <: TransientVector
-  elements::Base.Vector{T}
-  active::Ref{Bool}
-  lock::ReentrantLock
-end
-
-struct TransientVectorNode <: TransientVector
-  # TransientVectors and PersistentVectors share no supertype, but can share
-  # nodes (if that part hasn't been changed yet).
-  elements::Base.Vector{Any}
-  active::Ref{Bool}
-  lock::ReentrantLock
-end
-
-count(v::TransientVectorLeaf) = length(v.elements)
-count(v::TransientVectorNode) = sum(count, v.elements; init=0)
-
-depth(v::TransientVectorLeaf) = 1
-depth(v::TransientVectorNode) = 1 + depth(v.elements[1])
-
-function tvl(elements::Base.Vector{T}) where T
-  TransientVectorLeaf{T}(elements, Ref(true), ReentrantLock())
-end
-
-tvn(elements) = TransientVectorLeaf(elements, Ref(true), ReentrantLock())
-
-# REVIEW: Do we need an empty marker for transients?
-transient!(v::EmptyVector) = tvl([])
-transient!(v::VectorLeaf) = tvl(copy(v.elements))
-transient!(v::VectorNode) = tvn(copy(v.elements))
-
-function checktransience(v::TransientVector)
-  if !v.active[]
-    throw("Transient has been peristed. Aborting to prevent memory corruption.")
-  end
-end
-
-function tlwrap(f, v::TransientVector)
-  try
-    lock(v.lock)
-    checktransience(v)
-    f()
-  finally
-    unlock(v.lock)
-  end
-end
-
-function persist!(v::TransientVectorLeaf)
-  tlwrap(v) do
-    v.active[] = false
-    vectorleaf(v.elements)
-  end
-end
-
-function addtoleaf(v::TransientVectorLeaf{T}, x::S) where {T, S}
-  N = typejoin(S, T)
-  v = tvl{N}(copy(v.elements))
-  push!(v.elements, x)
-  return v
-end
-
-function addtoleaf(v::TransientVectorLeaf{T}, x::S) where {T, S <: T}
-  push!(v.elements, x)
-  return v
-end
-
-function conj!(v::TransientVectorLeaf{T}, x::S) where {T, S <: T}
-  if length(v.elements) == nodelength
-    tvn([v, tvl([x])])
-  else
-    addtoleaf(v, x)
-  end
-end
-
-function conj!(v::TransientVectorNode, x)
 end

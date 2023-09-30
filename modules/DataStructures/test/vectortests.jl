@@ -71,14 +71,38 @@ end
 end
 
 @testset "Transient Vectors" begin
-  t = transient!(emptyvector)
+  v = vec([1])
+  t = transient!(v)
 
   @test t isa ds.TransientVector
   @test !(t isa Vector)
 
-  @test persist!(t) === emptyvector
+  @test persist!(t) == v
 
   @test_throws String persist!(t)
+  @test_throws String conj!(t, 5)
+
+  @test depth(reduce(conj!, transient!(emptyvector), 1:31)) == 1
+  @test depth(reduce(conj!, transient!(emptyvector), 1:33)) == 2
+  @test depth(reduce(conj!, transient!(emptyvector), 1:1025)) == 3
+
+  v = transient!(vector(1,2,3))
+
+  conj!(v, :asd)
+
+  @test persist!(v) == vector(1,2,3,:asd)
+
+  v = transient!(vec(1:65))
+
+  v = conj!(v, "test")
+
+  @test last(persist!(v)) == "test"
+
+  v = transient!(vec(1:1026))
+
+  v = conj!(v, 0x12af)
+
+  @test last(persist!(v)) == 0x12af
 
 end
 

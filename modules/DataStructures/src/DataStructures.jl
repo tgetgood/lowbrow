@@ -10,6 +10,7 @@ nil = nothing
 include("./sexps.jl")
 include("./sequential.jl")
 include("./vector.jl")
+include("./transientvector.jl")
 include("./list.jl")
 include("./map.jl")
 # include("./set.jl")
