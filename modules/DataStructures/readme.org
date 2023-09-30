@@ -201,3 +201,25 @@ contexts. Creating vectors with Vector(undef, 32) and tracking indicies instead
 of using `end` actually caused a substantial regression in performance. I don't
 know why. It took more memory to allocate less? Each node had an extra byte to
 store the index, but that doesn't account for it.
+* [2023-09-29 Fri] Transients
+
+ first crack at transients and they do a lot more harm than good:
+
+ 2:   0.402445 seconds (670.46 k allocations: 44.595 MiB, 3.47% gc time, 99.94% compilation time)
+ 4:   0.000037 seconds (136 allocations: 3.953 KiB)
+ 8:   0.000051 seconds (260 allocations: 7.531 KiB)
+ 16:   0.137807 seconds (286.42 k allocations: 19.423 MiB, 99.81% compilation time)
+ 32:   0.127717 seconds (279.40 k allocations: 18.837 MiB, 99.75% compilation time)
+ 64:   0.000405 seconds (7.09 k allocations: 170.391 KiB)
+ 128:   0.001063 seconds (24.48 k allocations: 535.469 KiB)
+ 256:   0.003657 seconds (89.97 k allocations: 1.798 MiB)
+ 512:   0.013832 seconds (343.82 k allocations: 6.599 MiB)
+ 1024:   0.053068 seconds (1.34 M allocations: 25.202 MiB)
+ 2048:   0.241664 seconds (5.31 M allocations: 98.406 MiB, 13.25% gc time)
+ 4096:   0.915464 seconds (21.10 M allocations: 388.814 MiB, 4.25% gc time)
+ 8192:   3.544060 seconds (84.15 M allocations: 1.509 GiB, 3.20% gc time)
+ 16384:  14.464104 seconds (336.06 M allocations: 6.019 GiB, 3.89% gc time)
+ abort...
+
+ Locking is the first culprit to look into. Is there a way to enforce thread
+ isolation at a higher level and not worry about locks?

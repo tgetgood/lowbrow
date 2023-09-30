@@ -110,7 +110,7 @@ function addtoleaf!(v::TransientVectorLeaf{T}, x::S) where {T, S <: T}
   return v
 end
 
-function conj!(v::TransientVectorLeaf{T}, x::S) where {T, S <: T}
+function conj!(v::TransientVectorLeaf{T}, x::S) where {T, S}
   tlwrap(v) do
     if length(v.elements) == nodelength
       tvn([v, tvl([x])])
@@ -177,4 +177,12 @@ function conj!(v::TransientVectorNode, x)
       tvn([v, transientsibling(x, depth(v))])
     end
   end
+end
+
+function conj!(v::TransientVector)
+  v
+end
+
+function into(to::PersistentVector, xform, from)
+  persist!(transduce(xform, conj!, transient!(to), from))
 end

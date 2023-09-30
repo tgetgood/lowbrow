@@ -101,16 +101,6 @@ length(v::Vector) = count(v)
 conj(v::Nothing, x) = vectorleaf([x])
 conj(v::EmptyVector, x) = vectorleaf([x])
 
-# function conj(v::VectorLeaf{T}, x::S) where {T, S <: T}
-#   if completep(v)
-#     vectornode([v, vectorleaf([x])], count(v) + 1, 2)
-#   else
-#     temp = copy(v.elements)
-#     push!(temp, x)
-#     vectorleaf(temp)
-#   end
-# end
-
 function addtoleaf(v::VectorLeaf{T}, x::S) where {T, S}
   N = typejoin(S, T)
   temp::Base.Vector{N} = copy(v.elements)
