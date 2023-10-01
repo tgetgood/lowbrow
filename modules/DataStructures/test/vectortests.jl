@@ -74,8 +74,13 @@ end
   v = vec([1])
   t = transient!(v)
 
+
   @test t isa ds.TransientVector
   @test !(t isa Vector)
+
+  # Can't use norm transient alteration functions
+  @test_throws MethodError conj(t, 4)
+  @test_throws MethodError assoc(t, 1, 0)
 
   @test persist!(t) == v
 

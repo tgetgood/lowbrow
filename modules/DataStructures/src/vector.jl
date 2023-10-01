@@ -236,7 +236,12 @@ end
 get(v::Vector, i) = nth(v, i)
 
 vector(args...) = vec(args)
+
 vector() = emptyvector
+vector(a) = vectorleaf([a])
+vector(a,b) = vectorleaf([a,b])
+vector(a,b,c) = vectorleaf([a,b,c])
+vector(a,b,c,d) = vectorleaf([a,b,c, d])
 
 vec() = emptyvector
 vec(v::Vector) = v
@@ -276,7 +281,19 @@ function incompletevectornode(nodes)
   )
 end
 
+function vec(args::Base.Vector)
+  if length(args) <= nodelength
+    vectorleaf(args)
+  else
+    largevec(args)
+  end
+end
+
 function vec(args)
+  largevec(args)
+end
+
+function largevec(args)
   xf = [leafpartition(), map(vectorleaf)]
 
   for i = 2:ceil(log(nodelength, length(args)))

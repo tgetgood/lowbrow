@@ -223,3 +223,127 @@ store the index, but that doesn't account for it.
 
  Locking is the first culprit to look into. Is there a way to enforce thread
  isolation at a higher level and not worry about locks?
+* [2023-10-01 Sun] Transients Take Two
+
+
+2:   0.235361 seconds (433.40 k allocations: 28.939 MiB, 6.07% gc time, 99.92% compilation time)
+4:   0.000030 seconds (203 allocations: 5.906 KiB)
+8:   0.000031 seconds (387 allocations: 11.234 KiB)
+16:   0.189812 seconds (401.51 k allocations: 26.632 MiB, 99.90% compilation time)
+32:   0.115477 seconds (167.73 k allocations: 11.353 MiB, 12.64% gc time, 99.81% compilation time)
+64:   0.000239 seconds (3.54 k allocations: 105.094 KiB)
+128:   0.000391 seconds (7.17 k allocations: 213.625 KiB)
+256:   0.000780 seconds (14.44 k allocations: 430.000 KiB)
+512:   0.067743 seconds (205.24 k allocations: 12.381 MiB, 96.26% compilation time)
+1024:   0.007544 seconds (93.54 k allocations: 2.309 MiB)
+2048:   0.017824 seconds (208.90 k allocations: 5.000 MiB)
+4096:   0.038943 seconds (439.63 k allocations: 10.382 MiB)
+8192:   0.081237 seconds (901.09 k allocations: 21.144 MiB)
+16384:   1.162575 seconds (11.70 M allocations: 193.909 MiB, 4.27% gc time)
+32768:   4.961132 seconds (53.15 M allocations: 843.174 MiB, 1.58% gc time)
+65536:  12.987711 seconds (136.04 M allocations: 2.092 GiB, 1.90% gc time)
+fail...
+
+10x better than transients take I, but still 100x worse than straight up
+persistence...
+
+What the hell? I've got a lot to learn it would appear.
+
+removing all locking and checking makes a marginal difference:
+
+4:   0.000017 seconds (201 allocations: 5.859 KiB)
+8:   0.000016 seconds (385 allocations: 11.188 KiB)
+16:   0.000054 seconds (810 allocations: 23.781 KiB)
+32:   0.000091 seconds (1.72 k allocations: 50.953 KiB)
+64:   0.000173 seconds (3.54 k allocations: 105.047 KiB)
+128:   0.000350 seconds (7.17 k allocations: 213.578 KiB)
+256:   0.000709 seconds (14.43 k allocations: 429.953 KiB)
+512:   0.002295 seconds (35.85 k allocations: 986.891 KiB)
+1024:   0.007289 seconds (93.53 k allocations: 2.309 MiB)
+2048:   0.017355 seconds (208.90 k allocations: 5.000 MiB)
+4096:   0.057255 seconds (441.65 k allocations: 10.515 MiB, 20.47% gc time, 13.93% compilation time)
+8192:   0.076030 seconds (901.08 k allocations: 21.144 MiB)
+16384:   1.064113 seconds (11.70 M allocations: 193.909 MiB, 3.54% gc time)
+32768:   4.895505 seconds (53.15 M allocations: 843.174 MiB, 2.19% gc time)
+
+Curiourly, transients are faster for vectors of depth < 2 and use quite a bit
+less memory until 8k 2^13 nodes, but after that it reverses violently. Something
+strange is happening as the tree grows. I'm computing the count recursively
+instead of storing it. I'm an idiot.
+
+After storing the count in a field as per the persistent version:
+
+2:   0.000038 seconds (110 allocations: 3.188 KiB)
+4:   0.000014 seconds (203 allocations: 5.906 KiB)
+8:   0.000020 seconds (387 allocations: 11.234 KiB)
+16:   0.000069 seconds (780 allocations: 22.828 KiB)
+32:   0.000104 seconds (1.57 k allocations: 46.125 KiB)
+64:   0.000197 seconds (3.13 k allocations: 92.469 KiB)
+128:   0.000396 seconds (6.27 k allocations: 185.500 KiB)
+256:   0.000781 seconds (12.54 k allocations: 370.891 KiB)
+512:   0.001643 seconds (27.16 k allocations: 774.953 KiB)
+1024:   0.003485 seconds (58.45 k allocations: 1.577 MiB)
+2048:   0.007230 seconds (121.01 k allocations: 3.218 MiB)
+4096:   0.014666 seconds (246.15 k allocations: 6.500 MiB)
+8192:   0.043788 seconds (496.42 k allocations: 13.064 MiB, 30.56% gc time)
+16384:   0.061483 seconds (1.09 M allocations: 27.645 MiB)
+32768:   0.147103 seconds (2.48 M allocations: 59.745 MiB, 9.11% gc time)
+65536:   0.304465 seconds (5.24 M allocations: 123.945 MiB, 9.01% gc time)
+131072:   0.624119 seconds (10.78 M allocations: 252.346 MiB, 9.83% gc time)
+262144:   1.273259 seconds (21.85 M allocations: 509.146 MiB, 10.89% gc time)
+524288:   2.741977 seconds (47.05 M allocations: 1.044 GiB, 12.38% gc time)
+1048576:   5.857330 seconds (103.72 M allocations: 2.232 GiB, 12.94% gc time)
+
+We're catching up on time, and we're using *less* ram than Base.Vector. Though
+the difference is negligeble.
+
+This won't work well for multithreading though. I'll have to compare
+multithreaded persistent vectors with whever I can accomplish here.
+
+
+At this point, let's go back and check the comparison:
+
+
+#+BEGIN_SRC julia
+  for i in 1:k
+    print(string(2^i)*": ")
+    @time rgb::Vector{UInt8} = reduce(vcat,
+      map(p -> [
+          reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
+          0xff
+        ],
+        image[1:2^i]
+      )
+    )
+  end
+#+END_SRC
+
+and we get:
+
+2:   0.000011 seconds (8 allocations: 448 bytes)
+4:   0.000002 seconds (10 allocations: 624 bytes)
+8:   0.000002 seconds (14 allocations: 976 bytes)
+16:   0.000002 seconds (22 allocations: 1.625 KiB)
+32:   0.000002 seconds (38 allocations: 3.000 KiB)
+64:   0.000004 seconds (70 allocations: 5.734 KiB)
+128:   0.000004 seconds (134 allocations: 11.172 KiB)
+256:   0.000012 seconds (262 allocations: 22.156 KiB)
+512:   0.000015 seconds (518 allocations: 44.078 KiB)
+1024:   0.000028 seconds (1.03 k allocations: 87.609 KiB)
+2048:   0.000054 seconds (2.05 k allocations: 174.609 KiB)
+4096:   0.000102 seconds (4.11 k allocations: 348.375 KiB)
+8192:   0.000203 seconds (8.20 k allocations: 696.297 KiB)
+16384:   0.000520 seconds (16.39 k allocations: 1.360 MiB)
+32768:   0.000909 seconds (32.78 k allocations: 2.719 MiB)
+65536:   0.001815 seconds (65.55 k allocations: 5.438 MiB)
+131072:   0.003632 seconds (131.08 k allocations: 10.875 MiB)
+262144:   0.024924 seconds (262.15 k allocations: 21.750 MiB, 57.98% gc time)
+524288:   0.015855 seconds (524.30 k allocations: 43.500 MiB)
+1048576:   0.066121 seconds (1.05 M allocations: 87.000 MiB, 33.43% gc time)
+
+I'm so far off it's embarrassing. I must have included compile time without
+checking it before.
+
+So I'm still 2 orders of magnitude off on time and one on space...
+
+Af
