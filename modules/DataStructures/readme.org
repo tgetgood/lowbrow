@@ -447,3 +447,8 @@
 
   Nope. Removing the preallocated buffer, but keeping the type argument makes
   everything worse...
+
+  I'm running the measures again and it looks like the ring buffer method uses
+  <10% more ram and runs 4x faster.
+
+  I need a better test setup than @time and @profile...
