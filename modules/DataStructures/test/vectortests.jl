@@ -74,7 +74,6 @@ end
   v = vec([1])
   t = transient!(v)
 
-
   @test t isa ds.TransientVector
   @test !(t isa Vector)
 
@@ -109,6 +108,7 @@ end
 
   @test last(persist!(v)) == 0x12af
 
+  @test reduce(conj!, transient!(emptyvector), 1:1025) == vec(1:1025)
 end
 
 @testset "Vector Seqs" begin
