@@ -241,7 +241,7 @@ vector() = emptyvector
 vector(a) = vectorleaf([a])
 vector(a,b) = vectorleaf([a,b])
 vector(a,b,c) = vectorleaf([a,b,c])
-vector(a,b,c,d) = vectorleaf([a,b,c, d])
+vector(a,b,c,d) = vectorleaf([a,b,c,d])
 
 vec() = emptyvector
 vec(v::Vector) = v
