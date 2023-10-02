@@ -141,7 +141,7 @@ function staticinit(config)
     hw.createdevice,
     hw.createcommandpools,
     hw.createdescriptorpools,
-    model.load,
+    # model.load,
     gp.renderpass,
     draw.commandbuffers,
     # (x, y) -> vertex.vertexbuffer(x, get(y, :vertex_data)),
@@ -241,4 +241,4 @@ function main(system, config)
   end
 end
 
-repl_teardown = main(system, config)
+# repl_teardown = main(system, config)

@@ -21,10 +21,12 @@ function bgr(p)
   )
 end
 
-function profile(system, config, k = 10)
+function profile(system, config, k = 18)
   dev = get(system, :device)
 
   image = load(get(config, :texture_file))
+
+  opacity = ds.conj(ds.emptyvector, 0xff)
 
   for i in 1:k
     print(string(2^i) * ": ")
@@ -32,12 +34,31 @@ function profile(system, config, k = 10)
       ds.emptyvector,
       map(bgr)
       ∘
-      map(x -> ds.conj(x, 0xff))
+      ds.aftereach(opacity)
+      # map(x -> ds.conj(x, 0xff))
       ∘
       ds.cat(),
       image[1:2^i]
     )
     nothing
+  end
+end
+
+function profile2(system, config, k=20)
+  dev = get(system, :device)
+
+  image = load(get(config, :texture_file))
+
+  for i in 1:k
+    print(string(2^i)*": ")
+    @time rgb::Vector{UInt8} = reduce(vcat,
+      map(p -> [
+          reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
+          0xff
+        ],
+        image[1:2^i]
+      )
+    )
   end
 end
 
