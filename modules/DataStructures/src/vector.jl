@@ -246,24 +246,26 @@ vector(a,b,c,d) = vectorleaf([a,b,c,d])
 vec() = emptyvector
 vec(v::Vector) = v
 
-function leafpartition()
-  acc = []
+function leafpartition(T)
+  acc = Base.Vector{T}(undef, nodelength)
+  i = 0
   function (emit)
     function inner()
       emit()
     end
     function inner(result)
-      if count(acc) > 0
-        emit(emit(result, acc))
+      if i > 0
+        emit(emit(result, [acc[j] for j in 1:i]))
       else
         emit(result)
       end
     end
     function inner(result, next)
-      push!(acc, next)
-      if length(acc) == nodelength
-        t = acc
-        acc = []
+      i+= 1
+      acc[i] = next
+      if i == nodelength
+        t = copy(acc)
+        i = 0
         emit(result, t)
       else
         result
@@ -294,10 +296,11 @@ function vec(args)
 end
 
 function largevec(args)
-  xf = [leafpartition(), map(vectorleaf)]
+  T = eltype(args)
+  xf = [leafpartition(T), map(vectorleaf)]
 
   for i = 2:ceil(log(nodelength, length(args)))
-    append!(xf, [leafpartition(), map(incompletevectornode)])
+    append!(xf, [leafpartition(Vector), map(incompletevectornode)])
   end
 
   first(into(emptyvector, ∘(xf...) , args))
