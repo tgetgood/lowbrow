@@ -263,7 +263,7 @@ function leafpartition(T)
     function inner(result, next)
       i+= 1
       acc[i] = next
-      if i == nodelength
+      if i === length(acc)
         t = copy(acc)
         i = 0
         emit(result, t)
