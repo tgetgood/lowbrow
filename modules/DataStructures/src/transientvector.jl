@@ -150,7 +150,7 @@ end
 function unsafe_conj!(parent, v::TransientVectorNode, x)
   if count(v.elements[end]) == nodelength^(v.depth-1)
     if length(v.elements) < nodelength
-      push!(v.elements, transientsibling(x, v.depth))
+      push!(v.elements, transientsibling(x, v.depth - 1))
       v.count += 1
     else
       replacelastchild!(
@@ -181,6 +181,6 @@ function into(to::PersistentVector, xform, from)
   persist!(transduce(xform, conj!, transient!(to), from))
 end
 
-# function into(to::PersistentVector, from)
-#   persist!(reduce(conj!, transient!(to), from))
-# end
+function into(to::PersistentVector, from)
+  persist!(reduce(conj!, transient!(to), from))
+end

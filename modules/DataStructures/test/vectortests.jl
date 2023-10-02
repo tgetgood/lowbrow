@@ -108,7 +108,7 @@ end
 
   @test last(persist!(v)) == 0x12af
 
-  @test reduce(conj!, transient!(emptyvector), 1:1025) == vec(1:1025)
+  @test persist!(reduce(conj!, transient!(emptyvector), 1:1025)) == vec(1:1025)
 end
 
 @testset "Vector Seqs" begin
