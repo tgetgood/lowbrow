@@ -20,8 +20,8 @@ mutable struct TransientVectorNode
   # TransientVectors and PersistentVectors share no supertype, but can share
   # nodes (if that part hasn't been changed yet).
   const elements::Base.Vector{Any}
-  const depth::UInt8
-  count::UInt64
+  const depth::Int8
+  count::Int64
 end
 
 # Effective type inference requires an empty marker here.
@@ -66,7 +66,7 @@ function tvl(elements::Base.Vector{T}) where T
 end
 
 function tvn(elements, count)
-  TransientVectorNode(elements, UInt8(depth(elements[1]) + 1), UInt(count))
+  TransientVectorNode(elements, depth(elements[1]) + 1, count)
 end
 
 function tv(root)
