@@ -452,3 +452,29 @@
   <10% more ram and runs 4x faster.
 
   I need a better test setup than @time and @profile...
+* [2023-10-02 Mon] Times to beat
+
+ #+BEGIN_SRC julia
+   @time vec(1:2^20); nothing
+   0.073854 seconds (3.37 M allocations: 144.005 MiB, 40.62% gc time)
+
+   @time into(emptyvector, 1:2^20); nothing
+   0.359100 seconds (11.55 M allocations: 207.188 MiB, 11.02% gc time)
+ #+END_SRC
+* Parallel transduction
+  Stateless transducers are trivially parallel. Many stateful transducers can
+  also be made parallel, but this is trickier. For now we can just rely on
+  programmer annotations to tell us when a transduction is associative.
+
+  A pipeline is associative if all components are.
+
+  Reduction is harder because concat is a performance killer in the current
+  persistent vector implementation.
+
+  RRB Tries could solve this problem. I haven't read that paper in a long time
+  though.
+
+  Since merge on maps is associative and commutative, we ought to be able to
+  parallelise mapish operations without too much ado.
+
+  Now do I really want to try and implement something along the lines of Cilk?
