@@ -3,347 +3,403 @@
 
   However, when trying to load textures with the following code:
 
-#+BEGIN_SRC julia
-  @time rgb = ds.into(
-    ds.emptyvector,
-    map(p -> [
+  #+BEGIN_SRC julia
+    @time rgb = ds.into(
+      ds.emptyvector,
+      map(p -> [
         reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
         0xff
       ])
-    ∘
-    ds.cat(),
-    ds.take(x, image)
-  )
-#+END_SRC
-
-Where =image= is an array of pixels, I get some fun results. For x = 2-2^15:
-
-2:   0.031788 seconds (46.67 k allocations: 9.054 MiB, 98.30% compilation time)
-4:   0.006815 seconds (84 allocations: 12.007 MiB, 85.72% gc time)
-8:   0.001803 seconds (164 allocations: 24.023 MiB)
-16:   0.021166 seconds (3.82 k allocations: 48.276 MiB, 23.66% gc time, 40.25% compilation time)
-32:   0.016689 seconds (866 allocations: 96.120 MiB, 41.37% gc time)
-64:   0.065319 seconds (48.74 k allocations: 195.433 MiB, 15.55% gc time, 58.27% compilation time)
-128:   0.044260 seconds (4.05 k allocations: 384.511 MiB, 38.96% gc time)
-256:   0.075904 seconds (8.30 k allocations: 769.056 MiB, 31.04% gc time)
-512:   0.143548 seconds (18.83 k allocations: 1.502 GiB, 32.47% gc time)
-1024:   0.288988 seconds (39.91 k allocations: 3.005 GiB, 32.32% gc time)
-2048:   0.570507 seconds (84.10 k allocations: 6.012 GiB, 32.30% gc time)
-4096:   1.138775 seconds (172.48 k allocations: 12.030 GiB, 32.34% gc time)
-8192:   2.278270 seconds (349.25 k allocations: 24.086 GiB, 32.43% gc time)
-16384:   4.563693 seconds (702.79 k allocations: 48.270 GiB, 32.32% gc time)
-32768:   9.203719 seconds (1.48 M allocations: 96.883 GiB, 32.35% gc time)
-
-Which extrapolated up to the full 1M pixels of the image in question, this would
-require 20M allocations and 3TB of allocated memory. Of course my machine runs
-out of ram long before that can be tested.
-
-The naive jl code:
-
-#+BEGIN_SRC julia
-  rgb::Vector{UInt8}  = reduce(vcat,
-    map(p -> [
-        reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
-        0xff
-      ],
-      image
+      ∘
+      ds.cat(),
+      ds.take(x, image)
     )
-  )
-#+END_SRC
+  #+END_SRC
 
-0.577784 seconds (2.15 M allocations: 2.243 GiB, 25.86% gc time, 5.11% compilation
+  Where =image= is an array of pixels, I get some fun results. For x = 2-2^15:
 
-So the number of allocations in the persistent case is is ~10x higher and the
-memory allocated and collected is >1000x higher.
+  2:   0.031788 seconds (46.67 k allocations: 9.054 MiB, 98.30% compilation time)
+  4:   0.006815 seconds (84 allocations: 12.007 MiB, 85.72% gc time)
+  8:   0.001803 seconds (164 allocations: 24.023 MiB)
+  16:   0.021166 seconds (3.82 k allocations: 48.276 MiB, 23.66% gc time, 40.25% compilation time)
+  32:   0.016689 seconds (866 allocations: 96.120 MiB, 41.37% gc time)
+  64:   0.065319 seconds (48.74 k allocations: 195.433 MiB, 15.55% gc time, 58.27% compilation time)
+  128:   0.044260 seconds (4.05 k allocations: 384.511 MiB, 38.96% gc time)
+  256:   0.075904 seconds (8.30 k allocations: 769.056 MiB, 31.04% gc time)
+  512:   0.143548 seconds (18.83 k allocations: 1.502 GiB, 32.47% gc time)
+  1024:   0.288988 seconds (39.91 k allocations: 3.005 GiB, 32.32% gc time)
+  2048:   0.570507 seconds (84.10 k allocations: 6.012 GiB, 32.30% gc time)
+  4096:   1.138775 seconds (172.48 k allocations: 12.030 GiB, 32.34% gc time)
+  8192:   2.278270 seconds (349.25 k allocations: 24.086 GiB, 32.43% gc time)
+  16384:   4.563693 seconds (702.79 k allocations: 48.270 GiB, 32.32% gc time)
+  32768:   9.203719 seconds (1.48 M allocations: 96.883 GiB, 32.35% gc time)
 
-10x on both counts would actually be acceptable for my exploratory use case, but
-the 1000-1500x doesn't fly.
+  Which extrapolated up to the full 1M pixels of the image in question, this would
+  require 20M allocations and 3TB of allocated memory. Of course my machine runs
+  out of ram long before that can be tested.
 
-Curiously, if I use Base.Vector, it takes longer and uses more ram. It also seg
-faults at 2^15 which I think is actually a stack overflow.
+  The naive jl code:
 
-The idea was to use Base.Vector and Base.reduce and have better performace. That
-needs a redesign.
+  #+BEGIN_SRC julia
+    rgb::Vector{UInt8}  = reduce(vcat,
+                                 map(p -> [
+                                   reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
+                                   0xff
+                                 ],
+                                     image
+                                     )
+                                 )
+  #+END_SRC
+
+  0.577784 seconds (2.15 M allocations: 2.243 GiB, 25.86% gc time, 5.11% compilation
+
+  So the number of allocations in the persistent case is is ~10x higher and the
+  memory allocated and collected is >1000x higher.
+
+  10x on both counts would actually be acceptable for my exploratory use case, but
+  the 1000-1500x doesn't fly.
+
+  Curiously, if I use Base.Vector, it takes longer and uses more ram. It also seg
+  faults at 2^15 which I think is actually a stack overflow.
+
+  The idea was to use Base.Vector and Base.reduce and have better performace. That
+  needs a redesign.
 * Performance improvements [2023-09-28 Thu]
 
-After reimplementing vectors using Tuples instead of arrays (not to mention
-fixing up some blatant errors, we get:
+  After reimplementing vectors using Tuples instead of arrays (not to mention
+  fixing up some blatant errors, we get: 2:   0.037318 seconds (34.10 k allocations: 2.270 MiB) 4:   0.000030 seconds (147 allocations: 3.234 KiB)
+  8:   0.000036 seconds (299 allocations: 6.750 KiB)
+  16:   0.012085 seconds (4.31 k allocations: 261.349 KiB)
+  32:   0.021579 seconds (7.78 k allocations: 456.428 KiB)
+  64:   0.040643 seconds (14.73 k allocations: 852.820 KiB)
+  128:   0.079438 seconds (28.61 k allocations: 1.631 MiB)
+  256:   0.154938 seconds (56.38 k allocations: 3.331 MiB)
+  512:   0.005223 seconds (42.55 k allocations: 1.547 MiB)
+  1024:   0.014135 seconds (102.44 k allocations: 4.144 MiB)
+  2048:   0.049300 seconds (245.93 k allocations: 13.219 MiB, 25.63% gc time)
+  4096:   0.088340 seconds (565.65 k allocations: 33.909 MiB)
+  8192:   0.250066 seconds (1.35 M allocations: 76.654 MiB, 5.44% gc time)
+  16384:   0.580798 seconds (3.10 M allocations: 166.967 MiB, 4.01% gc time)
+  32768:   1.288246 seconds (6.79 M allocations: 368.141 MiB, 3.48% gc time)
+  65536:   2.873495 seconds (14.92 M allocations: 894.722 MiB, 3.85% gc time)
+  131072:   6.365209 seconds (32.24 M allocations: 1.982 GiB, 4.17% gc time)
+  262144:  14.536195 seconds (71.52 M allocations: 4.240 GiB, 3.77% gc time)
+  524288:  32.252954 seconds (155.95 M allocations: 8.910 GiB, 3.66% gc time)
+  1048576:  68.632605 seconds (330.91 M allocations: 18.891 GiB, 3.62% gc time)
 
-2:   0.037318 seconds (34.10 k allocations: 2.270 MiB)
-4:   0.000030 seconds (147 allocations: 3.234 KiB)
-8:   0.000036 seconds (299 allocations: 6.750 KiB)
-16:   0.012085 seconds (4.31 k allocations: 261.349 KiB)
-32:   0.021579 seconds (7.78 k allocations: 456.428 KiB)
-64:   0.040643 seconds (14.73 k allocations: 852.820 KiB)
-128:   0.079438 seconds (28.61 k allocations: 1.631 MiB)
-256:   0.154938 seconds (56.38 k allocations: 3.331 MiB)
-512:   0.005223 seconds (42.55 k allocations: 1.547 MiB)
-1024:   0.014135 seconds (102.44 k allocations: 4.144 MiB)
-2048:   0.049300 seconds (245.93 k allocations: 13.219 MiB, 25.63% gc time)
-4096:   0.088340 seconds (565.65 k allocations: 33.909 MiB)
-8192:   0.250066 seconds (1.35 M allocations: 76.654 MiB, 5.44% gc time)
-16384:   0.580798 seconds (3.10 M allocations: 166.967 MiB, 4.01% gc time)
-32768:   1.288246 seconds (6.79 M allocations: 368.141 MiB, 3.48% gc time)
-65536:   2.873495 seconds (14.92 M allocations: 894.722 MiB, 3.85% gc time)
-131072:   6.365209 seconds (32.24 M allocations: 1.982 GiB, 4.17% gc time)
-262144:  14.536195 seconds (71.52 M allocations: 4.240 GiB, 3.77% gc time)
-524288:  32.252954 seconds (155.95 M allocations: 8.910 GiB, 3.66% gc time)
-1048576:  68.632605 seconds (330.91 M allocations: 18.891 GiB, 3.62% gc time)
+  ~10x improvement in run time. Huge improvement in allocated space, but number of
+  allocations is ~6x higher.
 
-~10x improvement in run time. Huge improvement in allocated space, but number of
-allocations is ~6x higher.
+  Lesson 1) transients are indispensible. Lesson 2) maybe tuples weren't such a
+  hot idea after all.
 
-Lesson 1) transients are indispensible. Lesson 2) maybe tuples weren't such a
-hot idea after all.
+  I'll try out the streamlined design with vectors again. I might be thrashing
+  here.
 
-I'll try out the streamlined design with vectors again. I might be thrashing
-here.
+  Easy wins are parallel transduction and transients. Maybe I should focus my
+  efforts there.
 
-Easy wins are parallel transduction and transients. Maybe I should focus my
-efforts there.
+  I also massively simplified the implementation of maps, and added some tests to
+  convince myself they work (to the extent I've thought to use them). But again
+  huge performance regression. They're basically unusable as is.
 
-I also massively simplified the implementation of maps, and added some tests to
-convince myself they work (to the extent I've thought to use them). But again
-huge performance regression. They're basically unusable as is.
+  After reimplementing with (base) vectors instead of tuples, I get:
+  2:   0.000036 seconds (68 allocations: 2.328 KiB)
+  4:   0.000011 seconds (138 allocations: 4.891 KiB)
+  8:   0.000017 seconds (278 allocations: 10.938 KiB)
+  16:   0.000050 seconds (930 allocations: 37.641 KiB)
+  32:   0.000094 seconds (2.35 k allocations: 95.234 KiB)
+  64:   0.000207 seconds (5.57 k allocations: 225.328 KiB)
+  128:   0.000493 seconds (13.54 k allocations: 619.172 KiB)
+  256:   0.001366 seconds (36.66 k allocations: 1.819 MiB)
+  512:   0.003244 seconds (88.02 k allocations: 4.183 MiB)
+  1024:   0.015228 seconds (193.80 k allocations: 9.068 MiB, 59.99% gc time)
+  2048:   0.012516 seconds (417.67 k allocations: 19.494 MiB)
+  4096:   0.036217 seconds (914.55 k allocations: 45.283 MiB, 24.31% gc time)
+  8192:   0.079682 seconds (2.10 M allocations: 113.657 MiB, 18.27% gc time)
+  16384:   0.158852 seconds (4.74 M allocations: 245.702 MiB, 13.64% gc time)
+  32768:   0.338404 seconds (10.12 M allocations: 514.794 MiB, 14.86% gc time)
+  65536:   0.701287 seconds (21.26 M allocations: 1.049 GiB, 14.67% gc time)
+  131072:   1.523102 seconds (45.11 M allocations: 2.295 GiB, 16.00% gc time)
+  262144:   3.396177 seconds (99.11 M allocations: 5.313 GiB, 16.90% gc time)
+  524288:   7.134940 seconds (215.47 M allocations: 11.204 GiB, 17.91% gc time)
+  1048576:  14.954999 seconds (451.32 M allocations: 23.141 GiB, 19.62% gc time)
 
-After reimplementing with (base) vectors instead of tuples, I get:
-2:   0.000036 seconds (68 allocations: 2.328 KiB)
-4:   0.000011 seconds (138 allocations: 4.891 KiB)
-8:   0.000017 seconds (278 allocations: 10.938 KiB)
-16:   0.000050 seconds (930 allocations: 37.641 KiB)
-32:   0.000094 seconds (2.35 k allocations: 95.234 KiB)
-64:   0.000207 seconds (5.57 k allocations: 225.328 KiB)
-128:   0.000493 seconds (13.54 k allocations: 619.172 KiB)
-256:   0.001366 seconds (36.66 k allocations: 1.819 MiB)
-512:   0.003244 seconds (88.02 k allocations: 4.183 MiB)
-1024:   0.015228 seconds (193.80 k allocations: 9.068 MiB, 59.99% gc time)
-2048:   0.012516 seconds (417.67 k allocations: 19.494 MiB)
-4096:   0.036217 seconds (914.55 k allocations: 45.283 MiB, 24.31% gc time)
-8192:   0.079682 seconds (2.10 M allocations: 113.657 MiB, 18.27% gc time)
-16384:   0.158852 seconds (4.74 M allocations: 245.702 MiB, 13.64% gc time)
-32768:   0.338404 seconds (10.12 M allocations: 514.794 MiB, 14.86% gc time)
-65536:   0.701287 seconds (21.26 M allocations: 1.049 GiB, 14.67% gc time)
-131072:   1.523102 seconds (45.11 M allocations: 2.295 GiB, 16.00% gc time)
-262144:   3.396177 seconds (99.11 M allocations: 5.313 GiB, 16.90% gc time)
-524288:   7.134940 seconds (215.47 M allocations: 11.204 GiB, 17.91% gc time)
-1048576:  14.954999 seconds (451.32 M allocations: 23.141 GiB, 19.62% gc time)
+  With no runtime compiler warmup to speak of, which is an added bonus.
 
-With no runtime compiler warmup to speak of, which is an added bonus.
+  so now we're down to 10x ram, 30x runtime, and 200x allocations. But that's
+  without transients. Progress.
 
-so now we're down to 10x ram, 30x runtime, and 200x allocations. But that's
-without transients. Progress.
+  And to think I went with tuples because I thought they would optimise better
+  being immutable. And they do in terms of allocations and memory usage. But 1.28x
+  more RAM for a 4.5x runtime boost seems like a good trade.
 
-And to think I went with tuples because I thought they would optimise better
-being immutable. And they do in terms of allocations and memory usage. But 1.28x
-more RAM for a 4.5x runtime boost seems like a good trade.
+  [2023-09-29 Fri]
 
-[2023-09-29 Fri]
+  2:   0.000040 seconds (72 allocations: 2.141 KiB)
+  4:   0.000011 seconds (142 allocations: 4.453 KiB)
+  8:   0.000018 seconds (282 allocations: 10.000 KiB)
+  16:   0.000050 seconds (866 allocations: 32.734 KiB)
+  32:   0.000095 seconds (2.14 k allocations: 81.078 KiB)
+  64:   0.000218 seconds (5.07 k allocations: 189.672 KiB)
+  128:   0.000470 seconds (12.47 k allocations: 528.500 KiB)
+  256:   0.001161 seconds (33.42 k allocations: 1.561 MiB)
+  512:   0.002527 seconds (77.35 k allocations: 3.539 MiB)
+  1024:   0.005505 seconds (168.29 k allocations: 7.620 MiB)
+  2048:   0.011057 seconds (362.45 k allocations: 16.345 MiB)
+  4096:   0.032831 seconds (799.94 k allocations: 38.357 MiB, 28.70% gc time)
+  8192:   0.071598 seconds (1.87 M allocations: 97.677 MiB, 23.86% gc time)
+  16384:   0.130356 seconds (4.11 M allocations: 209.177 MiB, 12.99% gc time)
+  32768:   0.281846 seconds (8.69 M allocations: 436.178 MiB, 16.36% gc time)
+  65536:   0.582891 seconds (18.24 M allocations: 908.179 MiB, 16.01% gc time)
+  131072:   1.223732 seconds (38.90 M allocations: 1.951 GiB, 16.16% gc time)
+  262144:   2.918031 seconds (86.53 M allocations: 4.558 GiB, 17.62% gc time)
+  524288:   6.131520 seconds (184.93 M allocations: 9.550 GiB, 18.30% gc time)
+  1048576:  12.946524 seconds (384.87 M allocations: 19.658 GiB, 20.43% gc time)
 
-2:   0.000040 seconds (72 allocations: 2.141 KiB)
-4:   0.000011 seconds (142 allocations: 4.453 KiB)
-8:   0.000018 seconds (282 allocations: 10.000 KiB)
-16:   0.000050 seconds (866 allocations: 32.734 KiB)
-32:   0.000095 seconds (2.14 k allocations: 81.078 KiB)
-64:   0.000218 seconds (5.07 k allocations: 189.672 KiB)
-128:   0.000470 seconds (12.47 k allocations: 528.500 KiB)
-256:   0.001161 seconds (33.42 k allocations: 1.561 MiB)
-512:   0.002527 seconds (77.35 k allocations: 3.539 MiB)
-1024:   0.005505 seconds (168.29 k allocations: 7.620 MiB)
-2048:   0.011057 seconds (362.45 k allocations: 16.345 MiB)
-4096:   0.032831 seconds (799.94 k allocations: 38.357 MiB, 28.70% gc time)
-8192:   0.071598 seconds (1.87 M allocations: 97.677 MiB, 23.86% gc time)
-16384:   0.130356 seconds (4.11 M allocations: 209.177 MiB, 12.99% gc time)
-32768:   0.281846 seconds (8.69 M allocations: 436.178 MiB, 16.36% gc time)
-65536:   0.582891 seconds (18.24 M allocations: 908.179 MiB, 16.01% gc time)
-131072:   1.223732 seconds (38.90 M allocations: 1.951 GiB, 16.16% gc time)
-262144:   2.918031 seconds (86.53 M allocations: 4.558 GiB, 17.62% gc time)
-524288:   6.131520 seconds (184.93 M allocations: 9.550 GiB, 18.30% gc time)
-1048576:  12.946524 seconds (384.87 M allocations: 19.658 GiB, 20.43% gc time)
+  Just by overloading conj with a fast case when the element being added is a
+  subtype of the collection type.
 
-Just by overloading conj with a fast case when the element being added is a
-subtype of the collection type.
+  I didn't expect reflection (typejoin) to be cheap, but that one call can't
+  account for what's going on here. Looking at the LLVM bitcode, the generate code
+  is superficially similar, but I'm not familiar enough to compare them without
+  great effort which I'd rather allocate elsewhere.
 
-I didn't expect reflection (typejoin) to be cheap, but that one call can't
-account for what's going on here. Looking at the LLVM bitcode, the generate code
-is superficially similar, but I'm not familiar enough to compare them without
-great effort which I'd rather allocate elsewhere.
+  Maybe allowing the possibility of having to box at every step causes all the
+  extra work. In any case I've learned to be much more wary of reflection.
 
-Maybe allowing the possibility of having to box at every step causes all the
-extra work. In any case I've learned to be much more wary of reflection.
+  And removing the asserts gets us:
 
-And removing the asserts gets us:
+  2:   0.266746 seconds (696.97 k allocations: 46.322 MiB, 99.87% compilation time)
+  4:   0.000036 seconds (142 allocations: 4.453 KiB)
+  8:   0.000034 seconds (282 allocations: 10.000 KiB)
+  16:   0.188647 seconds (130.75 k allocations: 8.612 MiB, 8.30% gc time, 99.93% compilation time)
+  32:   0.000098 seconds (1.85 k allocations: 72.125 KiB)
+  64:   0.000166 seconds (3.95 k allocations: 161.656 KiB)
+  128:   0.000365 seconds (8.14 k allocations: 438.359 KiB)
+  256:   0.000868 seconds (16.52 k allocations: 1.250 MiB)
+  512:   0.008639 seconds (42.78 k allocations: 2.864 MiB, 77.68% compilation time)
+  1024:   0.003965 seconds (94.47 k allocations: 6.089 MiB)
+  2048:   0.008332 seconds (198.40 k allocations: 12.750 MiB)
+  4096:   0.033216 seconds (406.25 k allocations: 29.133 MiB, 47.31% gc time)
+  8192:   0.049455 seconds (821.97 k allocations: 70.945 MiB, 25.66% gc time)
+  16384:   0.100161 seconds (1.98 M allocations: 153.680 MiB, 16.17% gc time)
+  32768:   0.188255 seconds (4.29 M allocations: 320.151 MiB, 10.64% gc time)
+  65536:   0.394972 seconds (8.92 M allocations: 659.092 MiB, 12.61% gc time)
+  131072:   0.855680 seconds (18.18 M allocations: 1.401 GiB, 13.63% gc time)
+  262144:   1.972930 seconds (36.69 M allocations: 3.199 GiB, 15.42% gc time)
+  524288:   4.259396 seconds (84.20 M allocations: 6.769 GiB, 17.15% gc time)
+  1048576:   8.968445 seconds (179.22 M allocations: 13.939 GiB, 18.54% gc time)
 
-2:   0.266746 seconds (696.97 k allocations: 46.322 MiB, 99.87% compilation time)
-4:   0.000036 seconds (142 allocations: 4.453 KiB)
-8:   0.000034 seconds (282 allocations: 10.000 KiB)
-16:   0.188647 seconds (130.75 k allocations: 8.612 MiB, 8.30% gc time, 99.93% compilation time)
-32:   0.000098 seconds (1.85 k allocations: 72.125 KiB)
-64:   0.000166 seconds (3.95 k allocations: 161.656 KiB)
-128:   0.000365 seconds (8.14 k allocations: 438.359 KiB)
-256:   0.000868 seconds (16.52 k allocations: 1.250 MiB)
-512:   0.008639 seconds (42.78 k allocations: 2.864 MiB, 77.68% compilation time)
-1024:   0.003965 seconds (94.47 k allocations: 6.089 MiB)
-2048:   0.008332 seconds (198.40 k allocations: 12.750 MiB)
-4096:   0.033216 seconds (406.25 k allocations: 29.133 MiB, 47.31% gc time)
-8192:   0.049455 seconds (821.97 k allocations: 70.945 MiB, 25.66% gc time)
-16384:   0.100161 seconds (1.98 M allocations: 153.680 MiB, 16.17% gc time)
-32768:   0.188255 seconds (4.29 M allocations: 320.151 MiB, 10.64% gc time)
-65536:   0.394972 seconds (8.92 M allocations: 659.092 MiB, 12.61% gc time)
-131072:   0.855680 seconds (18.18 M allocations: 1.401 GiB, 13.63% gc time)
-262144:   1.972930 seconds (36.69 M allocations: 3.199 GiB, 15.42% gc time)
-524288:   4.259396 seconds (84.20 M allocations: 6.769 GiB, 17.15% gc time)
-1048576:   8.968445 seconds (179.22 M allocations: 13.939 GiB, 18.54% gc time)
+  Which really oughtn't be surprising...
 
-Which really oughtn't be surprising...
-
-One idea which I ought to look into is preallocating vectorleaves in certain
-contexts. Creating vectors with Vector(undef, 32) and tracking indicies instead
-of using `end` actually caused a substantial regression in performance. I don't
-know why. It took more memory to allocate less? Each node had an extra byte to
-store the index, but that doesn't account for it.
+  One idea which I ought to look into is preallocating vectorleaves in certain
+  contexts. Creating vectors with Vector(undef, 32) and tracking indicies instead
+  of using `end` actually caused a substantial regression in performance. I don't
+  know why. It took more memory to allocate less? Each node had an extra byte to
+  store the index, but that doesn't account for it.
 * [2023-09-29 Fri] Transients
 
- first crack at transients and they do a lot more harm than good:
+  first crack at transients and they do a lot more harm than good:
 
- 2:   0.402445 seconds (670.46 k allocations: 44.595 MiB, 3.47% gc time, 99.94% compilation time)
- 4:   0.000037 seconds (136 allocations: 3.953 KiB)
- 8:   0.000051 seconds (260 allocations: 7.531 KiB)
- 16:   0.137807 seconds (286.42 k allocations: 19.423 MiB, 99.81% compilation time)
- 32:   0.127717 seconds (279.40 k allocations: 18.837 MiB, 99.75% compilation time)
- 64:   0.000405 seconds (7.09 k allocations: 170.391 KiB)
- 128:   0.001063 seconds (24.48 k allocations: 535.469 KiB)
- 256:   0.003657 seconds (89.97 k allocations: 1.798 MiB)
- 512:   0.013832 seconds (343.82 k allocations: 6.599 MiB)
- 1024:   0.053068 seconds (1.34 M allocations: 25.202 MiB)
- 2048:   0.241664 seconds (5.31 M allocations: 98.406 MiB, 13.25% gc time)
- 4096:   0.915464 seconds (21.10 M allocations: 388.814 MiB, 4.25% gc time)
- 8192:   3.544060 seconds (84.15 M allocations: 1.509 GiB, 3.20% gc time)
- 16384:  14.464104 seconds (336.06 M allocations: 6.019 GiB, 3.89% gc time)
- abort...
+  2:   0.402445 seconds (670.46 k allocations: 44.595 MiB, 3.47% gc time, 99.94% compilation time)
+  4:   0.000037 seconds (136 allocations: 3.953 KiB)
+  8:   0.000051 seconds (260 allocations: 7.531 KiB)
+  16:   0.137807 seconds (286.42 k allocations: 19.423 MiB, 99.81% compilation time)
+  32:   0.127717 seconds (279.40 k allocations: 18.837 MiB, 99.75% compilation time)
+  64:   0.000405 seconds (7.09 k allocations: 170.391 KiB)
+  128:   0.001063 seconds (24.48 k allocations: 535.469 KiB)
+  256:   0.003657 seconds (89.97 k allocations: 1.798 MiB)
+  512:   0.013832 seconds (343.82 k allocations: 6.599 MiB)
+  1024:   0.053068 seconds (1.34 M allocations: 25.202 MiB)
+  2048:   0.241664 seconds (5.31 M allocations: 98.406 MiB, 13.25% gc time)
+  4096:   0.915464 seconds (21.10 M allocations: 388.814 MiB, 4.25% gc time)
+  8192:   3.544060 seconds (84.15 M allocations: 1.509 GiB, 3.20% gc time)
+  16384:  14.464104 seconds (336.06 M allocations: 6.019 GiB, 3.89% gc time)
+  abort...
 
- Locking is the first culprit to look into. Is there a way to enforce thread
- isolation at a higher level and not worry about locks?
+  Locking is the first culprit to look into. Is there a way to enforce thread
+  isolation at a higher level and not worry about locks?
 * [2023-10-01 Sun] Transients Take Two
+  2:   0.235361 seconds (433.40 k allocations: 28.939 MiB, 6.07% gc time, 99.92% compilation time)
+  4:   0.000030 seconds (203 allocations: 5.906 KiB)
+  8:   0.000031 seconds (387 allocations: 11.234 KiB)
+  16:   0.189812 seconds (401.51 k allocations: 26.632 MiB, 99.90% compilation time)
+  32:   0.115477 seconds (167.73 k allocations: 11.353 MiB, 12.64% gc time, 99.81% compilation time)
+  64:   0.000239 seconds (3.54 k allocations: 105.094 KiB)
+  128:   0.000391 seconds (7.17 k allocations: 213.625 KiB)
+  256:   0.000780 seconds (14.44 k allocations: 430.000 KiB)
+  512:   0.067743 seconds (205.24 k allocations: 12.381 MiB, 96.26% compilation time)
+  1024:   0.007544 seconds (93.54 k allocations: 2.309 MiB)
+  2048:   0.017824 seconds (208.90 k allocations: 5.000 MiB)
+  4096:   0.038943 seconds (439.63 k allocations: 10.382 MiB)
+  8192:   0.081237 seconds (901.09 k allocations: 21.144 MiB)
+  16384:   1.162575 seconds (11.70 M allocations: 193.909 MiB, 4.27% gc time)
+  32768:   4.961132 seconds (53.15 M allocations: 843.174 MiB, 1.58% gc time)
+  65536:  12.987711 seconds (136.04 M allocations: 2.092 GiB, 1.90% gc time)
+  fail...
+
+  10x better than transients take I, but still 100x worse than straight up
+  persistence...
+
+  What the hell? I've got a lot to learn it would appear.
+
+  removing all locking and checking makes a marginal difference:
+
+  4:   0.000017 seconds (201 allocations: 5.859 KiB)
+  8:   0.000016 seconds (385 allocations: 11.188 KiB)
+  16:   0.000054 seconds (810 allocations: 23.781 KiB)
+  32:   0.000091 seconds (1.72 k allocations: 50.953 KiB)
+  64:   0.000173 seconds (3.54 k allocations: 105.047 KiB)
+  128:   0.000350 seconds (7.17 k allocations: 213.578 KiB)
+  256:   0.000709 seconds (14.43 k allocations: 429.953 KiB)
+  512:   0.002295 seconds (35.85 k allocations: 986.891 KiB)
+  1024:   0.007289 seconds (93.53 k allocations: 2.309 MiB)
+  2048:   0.017355 seconds (208.90 k allocations: 5.000 MiB)
+  4096:   0.057255 seconds (441.65 k allocations: 10.515 MiB, 20.47% gc time, 13.93% compilation time)
+  8192:   0.076030 seconds (901.08 k allocations: 21.144 MiB)
+  16384:   1.064113 seconds (11.70 M allocations: 193.909 MiB, 3.54% gc time)
+  32768:   4.895505 seconds (53.15 M allocations: 843.174 MiB, 2.19% gc time)
+
+  Curiourly, transients are faster for vectors of depth < 2 and use quite a bit
+  less memory until 8k 2^13 nodes, but after that it reverses violently. Something
+  strange is happening as the tree grows. I'm computing the count recursively
+  instead of storing it. I'm an idiot.
+
+  After storing the count in a field as per the persistent version:
+
+  2:   0.000038 seconds (110 allocations: 3.188 KiB)
+  4:   0.000014 seconds (203 allocations: 5.906 KiB)
+  8:   0.000020 seconds (387 allocations: 11.234 KiB)
+  16:   0.000069 seconds (780 allocations: 22.828 KiB)
+  32:   0.000104 seconds (1.57 k allocations: 46.125 KiB)
+  64:   0.000197 seconds (3.13 k allocations: 92.469 KiB)
+  128:   0.000396 seconds (6.27 k allocations: 185.500 KiB)
+  256:   0.000781 seconds (12.54 k allocations: 370.891 KiB)
+  512:   0.001643 seconds (27.16 k allocations: 774.953 KiB)
+  1024:   0.003485 seconds (58.45 k allocations: 1.577 MiB)
+  2048:   0.007230 seconds (121.01 k allocations: 3.218 MiB)
+  4096:   0.014666 seconds (246.15 k allocations: 6.500 MiB)
+  8192:   0.043788 seconds (496.42 k allocations: 13.064 MiB, 30.56% gc time)
+  16384:   0.061483 seconds (1.09 M allocations: 27.645 MiB)
+  32768:   0.147103 seconds (2.48 M allocations: 59.745 MiB, 9.11% gc time)
+  65536:   0.304465 seconds (5.24 M allocations: 123.945 MiB, 9.01% gc time)
+  131072:   0.624119 seconds (10.78 M allocations: 252.346 MiB, 9.83% gc time)
+  262144:   1.273259 seconds (21.85 M allocations: 509.146 MiB, 10.89% gc time)
+  524288:   2.741977 seconds (47.05 M allocations: 1.044 GiB, 12.38% gc time)
+  1048576:   5.857330 seconds (103.72 M allocations: 2.232 GiB, 12.94% gc time)
+
+  We're catching up on time, and we're using *less* ram than Base.Vector. Though
+  the difference is negligeble.
+
+  This won't work well for multithreading though. I'll have to compare
+  multithreaded persistent vectors with whever I can accomplish here.
 
 
-2:   0.235361 seconds (433.40 k allocations: 28.939 MiB, 6.07% gc time, 99.92% compilation time)
-4:   0.000030 seconds (203 allocations: 5.906 KiB)
-8:   0.000031 seconds (387 allocations: 11.234 KiB)
-16:   0.189812 seconds (401.51 k allocations: 26.632 MiB, 99.90% compilation time)
-32:   0.115477 seconds (167.73 k allocations: 11.353 MiB, 12.64% gc time, 99.81% compilation time)
-64:   0.000239 seconds (3.54 k allocations: 105.094 KiB)
-128:   0.000391 seconds (7.17 k allocations: 213.625 KiB)
-256:   0.000780 seconds (14.44 k allocations: 430.000 KiB)
-512:   0.067743 seconds (205.24 k allocations: 12.381 MiB, 96.26% compilation time)
-1024:   0.007544 seconds (93.54 k allocations: 2.309 MiB)
-2048:   0.017824 seconds (208.90 k allocations: 5.000 MiB)
-4096:   0.038943 seconds (439.63 k allocations: 10.382 MiB)
-8192:   0.081237 seconds (901.09 k allocations: 21.144 MiB)
-16384:   1.162575 seconds (11.70 M allocations: 193.909 MiB, 4.27% gc time)
-32768:   4.961132 seconds (53.15 M allocations: 843.174 MiB, 1.58% gc time)
-65536:  12.987711 seconds (136.04 M allocations: 2.092 GiB, 1.90% gc time)
-fail...
-
-10x better than transients take I, but still 100x worse than straight up
-persistence...
-
-What the hell? I've got a lot to learn it would appear.
-
-removing all locking and checking makes a marginal difference:
-
-4:   0.000017 seconds (201 allocations: 5.859 KiB)
-8:   0.000016 seconds (385 allocations: 11.188 KiB)
-16:   0.000054 seconds (810 allocations: 23.781 KiB)
-32:   0.000091 seconds (1.72 k allocations: 50.953 KiB)
-64:   0.000173 seconds (3.54 k allocations: 105.047 KiB)
-128:   0.000350 seconds (7.17 k allocations: 213.578 KiB)
-256:   0.000709 seconds (14.43 k allocations: 429.953 KiB)
-512:   0.002295 seconds (35.85 k allocations: 986.891 KiB)
-1024:   0.007289 seconds (93.53 k allocations: 2.309 MiB)
-2048:   0.017355 seconds (208.90 k allocations: 5.000 MiB)
-4096:   0.057255 seconds (441.65 k allocations: 10.515 MiB, 20.47% gc time, 13.93% compilation time)
-8192:   0.076030 seconds (901.08 k allocations: 21.144 MiB)
-16384:   1.064113 seconds (11.70 M allocations: 193.909 MiB, 3.54% gc time)
-32768:   4.895505 seconds (53.15 M allocations: 843.174 MiB, 2.19% gc time)
-
-Curiourly, transients are faster for vectors of depth < 2 and use quite a bit
-less memory until 8k 2^13 nodes, but after that it reverses violently. Something
-strange is happening as the tree grows. I'm computing the count recursively
-instead of storing it. I'm an idiot.
-
-After storing the count in a field as per the persistent version:
-
-2:   0.000038 seconds (110 allocations: 3.188 KiB)
-4:   0.000014 seconds (203 allocations: 5.906 KiB)
-8:   0.000020 seconds (387 allocations: 11.234 KiB)
-16:   0.000069 seconds (780 allocations: 22.828 KiB)
-32:   0.000104 seconds (1.57 k allocations: 46.125 KiB)
-64:   0.000197 seconds (3.13 k allocations: 92.469 KiB)
-128:   0.000396 seconds (6.27 k allocations: 185.500 KiB)
-256:   0.000781 seconds (12.54 k allocations: 370.891 KiB)
-512:   0.001643 seconds (27.16 k allocations: 774.953 KiB)
-1024:   0.003485 seconds (58.45 k allocations: 1.577 MiB)
-2048:   0.007230 seconds (121.01 k allocations: 3.218 MiB)
-4096:   0.014666 seconds (246.15 k allocations: 6.500 MiB)
-8192:   0.043788 seconds (496.42 k allocations: 13.064 MiB, 30.56% gc time)
-16384:   0.061483 seconds (1.09 M allocations: 27.645 MiB)
-32768:   0.147103 seconds (2.48 M allocations: 59.745 MiB, 9.11% gc time)
-65536:   0.304465 seconds (5.24 M allocations: 123.945 MiB, 9.01% gc time)
-131072:   0.624119 seconds (10.78 M allocations: 252.346 MiB, 9.83% gc time)
-262144:   1.273259 seconds (21.85 M allocations: 509.146 MiB, 10.89% gc time)
-524288:   2.741977 seconds (47.05 M allocations: 1.044 GiB, 12.38% gc time)
-1048576:   5.857330 seconds (103.72 M allocations: 2.232 GiB, 12.94% gc time)
-
-We're catching up on time, and we're using *less* ram than Base.Vector. Though
-the difference is negligeble.
-
-This won't work well for multithreading though. I'll have to compare
-multithreaded persistent vectors with whever I can accomplish here.
+  At this point, let's go back and check the comparison:
 
 
-At this point, let's go back and check the comparison:
+  #+BEGIN_SRC julia
+    for i in 1:k
+      print(string(2^i)*": ")
+      @time rgb::Vector{UInt8} = reduce(vcat,
+                                        map(p -> [
+                                          reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
+                                          0xff
+                                        ],
+                                            image[1:2^i]
+                                            )
+                                        )
+    end
+  #+END_SRC
 
+  and we get:
 
-#+BEGIN_SRC julia
-  for i in 1:k
-    print(string(2^i)*": ")
-    @time rgb::Vector{UInt8} = reduce(vcat,
-      map(p -> [
-          reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
-          0xff
-        ],
-        image[1:2^i]
-      )
-    )
-  end
-#+END_SRC
+  2:   0.000011 seconds (8 allocations: 448 bytes)
+  4:   0.000002 seconds (10 allocations: 624 bytes)
+  8:   0.000002 seconds (14 allocations: 976 bytes)
+  16:   0.000002 seconds (22 allocations: 1.625 KiB)
+  32:   0.000002 seconds (38 allocations: 3.000 KiB)
+  64:   0.000004 seconds (70 allocations: 5.734 KiB)
+  128:   0.000004 seconds (134 allocations: 11.172 KiB)
+  256:   0.000012 seconds (262 allocations: 22.156 KiB)
+  512:   0.000015 seconds (518 allocations: 44.078 KiB)
+  1024:   0.000028 seconds (1.03 k allocations: 87.609 KiB)
+  2048:   0.000054 seconds (2.05 k allocations: 174.609 KiB)
+  4096:   0.000102 seconds (4.11 k allocations: 348.375 KiB)
+  8192:   0.000203 seconds (8.20 k allocations: 696.297 KiB)
+  16384:   0.000520 seconds (16.39 k allocations: 1.360 MiB)
+  32768:   0.000909 seconds (32.78 k allocations: 2.719 MiB)
+  65536:   0.001815 seconds (65.55 k allocations: 5.438 MiB)
+  131072:   0.003632 seconds (131.08 k allocations: 10.875 MiB)
+  262144:   0.024924 seconds (262.15 k allocations: 21.750 MiB, 57.98% gc time)
+  524288:   0.015855 seconds (524.30 k allocations: 43.500 MiB)
+  1048576:   0.066121 seconds (1.05 M allocations: 87.000 MiB, 33.43% gc time)
 
-and we get:
+  I'm so far off it's embarrassing. I must have included compile time without
+  checking it before.
 
-2:   0.000011 seconds (8 allocations: 448 bytes)
-4:   0.000002 seconds (10 allocations: 624 bytes)
-8:   0.000002 seconds (14 allocations: 976 bytes)
-16:   0.000002 seconds (22 allocations: 1.625 KiB)
-32:   0.000002 seconds (38 allocations: 3.000 KiB)
-64:   0.000004 seconds (70 allocations: 5.734 KiB)
-128:   0.000004 seconds (134 allocations: 11.172 KiB)
-256:   0.000012 seconds (262 allocations: 22.156 KiB)
-512:   0.000015 seconds (518 allocations: 44.078 KiB)
-1024:   0.000028 seconds (1.03 k allocations: 87.609 KiB)
-2048:   0.000054 seconds (2.05 k allocations: 174.609 KiB)
-4096:   0.000102 seconds (4.11 k allocations: 348.375 KiB)
-8192:   0.000203 seconds (8.20 k allocations: 696.297 KiB)
-16384:   0.000520 seconds (16.39 k allocations: 1.360 MiB)
-32768:   0.000909 seconds (32.78 k allocations: 2.719 MiB)
-65536:   0.001815 seconds (65.55 k allocations: 5.438 MiB)
-131072:   0.003632 seconds (131.08 k allocations: 10.875 MiB)
-262144:   0.024924 seconds (262.15 k allocations: 21.750 MiB, 57.98% gc time)
-524288:   0.015855 seconds (524.30 k allocations: 43.500 MiB)
-1048576:   0.066121 seconds (1.05 M allocations: 87.000 MiB, 33.43% gc time)
+  So I'm still 2 orders of magnitude off on time and one on space...
 
-I'm so far off it's embarrassing. I must have included compile time without
-checking it before.
+  Special methods for creating small vectors make a noticable improvement:
 
-So I'm still 2 orders of magnitude off on time and one on space...
+  2:   0.000019 seconds (29 allocations: 944 bytes)
+  4:   0.000005 seconds (40 allocations: 1.359 KiB)
+  8:   0.000006 seconds (60 allocations: 2.125 KiB)
+  16:   0.000034 seconds (125 allocations: 4.594 KiB)
+  32:   0.000043 seconds (256 allocations: 9.641 KiB)
+  64:   0.000078 seconds (512 allocations: 19.484 KiB)
+  128:   0.000168 seconds (1.02 k allocations: 39.516 KiB)
+  256:   0.000831 seconds (2.05 k allocations: 78.906 KiB)
+  512:   0.000700 seconds (6.17 k allocations: 190.969 KiB)
+  1024:   0.001800 seconds (16.46 k allocations: 447.203 KiB)
+  2048:   0.003910 seconds (37.05 k allocations: 959.453 KiB)
+  4096:   0.008681 seconds (78.22 k allocations: 1.938 MiB)
+  8192:   0.015827 seconds (160.55 k allocations: 3.939 MiB)
+  16384:   0.036072 seconds (420.48 k allocations: 9.395 MiB)
+  32768:   0.075162 seconds (1.13 M allocations: 23.245 MiB)
+  65536:   0.157719 seconds (2.56 M allocations: 50.945 MiB)
+  131072:   0.339623 seconds (5.41 M allocations: 106.346 MiB)
+  262144:   0.701219 seconds (11.11 M allocations: 217.146 MiB, 8.55% gc time)
+  524288:   1.494626 seconds (25.55 M allocations: 485.249 MiB, 7.36% gc time)
+  1048576:   3.373203 seconds (60.73 M allocations: 1.091 GiB, 10.46% gc time)
 
-Af
+  Halving the ram usage. Not bad.
+
+* [2023-10-01 Sun] More focused metrics
+
+  These notes are a mess. But then so are my thoughts at the moment.
+
+  Let's try another tack.
+
+  Naive =into=
+  #+BEGIN_SRC julia
+    @time into(emptyvector, 1:2^20)
+    1.649648 seconds (30.95 M allocations: 3.548 GiB, 26.17% gc time)
+  #+END_SRC
+
+  Transient =into=
+  #+BEGIN_SRC julia
+    @time into(emptyvector, 1:2^20)
+    0.715259 seconds (17.95 M allocations: 318.826 MiB, 15.18% gc time)
+  #+END_SRC
+
+  alloc once recursive partitioning (current =vec= implementation).
+  #+BEGIN_SRC julia
+    @time vec(1:2^20)
+    0.148071 seconds (3.40 M allocations: 98.187 MiB, 32.71% gc time)
+  #+END_SRC
+
+  The moral being that while transients help — a lot! — being clever helps even
+  more.
+
+  Of course, compared to native methods we're still out in the woods:
+
+  #+BEGIN_SRC julia
+    @time [i for i in 1:2^20]; nothing
+    0.001074 seconds (2 allocations: 8.000 MiB)
+  #+END_SRC
+
+  So we're 100x slower and 10x heavier on ram than julia's datastructures. I'm
+  pretty sure further optimisation of the transients is beyond me without moving
+  to a lower level.
