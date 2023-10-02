@@ -4,12 +4,32 @@ abstract type Sequential end
 emptyp(x::Sequential) = count(x) == 0
 emptyp(x) = length(x) == 0
 
+struct Reduced{T}
+  value::T
+end
+
+function reduced(x)
+  throw(Reduced(x))
+end
+
 function reduce(f, coll)
   reduce(f, f(), coll)
 end
 
-# General reduce for anything sequential
 function reduce(f, init, coll)
+  try
+    ireduce(f, init, coll)
+  catch r
+    if r isa Reduced
+      r.value
+    else
+      throw(r)
+    end
+  end
+end
+
+# Fallback reduce impl for anything sequential
+function ireduce(f, init, coll)
   if emptyp(coll)
     init
   else
@@ -33,29 +53,53 @@ into(x) = x
 into(to, from) = reduce(conj, to, from)
 into(to, xform, from) = transduce(xform, conj, to, from)
 
+function drop(n)
+  function (emit)
+    function inner()
+      emit()
+    end
+    function inner(result)
+      emit(result)
+    end
+    function inner(result, next)
+      if n === 0
+        emit(result, next)
+      else
+        n -= 1
+        result
+      end
+    end
+    return inner
+  end
+end
+
 function drop(n, coll)
-  if n == 0
-    coll
-  else
-    drop(n - 1, rest(coll))
+  into(empty(coll), drop(n), coll)
+end
+
+function take(n)
+  function (emit)
+    function inner()
+      emit()
+    end
+    function inner(result)
+      emit(result)
+    end
+    function inner(result, next)
+      if n === 1
+        reduced(emit(result, next))
+      else
+        n -= 1
+        emit(result, next)
+      end
+    end
+    return inner
   end
 end
 
 function take(n, coll)
-  out = emptyvector
-  s = coll
-  for i in 1:n
-    f = first(s)
-    if f === nothing
-      break
-    else
-      out = conj(out, f)
-      s = rest(s)
-    end
-  end
-  return out
+  into(empty(coll), take(n), coll)
 end
-
 
 conj() = emptyvector
 conj(x) = x

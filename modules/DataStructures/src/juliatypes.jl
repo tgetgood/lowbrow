@@ -28,9 +28,9 @@ function get(v::Base.Vector, i)
   end
 end
 
-reduce(f, init, coll::UnitRange) = Base.reduce(f, coll; init)
-reduce(f, init, coll::Array) = Base.reduce(f, coll; init)
-reduce(f, init, coll::Tuple) = Base.reduce(f, coll; init)
+ireduce(f, init, coll::UnitRange) = Base.reduce(f, coll; init)
+ireduce(f, init, coll::Array) = Base.reduce(f, coll; init)
+ireduce(f, init, coll::Tuple) = Base.reduce(f, coll; init)
 
 
 Base.convert(::Type{Base.Vector}, xs::VectorLeaf) = [i for i in xs.elements]

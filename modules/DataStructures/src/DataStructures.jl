@@ -4,7 +4,7 @@ import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge,
 
 # How many bits of hash are used at each level of the HAMT?
 hashbits = 5
-nodelength::Unsigned = 2^hashbits
+nodelength = 2^hashbits
 nil = nothing
 
 include("./sexps.jl")

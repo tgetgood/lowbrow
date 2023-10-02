@@ -38,30 +38,30 @@ end
 struct VectorNode <: PersistentVector
   elements::Base.Vector{PersistentVector}
   # FIXME: This shouldn't be fixed size, but memory indirection is killing me.
-  count::UInt64
+  count::Int64
   # max depth is log(nodelength, typemax(typeof(count))). 4 bits would suffice.
-  depth::UInt8
+  depth::Int8
 end
 
 function vectornode(els::Base.Vector, count, depth)
-  VectorNode(els, UInt64(count), UInt8(depth))
+  VectorNode(els, count, depth)
 end
 
 function vectornode(els::Base.Vector)
-  VectorNode(els, UInt(sum(count, els; init=0)), UInt8(depth(els[1]) + 1))
+  VectorNode(els, sum(count, els; init=0), depth(els[1]) + 1)
 end
 
 # function vectornode(els::VectorLeaf, count, depth)
 #   vectornode(Tuple(els), count, depth)
 # end
 
-function reduce(f, init, coll::VectorLeaf)
+function ireduce(f, init, coll::VectorLeaf)
   Base.reduce(f, coll.elements, init=init)
 end
 
-function reduce(f, init, coll::VectorNode)
+function ireduce(f, init, coll::VectorNode)
   Base.reduce(
-    (acc, x) -> reduce(f, acc, x),
+    (acc, x) -> ireduce(f, acc, x),
     coll.elements,
     init=init
   )
