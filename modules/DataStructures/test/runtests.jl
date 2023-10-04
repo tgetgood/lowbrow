@@ -20,3 +20,4 @@ import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, Emp
 
 include("./vectortests.jl")
 # include("./maptests.jl")
+include("xformtests.jl")

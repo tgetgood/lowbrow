@@ -8,6 +8,10 @@ struct Reduced{T}
   value::T
 end
 
+# REVIEW: This is too much like Scala's null zoo for my liking.
+struct NoEmission end
+const none = NoEmission()
+
 function reduced(x)
   throw(Reduced(x))
 end
@@ -21,7 +25,11 @@ function reduce(f, init, coll)
     ireduce(f, init, coll)
   catch r
     if r isa Reduced
-      r.value
+      if r.value === nothing
+        none
+      else
+        r.value
+      end
     else
       throw(r)
     end
@@ -37,6 +45,9 @@ function ireduce(f, init, coll)
   end
 end
 
+##### TODO: split/join funcitons for the from/to collections to allow parallel
+##### transduction. This will require knowing which transducers can be run in
+##### parallel.
 function transduce(xform, f, to, from)
   g = xform(f)
   # Don't forget to flush state after input terminates
@@ -48,6 +59,9 @@ function transduce(xform, f, from)
   g(reduce(g, g(), from))
 end
 
+## Fallback `into` implementations.
+##
+## Collection specific specialisations are recommended.
 into() = emptyvector
 into(x) = x
 into(to, from) = reduce(conj, to, from)
@@ -73,9 +87,7 @@ function drop(n)
   end
 end
 
-function drop(n, coll)
-  into(empty(coll), drop(n), coll)
-end
+drop(n, coll) = into(empty(coll), drop(n), coll)
 
 function take(n)
   function (emit)
@@ -97,18 +109,54 @@ function take(n)
   end
 end
 
-function take(n, coll)
-  into(empty(coll), take(n), coll)
-end
+take(n, coll) = into(empty(coll), take(n), coll)
+
+# function seqcompose(xforms)
+#   function (emit)
+#     function inner(xs...)
+#       try
+#         first(xforms)(xs...)
+#       catch r
+#         if r isa Reduced
+#           xforms = rest(xforms)
+#           if emptyp(xforms)
+#             throw r
+#           else
+#             emit(unreduce(r))
 
 conj() = emptyvector
 conj(x) = x
 
 concat(xs, ys) = into(xs, ys)
 
-# This is a case where early abort could help. Particularly if `p` is expensive.
-every(p, xs) = reduce((x, y) -> x && y, true, map(p, xs))
-# count(xs) == count(filter(p, xs))
+# This is an odd one. The "natural" implementation for `every` throws away the
+# accumulator arg since only the last one matters. But that can't be composed
+# with other transducers.
+#
+# As is, this can be composed, but will short circuit and throw away the
+# downstream computation the first time `p` evaluates to `false`. I think that's
+# the correct behaviour, but it's still weird...
+function every(p)
+  function (emit)
+    function inner()
+      emit()
+    end
+    function inner(result)
+      emit(result)
+    end
+    function inner(result, next)
+      if p(next)
+        emit(result, next)
+      else
+        reduced(none)
+      end
+    end
+    return inner
+  end
+end
+
+lastarg(xs...) = xs[end]
+every(p, xs) = transduce(every(p), lastarg, nil, xs) !== none
 
 function cat()
   function (emit)

@@ -306,6 +306,14 @@ function largevec(args)
   first(into(emptyvector, ∘(xf...) , args))
 end
 
+# function into(to::PersistentVector, xform, from)
+
+# end
+
+# function into(to::PersistentVector, from)
+
+# end
+
 reverse(v::EmptyVector) = v
 
 function reverse(v::Vector)

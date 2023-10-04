@@ -2,6 +2,9 @@
 
 empty(x::Base.Vector) = []
 
+# Ranges are immutable, so let's just use our vectors.
+empty(x::AbstractRange) = emptyvector
+
 count(v::Base.Vector) = length(v)
 
 conj(v::Base.Vector, x) = vcat(v, [x])
@@ -28,7 +31,7 @@ function get(v::Base.Vector, i)
   end
 end
 
-ireduce(f, init, coll::UnitRange) = Base.reduce(f, coll; init)
+ireduce(f, init, coll::AbstractRange) = Base.reduce(f, coll; init)
 ireduce(f, init, coll::Array) = Base.reduce(f, coll; init)
 ireduce(f, init, coll::Tuple) = Base.reduce(f, coll; init)
 
