@@ -2,6 +2,7 @@ abstract type Map <: Sequential end
 
 abstract type MapNode end
 
+# REVIEW: Would adding {K,V} type parameters do anything except bloat code size?
 struct MapEntry <: MapNode
   key::Any
   value::Any
@@ -15,8 +16,7 @@ function val(x::MapEntry)
   x.value
 end
 
-struct EmptyMap <: Map
-end
+struct EmptyMap <: Map end
 
 const emptymap = EmptyMap()
 
@@ -25,11 +25,10 @@ const emptymap = EmptyMap()
 const arraymapsizethreashold = 8
 
 struct PersistentArrayMap <: Map
-  kvs::Tuple
+  kvs::Base.Vector{Any}
 end
 
-struct EmptyMarker <: MapNode
-end
+struct EmptyMarker <: MapNode end
 
 const emptymarker = EmptyMarker()
 
@@ -37,14 +36,13 @@ const emptymarker = EmptyMarker()
 # different levels cannot be merged sensibly and so passing subnodes around as
 # full fledged maps is bound to end in confusion and disaster.
 struct PersistentHashNode <: MapNode
-  ht::NTuple{Int(nodelength), MapNode}
-  level::UInt
-  count::UInt
+  ht::Base.Vector{MapNode}
+  # FIXME: Should not be fixed size
+  level::Int
+  count::Int
 end
 
-const emptyhash = NTuple{Int(nodelength), MapNode}(
-  map(x -> emptymarker, 1:nodelength)
-)
+const emptyhash::Base.Vector{MapNode} = [emptymarker for i in 1:nodelength]
 
 emptyhashnode(level) = PersistentHashNode(emptyhash, level, 0)
 
@@ -52,8 +50,6 @@ emptyhashnode(level) = PersistentHashNode(emptyhash, level, 0)
 # consider it worth it until proven otherwise.
 struct PersistentHashMap <: Map
   root::PersistentHashNode
-  # ht::NTuple{Int(nodelength), MapNode}
-  # count::UInt
 end
 
 const emptyhashmap = PersistentHashMap(emptyhashnode(1))
@@ -87,22 +83,29 @@ nth(h::HashSeq, n) = first(HashSeq(h.hash, h.current+n))
 empty(m::Map) = emptymap
 
 count(m::EmptyMarker) = 0
-count(m::PersistentHashNode)::Int = m.count
+count(m::PersistentHashNode) = m.count
 count(m::MapEntry) = 1
 count(m::EmptyMap) = 0
-count(m::PersistentArrayMap) = length(m.kvs) >> 1 # inline kvs
-count(m::PersistentHashMap)::Int = m.root.count
+count(m::PersistentArrayMap) = div(length(m.kvs), 2) # inline kvs
+count(m::PersistentHashMap) = m.root.count
 
 emptyp(m::Map) = count(m) == 0
 
 conj(m::Map, x::Nothing) = m
-conj(m::Map, e::MapEntry) = assoc(m, e.key, e.value)
 conj(m::Map, v::Vector) = assoc(m, v[1], v[2])
 
-seq(x::Nothing) = emptyvector
+assoc(m::PersistentHashMap, k, v) = conj(m, MapEntry(k, v))
+assoc(m::Map, k::Nothing, v) = throw("nothing is not a valid map key.")
+assoc(x::Nothing, k::Nothing, v) = throw("nothing is not a valid map key.")
+assoc(x::Nothing, k, v) = PersistentArrayMap([k, v])
+assoc(m::EmptyMap, k, v) = PersistentArrayMap([k, v])
 
-# Defer to `seq` for concrete type unless overridden.
+seq(x::Nothing) = emptyvector
+seq(x::EmptyMap) = emptyvector
+
 first(m::Map) = first(seq(m))
+first(m::PersistentArrayMap) = MapEntry(m.kvs[1], m.kvs[2])
+
 rest(m::Map) = rest(seq(m))
 
 get(m::Nothing, k) = nil
@@ -146,7 +149,7 @@ end
 
 containsp(m::Map, k) = getindexed(m, k)[2] !== :notfound
 
-function associn(m::Map, ks::Vector, v)
+function associn(m::Map, ks, v)
   if count(ks) == 1
     assoc(m, first(ks), v)
   else
@@ -155,35 +158,29 @@ function associn(m::Map, ks::Vector, v)
   end
 end
 
-function associn(m::Map, ks, v)
-  associn(m, vec(ks), v)
-end
-
 function assoc(m::Map, k, v, kvs...)
   @assert length(kvs) % 2 == 0
 
   into(assoc(m, k, v), partition(2), kvs)
 end
 
-assoc(m::Map, k::Nothing, v) = throw("nothing is not a valid map key.")
-assoc(x::Nothing, k, v) = PersistentArrayMap((k, v))
-assoc(m::EmptyMap, k, v) = PersistentArrayMap((k, v))
+function conj(m::PersistentArrayMap, e::MapEntry)
+  assoc(m, e.key, e.value)
+end
 
 function assoc(m::PersistentArrayMap, k, v)
-  if count(m) >= arraymapsizethreashold
-    assoc(into(emptyhashmap, m), k, v)
-  else
-    (_, i) = getindexed(m, k)
-
-    if i === :notfound
-      PersistentArrayMap((m.kvs...,k,v))
+  (_, i) = getindexed(m, k)
+  if i === :notfound
+    if count(m) >= arraymapsizethreashold
+      assoc(into(emptyhashmap, m), k, v)
     else
-      PersistentArrayMap((
-        m.kvs[1:i-1]...,
-        m.kvs[i+2:end]...,
-        k,v
-      ))
+      PersistentArrayMap(push!(copy(m.kvs), k, v))
     end
+  else
+    kvs = []
+    append!(kvs, m.kvs[1:i-1], m.kvs[i+2:end])
+    push!(kvs, k, v)
+    PersistentArrayMap(kvs)
   end
 end
 
@@ -192,7 +189,9 @@ function dissoc(m::PersistentArrayMap, k)
   if i === :notfound
     m
   else
-    PersistentArrayMap((m.kvs[1:i-1]..., m.kvs[i+2:end]...))
+    kvs = []
+    append!(kvs, m.kvs[1:i-1], m.kvs[i+2:end])
+    PersistentArrayMap(kvs)
   end
 end
 
@@ -200,11 +199,21 @@ function seq(m::PersistentArrayMap)
   map(i -> MapEntry(m.kvs[i], m.kvs[i+1]), 1:2:length(m.kvs))
 end
 
-
-# REVIEW: Profile and see if first often comes without rest. This isn't useful
-# unless that's the case.
-function first(m::PersistentArrayMap)
-  MapEntry(m.kvs[1], m.kvs[2])
+function Base.:(==)(x::PersistentArrayMap, y::PersistentArrayMap)
+  if x === y
+    return true
+  elseif count(x) !== count(y)
+    return false
+  else
+    for i in 1:count(x)
+      key = x.kvs[2*i-1]
+      (v, j) = getindexed(y, key)
+      if j === :notfound || v != x.kvs[2*i]
+        return false
+      end
+    end
+    return true
+  end
 end
 
 ##### Hash Maps
@@ -329,8 +338,11 @@ function printmap(io, m)
   print(io, transduce(interpose("\n ") ∘ map(string), *, "", m))
 end
 
-function show(io::IO, mime::MIME"text/plain", m::Map)
+function show(io::IO, mime::MIME"text/plain", m::EmptyMap)
+  print(io, "{}")
+end
 
+function show(io::IO, mime::MIME"text/plain", m::Map)
   print(io, string(count(m)) * "-element DataStructures.Map: {\n ")
   s = seq(m)
   if count(m) > 33

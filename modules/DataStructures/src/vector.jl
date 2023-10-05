@@ -341,15 +341,18 @@ function printvec(io::IO, v)
   print(io, transduce(interpose("\n ") ∘ map(string), *, "", v))
 end
 
+function show(io::IO, mime::MIME"text/plain", v::EmptyVector)
+  print(io, "[]")
+end
 
 function show(io::IO, mime::MIME"text/plain", v::Vector)
   print(io, string(count(v)) * "-element DataStructures.Vector: [\n ")
 
-  # REVIEW: Why 65? Because it had to be something...
-  if count(v) > 65
-    printvec(io, take(32, v))
+  # REVIEW: Why 33? Because it had to be something...
+  if count(v) > 33
+    printvec(io, take(16, v))
     print(io, "\n ...\n ")
-    printvec(io, takelast(32, v))
+    printvec(io, takelast(16, v))
   else
     printvec(io, v)
   end

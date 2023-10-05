@@ -18,6 +18,19 @@
   @test get(c, [1,2,3]) === Base.Vector
   @test get(c, vec(1:3)) === Vector
   @test get(c, "string") === complex(1f0, 13f-2)
+
+  @test hashmap(:a, 1, :b, 2) == hashmap(:b, 2, :a, 1)
+
+  m = assoc(emptymap, :a, 1, :b, 2, "c", 3)
+
+  @test dissoc(m, :a) == hashmap(:b, 2, "c", 3)
+  @test dissoc(m, :b) == hashmap(:a, 1, "c", 3)
+  @test dissoc(m, "c") == hashmap(:a, 1, :b, 2)
+
+  inc(x) = x + 1
+  fnil(f, default) = x -> x === nothing ? f(default) : f(x)
+
+  @test update(emptymap, "aaa", fnil(inc, 0)) == hashmap("aaa", 1)
 end
 
 @testset "nested maps" begin
@@ -27,8 +40,8 @@ end
   @test getin(m, [:a, :a], :default) === :default
   @test getin(m, [:b, :a], :default) === :default
 
-  @test getin(updatein(m, [:a, :b], x -> x + 1), [:a, :b]) == 6
   @test getin(associn(m, [:a, :c, :b], :sym), [:a, :c]) == hashmap(:b, :sym)
+  @test getin(updatein(m, [:a, :b], +, 1), [:a, :b]) == 6
 
   m2 = into(emptymap, map(i -> (i,i)), 1:4)
 

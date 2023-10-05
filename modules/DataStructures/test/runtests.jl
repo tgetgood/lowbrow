@@ -19,5 +19,5 @@ import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, Emp
 # import" property helps but is a bit of a kludge.
 
 include("./vectortests.jl")
-# include("./maptests.jl")
+include("./maptests.jl")
 include("xformtests.jl")

@@ -16,6 +16,11 @@ function assoc(v::Base.Vector, i, val)
   return v2
 end
 
+function assoc(v::Base.Vector, key, val)
+  v[key] = val
+  v
+end
+
 rest(v::Base.Array) = v[2:end]
 rest(v::UnitRange) = rest(Base.Vector(v))
 rest(v::Tuple) = v[2:end]
