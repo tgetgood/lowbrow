@@ -386,3 +386,21 @@ end
 function Base.:(==)(x::VectorNode, y::VectorNode)
   x.count === y.count && x.elements == y.elements
 end
+
+function Base.convert(::Type{Base.Vector{T}}, xs::VectorLeaf{T}) where T
+  copy(xs.elements)
+end
+
+function Base.convert(::Type{Base.Vector{T}}, xs::VectorNode) where T
+  v = Base.Vector{T}()
+  dumpwalk(v, xs)
+end
+
+function dumpwalk(x::Base.Vector{T}, v::VectorNode) where T
+  reduce(dumpwalk, x, v.elements)
+end
+
+function dumpwalk(x::Base.Vector{T}, v::VectorLeaf{T}) where T
+  append!(x, v.elements)
+  x
+end
