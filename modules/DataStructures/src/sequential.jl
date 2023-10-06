@@ -61,7 +61,7 @@ end
 
 function ireduce(f, acc, lists...)
   if every(!emptyp, lists)
-    reduce(f, f(acc, map(first, lists)...), map(rest, lists)...)
+    ireduce(f, f(acc, map(first, lists)...), map(rest, lists)...)
   else
     acc
   end
