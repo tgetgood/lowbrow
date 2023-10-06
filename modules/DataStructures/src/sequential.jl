@@ -288,17 +288,64 @@ function aftereach(delim)
   end
 end
 
-# FIXME: What's going on here?
+function repeat(xs...)
+  RepeatingSeq(xs, 1)
+end
 
-# Interleave is a higher order form of transducer (as is map in general). The
-# current implementation only works for a single argument at each step, which is
-# wrong, but whenever I try to generalise I quickly wind up with a mess.
+struct RepeatingSeq
+  els::Tuple
+  i::Int
+end
 
-# function interleave()
-#   i = 1
-#   function inner(emit)
-#   end
-# end
+first(s::RepeatingSeq) = s.els[s.i]
+
+function rest(s::RepeatingSeq)
+  l = length(s.els)
+  if l === 1
+    s
+  else
+    RepeatingSeq(s.els, (s.i % l) + 1)
+  end
+end
+
+emptyp(s::RepeatingSeq) = false
+
+# Actually it's infinite... but `Inf` is a float thing
+count(s::RepeatingSeq) = typemax(Int)
+
+function interleave()
+  function (emit)
+    function inner(emit)
+    end
+    function inner(result)
+      emit(result)
+    end
+    function inner(result, xs...)
+      reduce(emit, result, xs)
+    end
+  end
+end
+
+function inject(ys)
+  function (emit)
+    function inner()
+      emit()
+    end
+    function inner(result)
+      emit(result)
+    end
+    function inner(result, x)
+      y = first(ys)
+      ys = rest(ys)
+      v = emit(result, x, y)
+      if emptyp(ys)
+        reduced(emit(v))
+      else
+        v
+      end
+    end
+  end
+end
 
 function partition(n)
   acc = []

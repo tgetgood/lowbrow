@@ -26,7 +26,7 @@ function profile(system, config, k = 18)
 
   image = load(get(config, :texture_file))
 
-  opacity = ds.conj(ds.emptyvector, 0xff)
+  opacity = ds.repeat(ds.conj(ds.emptyvector, 0xff))
 
   for i in 1:k
     print(string(2^i) * ": ")
@@ -34,12 +34,15 @@ function profile(system, config, k = 18)
       ds.emptyvector,
       map(bgr)
       ∘
-      ds.aftereach(opacity)
-      # map(x -> ds.conj(x, 0xff))
+      ds.inject(opacity)
+      ∘
+      ds.interleave()
       ∘
       ds.cat(),
       image[1:2^i]
     )
+    out = convert(Base.Vector{UInt8}, rgb)
+    @info typeof(out)
     nothing
   end
 end

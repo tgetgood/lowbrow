@@ -18,5 +18,7 @@ even(x) = x % 2 == 0
   @test into(emptyvector, xform(), 2:2:100) == vector(4, 16, 36, 64)
 
   @test into(emptyvector, take(5) ∘ take(5) ∘ take(5), vec(1:1000)) == vec(1:5)
+end
 
+@testset "Multiple Streams" begin
 end
