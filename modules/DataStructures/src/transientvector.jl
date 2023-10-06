@@ -176,3 +176,11 @@ function conj!(v::TransientVector, x)
     return v
   end
 end
+
+function into(to::PersistentVector, xform, from...)
+  persist!(transduce(xform, conj!, transient!(to), from...))
+end
+
+function into(to::PersistentVector, from)
+  persist!(reduce(conj!, transient!(to), from))
+end
