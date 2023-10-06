@@ -216,6 +216,38 @@ function zipmap(x, y)
   into(emptymap, zip(), x, y)
 end
 
+## FIXME: Sooo much boilerplate. I need to write macros for building xforms.
+function mapkeys(f)
+  function emit()
+    function inner()
+      emit()
+    end
+    function inner(result)
+      emit(result)
+    end
+    function inner(result, e)
+      emit(result, MapEntry(f(key(e)), val(e)))
+    end
+  end
+end
+
+function mapvals(f)
+  function emit()
+    function inner()
+      emit()
+    end
+    function inner(result)
+      emit(result)
+    end
+    function inner(result, e)
+      emit(result, MapEntry(key(e), f(val(e))))
+    end
+  end
+end
+
+mapkeys(f, m) = into(empty(m), mapkeys(f), m)
+mapvals(f, m) = into(empty(m), mapvals(f), m)
+
 ##### Empty maps
 
 merge(x::EmptyMap, y::Map) = y
