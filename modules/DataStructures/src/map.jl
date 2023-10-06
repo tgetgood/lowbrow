@@ -212,6 +212,10 @@ function vals(m::Map)
   map(x -> x.value, seq(m))
 end
 
+function zipmap(x, y)
+  into(emptymap, zip(), x, y)
+end
+
 ##### Empty maps
 
 merge(x::EmptyMap, y::Map) = y
@@ -438,57 +442,4 @@ function Base.:(==)(x::PersistentHashMap, y::PersistentArrayMap)
   else
     every(k -> get(x, k) == get(y, k), keys(y))
   end
-end
-
-##### Ordered Maps
-##
-## associative datastructure that preserves insertion order on iteration.
-## Specifically, this means that `keys` and `vals` return the keys and vals of
-## the map in the order in which they were inserted.
-
-## N.B.: performance will not be stellar if you overwrite keys frequently in a
-## large map. Getting the list of keys or vals *should* always be O(n) --- O(1)
-## per iteration step --- but the constants grow as keeping track of order gets
-## more involved.
-
-## The above isn't true because I haven't implemented lazy evaluation
-## yet... In reality, updating a key is O(n) worst case, but getting the keys is
-## O(1).
-struct OrderedMap <: Map
-  inner::Map
-  keyseq::Vector
-end
-
-const emptyorderedmap = OrderedMap(emptymap, emptyvector)
-
-function assoc(m::OrderedMap, k, v)
-  m2 = assoc(m.inner, k, v)
-  if containsp(m, k)
-    keyseq = conj(filter(x -> x != k, m.keyseq), k)
-  else
-    keyseq = conj(m.keyseq, k)
-  end
-  return OrderedMap(m2, keyseq)
-end
-
-function dissoc(m::OrderedMap, k)
-  OrderedMap(
-    dissoc(m.inner, k),
-    filter(x -> x != k, m.keyseq)
-  )
-end
-
-get(m::OrderedMap, k, default) = get(m.inner, k, default)
-
-seq(m::OrderedMap) = map(k -> MapEntry(k, get(m, k)), m.keyseq)
-
-keys(m::OrderedMap) = m.keyseq
-
-vals(m::OrderedMap) = map(k -> get(m, k), m.keyseq)
-
-count(m::OrderedMap) = count(m.keyseq)
-
-function zipmap(x, y)
-  i = min(count(x), count(y))
-  reduce((a, i) -> assoc(a, x[i], y[i]), emptymap, 1:i)
 end

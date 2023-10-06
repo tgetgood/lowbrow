@@ -78,7 +78,7 @@ end
 into() = emptyvector
 into(x) = x
 into(to, from) = reduce(conj, to, from)
-into(to, xform, from) = transduce(xform, conj, to, from)
+into(to, xform, from...) = transduce(xform, conj, to, from...)
 
 function drop(n)
   function (emit)
