@@ -15,17 +15,15 @@ function vert(pos, tex)
   Vertex(tuple(pos...), tuple(tex...))
 end
 
+fnil(f, default) = (acc, x) -> x === nothing ? f(acc, default) : f(acc, x)
+
 function typesort(lines)
   res = ds.emptymap
   for line in lines
     s = split(line, " ")
     tag = first(s)
     val = ds.rest(s)
-    if ds.containsp(res, tag)
-      push!(get(res, tag), val)
-    else
-      res = ds.assoc(res, tag, [val])
-    end
+    res = ds.update(res, tag, fnil(ds.conj, ds.emptyvector), val)
   end
   return res
 end
@@ -39,6 +37,7 @@ function triplev(f, vs, ts)
   tex = ts[t[2]]
   vert(vs[t[1]], (1f0-tex[2], tex[1]))
 end
+
 
 function load(system, config)
   filename = get(config, :model_file)
@@ -74,6 +73,11 @@ function load(system, config)
     vertex.vertexbuffer(system, verticies),
     vertex.indexbuffer(system, ds.into(Vector{UInt}(), indicies))
   )
+end
+
+function profile(system, config)
+  @time load(system, config)
+  nothing
 end
 
 end

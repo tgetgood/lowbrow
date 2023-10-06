@@ -71,16 +71,6 @@ function textureimage(system, config)
 
   mips = Int(1 + floor(log2(max(size(image)...))))
 
-  # @time rgb = ds.into(
-  #   ds.emptyvector,
-  #   map(bgr)
-  #   ∘
-  #   map(x -> ds.conj(x, 0xff))
-  #   ∘
-  #   ds.cat(),
-  #   image
-  # )
-
   rgb::Vector{UInt8} = reduce(vcat,
     map(p -> [
         reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
