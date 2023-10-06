@@ -26,15 +26,13 @@ function profile(system, config, k = 18)
 
   image = load(get(config, :texture_file))
 
-  opacity = ds.repeat(ds.conj(ds.emptyvector, 0xff))
-
   for i in 1:k
     print(string(2^i) * ": ")
     @time rgb = ds.into(
       ds.emptyvector,
       map(bgr)
       ∘
-      ds.inject(opacity)
+      ds.inject(ds.repeat(ds.conj(ds.emptyvector, 0xff)))
       ∘
       ds.interleave()
       ∘
@@ -74,13 +72,16 @@ function textureimage(system, config)
 
   mips = Int(1 + floor(log2(max(size(image)...))))
 
-  rgb::Vector{UInt8} = reduce(vcat,
-    map(p -> [
-        reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
-        0xff
-      ],
-      image
-    )
+  rgb::Vector{UInt8} = ds.into(
+    ds.emptyvector,
+    map(bgr)
+    ∘
+    ds.inject(ds.repeat(ds.conj(ds.emptyvector, 0xff)))
+    ∘
+    ds.interleave()
+    ∘
+    ds.cat(),
+    image
   )
 
   staging = hw.transferbuffer(system, sizeof(rgb))
