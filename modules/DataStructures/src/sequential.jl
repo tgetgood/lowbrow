@@ -20,12 +20,14 @@ function reduce(f, coll)
   reduce(f, f(), coll)
 end
 
+empty(x::Nothing) = nothing
+
 function reduce(f, init, coll...)
   try
     ireduce(f, init, coll...)
   catch r
     if r isa Reduced
-      if r.value === nothing
+      if r.value === none
         none
       else
         r.value
@@ -45,6 +47,14 @@ function ireduce(f, init, coll)
   end
 end
 
+function ireduce(f, acc, lists...)
+  if every(!emptyp, lists)
+    ireduce(f, f(acc, map(first, lists)...), map(rest, lists)...)
+  else
+    acc
+  end
+end
+
 ##### TODO: split/join funcitons for the from/to collections to allow parallel
 ##### transduction. This will require knowing which transducers can be run in
 ##### parallel.
@@ -57,14 +67,6 @@ end
 function transduce(xform, f, from)
   g = xform(f)
   g(reduce(g, g(), from))
-end
-
-function ireduce(f, acc, lists...)
-  if every(!emptyp, lists)
-    ireduce(f, f(acc, map(first, lists)...), map(rest, lists)...)
-  else
-    acc
-  end
 end
 
 function transduce(xform, f, to, from...)
@@ -394,7 +396,8 @@ end
 
 function interleave()
   function (emit)
-    function inner(emit)
+    function inner()
+      emit()
     end
     function inner(result)
       emit(result)

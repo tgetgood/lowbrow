@@ -105,6 +105,8 @@ function persist!(v::TransientVector)
   end
 end
 
+persist!(x::NoEmission) = x
+
 function transientsibling(x, depth)
   if depth == 1
     tvl([x])
@@ -176,6 +178,8 @@ function conj!(v::TransientVector, x)
     return v
   end
 end
+
+empty(v::TransientVector) = transientemptyvector
 
 function into(to::PersistentVector, xform, from...)
   persist!(transduce(xform, conj!, transient!(to), from...))

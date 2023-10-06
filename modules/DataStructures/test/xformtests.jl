@@ -5,6 +5,7 @@ even(x) = x % 2 == 0
   @test take(5, 1:2^60) == vec(1:5)
   @test into(emptyvector, take(5) ∘ map(inc), 1:2^32) == vec(2:6)
 
+  @test every(even, []) == true
   @test every(even, [1]) == false
   @test every(even, [1,2,3]) == false
   @test every(even, [2]) == true
