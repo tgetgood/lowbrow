@@ -16,6 +16,10 @@ function val(x::MapEntry)
   x.value
 end
 
+function Base.:(==)(x::MapEntry, y::MapEntry)
+  x.key == y.key && x.value == y.value
+end
+
 struct EmptyMap <: Map end
 
 const emptymap = EmptyMap()
@@ -80,6 +84,17 @@ rest(s::HashSeq) = HashSeq(s.hash, s.current + 1)
 # hope of performance.
 nth(h::HashSeq, n) = first(HashSeq(h.hash, h.current+n))
 
+##### General methods
+
+# REVIEW: This might be a tad slow for large maps. At least it's cacheable (and
+# incremental!). But then how do I make use of that?
+function hash(m::Map)
+  # 0xd45866ec3759ca93 is a random seed. I want any two maps with the same
+  # elements to have the same hash and be equal. This seems like a decent way to
+  # accomplish that.
+  transduce(map(hash), xor, 0xd45866ec3759ca93, m)
+end
+
 empty(m::Map) = emptymap
 
 count(m::EmptyMarker) = 0
@@ -91,50 +106,16 @@ count(m::PersistentHashMap) = m.root.count
 
 emptyp(m::Map) = count(m) == 0
 
-conj(m::Map, x::Nothing) = m
 conj(m::Map, v::Vector) = assoc(m, v[1], v[2])
 
-assoc(m::PersistentHashMap, k, v) = conj(m, MapEntry(k, v))
 assoc(m::Map, k::Nothing, v) = throw("nothing is not a valid map key.")
-assoc(x::Nothing, k::Nothing, v) = throw("nothing is not a valid map key.")
-assoc(x::Nothing, k, v) = PersistentArrayMap([k, v])
-assoc(m::EmptyMap, k, v) = PersistentArrayMap([k, v])
-
-seq(x::Nothing) = emptyvector
-seq(x::EmptyMap) = emptyvector
 
 first(m::Map) = first(seq(m))
-first(m::PersistentArrayMap) = MapEntry(m.kvs[1], m.kvs[2])
-
 rest(m::Map) = rest(seq(m))
 
-get(m::Nothing, k) = nil
-get(m::Nothing, k, default) = default
-get(m::EmptyMap, x) = get(m, x, nothing)
-get(m::EmptyMap, x, default) = default
-
-function getindexed(m::EmptyMap, k)
-  nothing, :notfound
-end
-
-"""
-Returns (v, i) where `v` is the value associated with key `k` in `m` and `i` is
-an index of `k` in `m` (what that means depends on the concrete type of `m`).
-
-i == :notfound if k is not a key in m.
-"""
-function getindexed(m::PersistentArrayMap, k, default=nil)
-  i = 1
-  while i < length(m.kvs)
-    if m.kvs[i] == k
-      return m.kvs[i+1], i
-    end
-    i += 2
-  end
-  return default, :notfound
-end
-
 get(m::Map, k, default=nil) = getindexed(m, k, default)[1]
+
+conj(m::Map, x::Nothing) = m
 
 function getin(m::Map, ks, default=nil)
   (v, i) = getindexed(m, first(ks))
@@ -164,134 +145,7 @@ function assoc(m::Map, k, v, kvs...)
   into(assoc(m, k, v), partition(2), kvs)
 end
 
-function conj(m::PersistentArrayMap, e::MapEntry)
-  assoc(m, e.key, e.value)
-end
-
-function assoc(m::PersistentArrayMap, k, v)
-  (_, i) = getindexed(m, k)
-  if i === :notfound
-    if count(m) >= arraymapsizethreashold
-      assoc(into(emptyhashmap, m), k, v)
-    else
-      PersistentArrayMap(push!(copy(m.kvs), k, v))
-    end
-  else
-    kvs = []
-    append!(kvs, m.kvs[1:i-1], m.kvs[i+2:end])
-    push!(kvs, k, v)
-    PersistentArrayMap(kvs)
-  end
-end
-
-function dissoc(m::PersistentArrayMap, k)
-  (_, i) = getindexed(m, k)
-  if i === :notfound
-    m
-  else
-    kvs = []
-    append!(kvs, m.kvs[1:i-1], m.kvs[i+2:end])
-    PersistentArrayMap(kvs)
-  end
-end
-
-function seq(m::PersistentArrayMap)
-  map(i -> MapEntry(m.kvs[i], m.kvs[i+1]), 1:2:length(m.kvs))
-end
-
-function Base.:(==)(x::PersistentArrayMap, y::PersistentArrayMap)
-  if x === y
-    return true
-  elseif count(x) !== count(y)
-    return false
-  else
-    for i in 1:count(x)
-      key = x.kvs[2*i-1]
-      (v, j) = getindexed(y, key)
-      if j === :notfound || v != x.kvs[2*i]
-        return false
-      end
-    end
-    return true
-  end
-end
-
-##### Hash Maps
-
-function getindexed(m::MapEntry, k, default, l)
-  if m.key == k
-    # The level at which an element was found (if found) tells you exactly what
-    # it's effective hash is.
-    m.value, l
-  else
-    default, :notfound
-  end
-end
-
-function getindexed(m::PersistentHashNode, k, default, l)
-  next = m.ht[nth(hashseq(k), m.level) + 1]
-
-  if next === emptymarker
-    default, :notfound
-  else
-    getindexed(next, k, default, m.level)
-  end
-end
-
-function getindexed(m::PersistentHashMap, k, default=nil)
-  getindexed(m.root, k, default, 1)
-end
-
-function assoc(m::PersistentHashNode, k, v, level=nil)
-  h = nth(hashseq(k), m.level) + 1
-  next = m.ht[h]
-
-  if next === emptymarker
-    # New entry increases size by one.
-    PersistentHashNode(assoc(m.ht, h, MapEntry(k, v)), m.level, m.count + 1)
-  else
-    submap = assoc(next, k, v, m.level)
-    ht = assoc(m.ht, h, submap)
-    c = sum(map(count, ht); init=0)
-
-    PersistentHashNode(ht, m.level, c)
-  end
-end
-
-function assoc(e::MapEntry, k, v, l=0)
-  if e.key == k
-    MapEntry(k, v)
-  else
-    assoc(assoc(emptyhashnode(l+1), e.key, e.value), k, v)
-  end
-end
-
-function assoc(
-  t::NTuple{Int(nodelength),MapNode}, i, v
-)::NTuple{Int(nodelength),MapNode}
-  tuple(t[1:i-1]..., v, t[i+1:end]...)
-end
-
-function assoc(m::PersistentHashMap, k, v)
-  (val, i) = getindexed(m, k)
-  if i !== :notfound && val == v
-    m
-  else
-    PersistentHashMap(assoc(m.root, k, v))
-  end
-end
-
-function dissoc(m::PersistentHashMap, k)
-  throw("not implemented")
-end
-
-gather(acc, m::EmptyMarker) = acc
-gather(acc, m::MapEntry) = conj(acc, m)
-gather(acc, m::PersistentHashNode) = reduce(gather, acc, m.ht)
-
-function seq(m::PersistentHashMap)
-  gather(emptyvector, m.root)
-end
+merge(x::Map) = x
 
 function update(m, k, f, v...)
   nv = f(get(m, k), v...)
@@ -311,13 +165,6 @@ end
 function hashmap(args...)
   @assert length(args) % 2 == 0
   into(emptymap, partition(2), args)
-end
-
-merge(x::Map) = x
-
-# TODO: Merge can be implemented much more efficiently.
-function merge(x::Map, y::Map)
-  into(x, y)
 end
 
 function string(x::MapEntry)
@@ -365,6 +212,234 @@ function vals(m::Map)
   map(x -> x.value, seq(m))
 end
 
+##### Empty maps
+
+merge(x::EmptyMap, y::Map) = y
+merge(x::Map, y::EmptyMap) = x
+
+merge(x::Nothing, y::Map) = y
+merge(x::Map, y::Nothing) = x
+
+assoc(x::Nothing, k::Nothing, v) = throw("nothing is not a valid map key.")
+assoc(x::Nothing, k, v) = PersistentArrayMap([k, v])
+assoc(m::EmptyMap, k, v) = PersistentArrayMap([k, v])
+
+conj(m::EmptyMap, e::MapEntry) = assoc(m, key(e), val(e))
+
+get(m::Nothing, k) = nil
+get(m::Nothing, k, default) = default
+get(m::EmptyMap, x) = nil
+get(m::EmptyMap, x, default) = default
+
+seq(x::Nothing) = emptyvector
+seq(x::EmptyMap) = emptyvector
+
+function getindexed(m::EmptyMap, k)
+  nothing, :notfound
+end
+
+function Base.:(==)(x::EmptyMap, y::Map)
+  count(y) === 0
+end
+
+function Base.:(==)(x::Map, y::EmptyMap)
+  count(x) === 0
+end
+
+##### Array Maps
+
+first(m::PersistentArrayMap) = MapEntry(m.kvs[1], m.kvs[2])
+
+"""
+Returns (v, i) where `v` is the value associated with key `k` in `m` and `i` is
+an index of `k` in `m` (what that means depends on the concrete type of `m`).
+
+i == :notfound if k is not a key in m.
+"""
+function getindexed(m::PersistentArrayMap, k, default=nil)
+  i = 1
+  while i < length(m.kvs)
+    if m.kvs[i] == k
+      return m.kvs[i+1], i
+    end
+    i += 2
+  end
+  return default, :notfound
+end
+
+function conj(m::PersistentArrayMap, e::MapEntry)
+  assoc(m, e.key, e.value)
+end
+
+function assoc(m::PersistentArrayMap, k, v)
+  (_, i) = getindexed(m, k)
+  if i === :notfound
+    if count(m) >= arraymapsizethreashold
+      assoc(into(emptyhashmap, m), k, v)
+    else
+      PersistentArrayMap(push!(copy(m.kvs), k, v))
+    end
+  else
+    kvs = []
+    append!(kvs, m.kvs[1:i-1], m.kvs[i+2:end])
+    push!(kvs, k, v)
+    PersistentArrayMap(kvs)
+  end
+end
+
+function dissoc(m::PersistentArrayMap, k)
+  (_, i) = getindexed(m, k)
+  if i === :notfound
+    m
+  else
+    kvs = []
+    append!(kvs, m.kvs[1:i-1], m.kvs[i+2:end])
+    PersistentArrayMap(kvs)
+  end
+end
+
+function seq(m::PersistentArrayMap)
+  map(i -> MapEntry(m.kvs[i], m.kvs[i+1]), 1:2:length(m.kvs))
+end
+
+# These have limited size, so the simplicity of this method trumps efficiency
+merge(x::PersistentArrayMap, y::PersistentArrayMap) = into(x, y)
+merge(x::PersistentArrayMap, y::PersistentHashMap ) = into(y, x)
+merge(x::PersistentHashMap,  y::PersistentArrayMap) = into(x, y)
+
+function Base.:(==)(x::PersistentArrayMap, y::PersistentArrayMap)
+  if x === y
+    return true
+  elseif count(x) !== count(y)
+    return false
+  else
+    for i in 1:count(x)
+      key = x.kvs[2*i-1]
+      (v, j) = getindexed(y, key)
+      if j === :notfound || v != x.kvs[2*i]
+        return false
+      end
+    end
+    return true
+  end
+end
+
+##### Hash Maps
+
+function getindexed(m::MapEntry, k, default, l)
+  if m.key == k
+    # The level at which an element was found (if found) tells you exactly what
+    # it's effective hash is.
+    m.value, l
+  else
+    default, :notfound
+  end
+end
+
+function getindexed(m::EmptyMarker, _, default, _)
+  default, :notfound
+end
+
+function getindexed(m::PersistentHashNode, k, default, l)
+  next = m.ht[nth(hashseq(k), m.level) + 1]
+
+  getindexed(next, k, default, m.level)
+end
+
+function getindexed(m::PersistentHashMap, k, default=nil)
+  getindexed(m.root, k, default, 1)
+end
+
+assoc(m::PersistentHashMap, k, v) = conj(m, MapEntry(k, v))
+
+function addtomap(m::PersistentHashNode, e::MapEntry, _=0)
+  h = nth(hashseq(key(e)), m.level) + 1
+  next = m.ht[h]
+
+  submap = addtomap(next, e, m.level)
+  ht = copy(m.ht)
+  ht[h] = submap
+
+  PersistentHashNode(ht, m.level, m.count + 1)
+end
+
+function addtomap(m::EmptyMarker, e::MapEntry, _)
+  e
+end
+
+function addtomap(e1::MapEntry, e2::MapEntry, l)
+  if key(e1) == key(e2)
+    e2
+  else
+    addtomap(addtomap(emptyhashnode(l+1), e1), e2)
+  end
+end
+
+function conj(m::PersistentHashMap, e::MapEntry)
+  (v, i) = getindexed(m, key(e))
+  if i !== :notfound && val(e) == i
+    m
+  else
+    PersistentHashMap(addtomap(m.root, e))
+  end
+end
+
+function dissoc(m::PersistentHashMap, k)
+  throw("not implemented")
+end
+
+gather(acc, m::EmptyMarker) = acc
+gather(acc, m::MapEntry) = conj(acc, m)
+gather(acc, m::PersistentHashNode) = reduce(gather, acc, m.ht)
+
+function seq(m::PersistentHashMap)
+  gather(emptyvector, m.root)
+end
+
+function merge(x::Map, y::Map)
+  into(x, y)
+end
+
+# function merge(x::PersistentHashMap, y::PersistentHashMap)
+#   ht = []
+#   for i in 1::nodelength
+#     if x.ht[i] == y.ht[i]
+#       ht[i] = x.ht[i]
+#     else
+#       ht[i] = merge(x.ht[i], y.ht[i])
+#     end
+#   end
+#   PersistentHashMap(PersistentHashNode(ht, sum(count, m.ht), x.level))
+# end
+
+function Base.:(==)(x::PersistentHashMap, y::PersistentHashMap)
+  if count(x) !== count(y)
+    return false
+  else
+    every(t -> t[1] == t[2], zip(x.root.ht, y.root.ht))
+  end
+end
+
+function Base.:(==)(x::PersistentHashNode, y::PersistentHashNode)
+  if count(x) !== count(y)
+    return false
+  else
+    every(t -> t[1] == t[2], zip(x.ht, y.ht))
+  end
+end
+
+function Base.:(==)(x::PersistentArrayMap, y::PersistentHashMap)
+  y == x
+end
+
+function Base.:(==)(x::PersistentHashMap, y::PersistentArrayMap)
+  if count(x) !== count(y)
+    return false
+  else
+    every(k -> get(x, k) == get(y, k), keys(y))
+  end
+end
+
 ##### Ordered Maps
 ##
 ## associative datastructure that preserves insertion order on iteration.
@@ -379,7 +454,6 @@ end
 ## The above isn't true because I haven't implemented lazy evaluation
 ## yet... In reality, updating a key is O(n) worst case, but getting the keys is
 ## O(1).
-
 struct OrderedMap <: Map
   inner::Map
   keyseq::Vector

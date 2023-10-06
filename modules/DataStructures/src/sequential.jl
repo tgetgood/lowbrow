@@ -20,9 +20,9 @@ function reduce(f, coll)
   reduce(f, f(), coll)
 end
 
-function reduce(f, init, coll)
+function reduce(f, init, coll...)
   try
-    ireduce(f, init, coll)
+    ireduce(f, init, coll...)
   catch r
     if r isa Reduced
       if r.value === nothing
@@ -57,6 +57,19 @@ end
 function transduce(xform, f, from)
   g = xform(f)
   g(reduce(g, g(), from))
+end
+
+function ireduce(f, acc, lists...)
+  if every(!emptyp, lists)
+    reduce(f, f(acc, map(first, lists)...), map(rest, lists)...)
+  else
+    acc
+  end
+end
+
+function transduce(xform, f, to, from...)
+  g = xform(f)
+  g(reduce(g, to, from...))
 end
 
 ## Fallback `into` implementations.
@@ -345,12 +358,18 @@ function prepend(head)
   end
 end
 
-# NTuple compatibility
-
-function rest(xs::NTuple)
-  xs[2:end]
+function zip()
+  function (emit)
+    function inner()
+      emit()
+    end
+    function inner(result)
+      emit(result)
+    end
+    function inner(result, xs...)
+      emit(result, vec(xs))
+    end
+  end
 end
 
-function count(xs::NTuple)
-  length(xs)
-end
+zip(colls...) = transduce(zip(), conj, emptyvector, colls...)

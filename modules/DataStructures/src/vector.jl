@@ -374,15 +374,15 @@ end
 
 ##### Equality
 
-hash(v::VectorLeaf) = hash(v.elements)
-hash(v::VectorNode) = hash(v.elements)
+# FIXME: Hashing the type is not stable between runs. Not critical just yet,
+# but it will be. I want hashes to be sufficiently stable that they can go on
+# the wire. Basically hash values and never hash memory addresses.
+hash(v::T) where T <: PersistentVector = xor(hash(T), hash(v.elements))
 
 function Base.:(==)(x::VectorLeaf, y::VectorLeaf)
   x.elements == y.elements
 end
 
 function Base.:(==)(x::VectorNode, y::VectorNode)
-  x.count === y.count &&
-    x.depth === y.depth &&
-    x.elements == y.elements
+  x.count === y.count && x.elements == y.elements
 end

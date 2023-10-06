@@ -21,6 +21,8 @@
 
   @test hashmap(:a, 1, :b, 2) == hashmap(:b, 2, :a, 1)
 
+  @test assoc(assoc(emptymap, :a, 3), :a, 6) == hashmap(:a, 6)
+
   m = assoc(emptymap, :a, 1, :b, 2, "c", 3)
 
   @test dissoc(m, :a) == hashmap(:b, 2, "c", 3)
@@ -31,6 +33,8 @@
   fnil(f, default) = x -> x === nothing ? f(default) : f(x)
 
   @test update(emptymap, "aaa", fnil(inc, 0)) == hashmap("aaa", 1)
+
+  @test conj(emptymap, MapEntry(:a, 1)) == hashmap(:a, 1)
 end
 
 @testset "nested maps" begin
@@ -88,6 +92,19 @@ end
   @test get(m, arraymapsizethreashold) == arraymapsizethreashold
 
   @test get(assoc(m, "string", vector(:a, 2, "c")), "string") isa Vector
+
+  @test emptyhashmap == emptymap
+
+  a = assoc(assoc(emptyhashmap, :a, 1), :b, 2)
+  b = assoc(assoc(emptyhashmap, :b, 2), :a, 1)
+  c = hashmap(:b, 2, :a, 1)
+
+  @test hash(a) === hash(b) == hash(c)
+
+  @test a == b == c
+
+  @test assoc(emptyhashmap, a, 1) == assoc(emptyhashmap, c, 1)
+
 end
 
 @testset "merging maps" begin
@@ -103,11 +120,18 @@ end
 
   c = merge(a, b)
 
+  d = into(emptymap, map(x -> [x,x]), 1:1025)
+
   @test count(c) < count(a) + count(b)
   @test get(c, :key) == 4
   @test get(merge(b, a), :key) == 2
-end
 
-@testset "ordered maps" begin
-  # TODO:
+  @test merge(a, emptymap) == merge(emptymap, a)
+
+  @test merge(a, emptyhashmap) == merge(emptyhashmap, a)
+
+  @test merge(a, emptymap) == merge(emptyhashmap, a)
+
+  @test merge(d, b) == merge(b, d)
+
 end

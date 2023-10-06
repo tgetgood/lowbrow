@@ -1,6 +1,9 @@
 module DataStructures
 
-import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex, eltype, show, last
+import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex, eltype, show, last, empty
+
+# N.B.: Base.rest is broken for ranges and zip iterators. It returns the
+# collection itself. Don't import it.
 
 # How many bits of hash are used at each level of the HAMT?
 hashbits = 5
