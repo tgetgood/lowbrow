@@ -27,11 +27,15 @@ end
 # would approach 18%. That's not all that much. Might be worth it in some
 # specialised settings, but not a priority until one of those come up.
 
-function vectorleaf(args::Base.Vector)
+vl(v::Base.Vector) = VectorLeaf(v)
+vl(t::Tuple) = VectorLeaf([x for x in t])
+vl(x) = VectorLeaf(convert(Base.Vector, x))
+
+function vectorleaf(args)
   if 0 === length(args)
     emptyvector
   else
-    VectorLeaf(args)
+    vl(args)
   end
 end
 
@@ -100,6 +104,7 @@ length(v::Vector) = count(v)
 
 conj(v::Nothing, x) = vectorleaf([x])
 conj(v::EmptyVector, x) = vectorleaf([x])
+conj(c::EmptyVector, x::NoEmission) = c
 
 function addtoleaf(v::VectorLeaf{T}, x::S) where {T, S}
   N = typejoin(S, T)
@@ -283,16 +288,12 @@ function incompletevectornode(nodes)
   )
 end
 
-function vec(args::Base.Vector)
+function vec(args)
   if length(args) <= nodelength
     vectorleaf(args)
   else
     largevec(args)
   end
-end
-
-function vec(args)
-  largevec(args)
 end
 
 function largevec(args)
@@ -306,13 +307,6 @@ function largevec(args)
   first(into(emptyvector, ∘(xf...) , args))
 end
 
-# function into(to::PersistentVector, xform, from)
-
-# end
-
-# function into(to::PersistentVector, from)
-
-# end
 
 reverse(v::EmptyVector) = v
 
@@ -402,5 +396,4 @@ end
 
 function dumpwalk(x::Base.Vector{T}, v::VectorLeaf{T}) where T
   append!(x, v.elements)
-  x
 end

@@ -1,6 +1,6 @@
 module DataStructures
 
-import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex, eltype, show, last, empty, repeat
+import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex, eltype, show, last, empty, repeat, split
 
 # N.B.: Base.rest is broken for ranges and zip iterators. It returns the
 # collection itself. Don't import it.
@@ -22,10 +22,10 @@ include("./queue.jl")
 include("./juliatypes.jl")
 
 # Sequential
-export first, rest, take, drop, reduce, transduce, into, map, filter, interpose, dup, cat, partition, seq, none
+export first, rest, take, drop, reduce, transduce, into, map, filter, interpose, dup, cat, partition, seq, none, seqcompose, zip, split, interleave, inject, takewhile, dropwhile
 
 # Vectors
-export emptyvector, nth, vec, vector, zip
+export emptyvector, nth, vec, vector
 
 # Lists
 

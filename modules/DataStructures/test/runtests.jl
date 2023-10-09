@@ -2,7 +2,7 @@ using Test
 
 using DataStructures
 import DataStructures as ds
-import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, EmptyVector, Vector, sibling, vectornode, vectorleaf, depth, emptyhashmap, reduce, arraymapsizethreashold, conj!
+import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, EmptyVector, Vector, sibling, vectornode, vectorleaf, depth, emptyhashmap, reduce, arraymapsizethreashold, conj!, zip
 
 # FIXME: This should be doable with modules with a standard function. The
 # support structure to let the runtime find all of these modules is ugly though.
@@ -21,3 +21,5 @@ import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, Emp
 include("./vectortests.jl")
 include("./maptests.jl")
 include("xformtests.jl")
+
+# into(emptyvector, ds.seqcompose(vector(take(2), take(4), take(1))), 1:10)

@@ -63,7 +63,6 @@ end
   @test count(m4) == count(m3)
   @test count(get(m4, :a)) == count(get(m3, :a)) + 1
 
-  @info m4
   @test getin(m4, [:a, :c]) == vector("purple")
 end
 
