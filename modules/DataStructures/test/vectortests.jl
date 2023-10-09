@@ -42,6 +42,8 @@
   @test nth(vec(1:32^4), 32) == 32
   @test nth(vec(1:32^4), 32*32*8 + 32*5 + 9) == 32^2*8 + 32*5 + 9
 
+  @test count(conj(vec(1:33), "asd")) == 34
+
 end
 
 @testset "Balanced Trees" begin

@@ -39,12 +39,13 @@ function vectorleaf(args)
   end
 end
 
-struct VectorNode <: PersistentVector
-  elements::Base.Vector{PersistentVector}
+struct VectorNode{T} <: PersistentVector where T <: PersistentVector
+  elements::Base.Vector{T}
   # FIXME: This shouldn't be fixed size, but memory indirection is killing me.
   count::Int64
   # max depth is log(nodelength, typemax(typeof(count))). 4 bits would suffice.
-  depth::Int8
+  # But, due to alignment using u8 saves no space and creates extra work.
+  depth::Int64
 end
 
 function vectornode(els::Base.Vector, count, depth)
@@ -54,10 +55,6 @@ end
 function vectornode(els::Base.Vector)
   VectorNode(els, sum(count, els; init=0), depth(els[1]) + 1)
 end
-
-# function vectornode(els::VectorLeaf, count, depth)
-#   vectornode(Tuple(els), count, depth)
-# end
 
 function ireduce(f, init, coll::VectorLeaf)
   Base.reduce(f, coll.elements, init=init)
@@ -87,9 +84,15 @@ function completep(v::VectorNode)
 end
 
 # If a vector is homogeneous, this may help with code generation. I don't
-# actually know though
-function eltype(v::VectorLeaf)
-  eltype(v.elements)
+# actually know though. Recursive type calculation can't be good for you though.
+eltype(v::VectorLeaf{T}) where T = T
+
+function eltype(v::VectorNode{T}) where T
+  S = T
+  while length(S.parameters) > 0
+    S = S.parameters[1]
+  end
+  S
 end
 
 const emptyvector = EmptyVector()
@@ -135,8 +138,14 @@ function sibling(x, depth)
   end
 end
 
-function join(els::Base.Vector, v::Vector)
+function join(els::Base.Vector{T}, v::T) where T <: PersistentVector
   temp = copy(els)
+  push!(temp, v)
+  vectornode(temp, sum(count, els; init=0) + count(v), depth(v) + 1)
+end
+
+function join(els::Base.Vector, v::Vector)
+  temp::Base.Vector{typejoin(eltype(els), eltype(v))} = copy(els)
   push!(temp, v)
   vectornode(temp, sum(count, els; init=0) + count(v), depth(v) + 1)
 end
@@ -251,9 +260,33 @@ vector(a,b,c,d) = vectorleaf([a,b,c,d])
 vec() = emptyvector
 vec(v::Vector) = v
 
-function leafpartition(T)
+# REVIEW: We could have a vector where one leaf contains UInt16s, another
+# contains float32s, etc.. Alignment would be a kind of magic and not practical
+# for most applications.
+#
+# jl tries very hard to make array elements homogenous bits types. The benefits
+# are obvious.
+#
+# But what if we allowed the length of leaves to vary and ensured each leaf was
+# a vector of homogenous bits type?
+#
+# Would that ever be useful in real life? I haven't come across that need, so
+# these vectors are still fully homogeneous (though possibly not just bits types
+# since we use `typejoin` when needed.
+#
+# But so far, for my purposes, a vector is either homogeneous
+# ints/floats/etc. or effectively Any.
+#
+# It *might* be useful to be more granular in joining types since right now if
+# you add a UInt16 to a vector of UInt32s it boxes everything instead of padding
+# the UInt16. Again, I don't need this yet.
+
+function leafpartition(T; init=[])
   acc = Base.Vector{T}(undef, nodelength)
-  i = 0
+  for j in 1:length(init)
+    acc[j] = init[j]
+  end
+  i = length(init)
   function (emit)
     function inner()
       emit()
@@ -296,15 +329,22 @@ function vec(args)
   end
 end
 
+function vecbuilder(xform, to, from)
+  T = eltype(args)
+
+end
+
 function largevec(args)
   T = eltype(args)
   xf = [leafpartition(T), map(vectorleaf)]
+  ptype = VectorLeaf{T}
 
   for i = 2:ceil(log(nodelength, length(args)))
-    append!(xf, [leafpartition(Vector), map(incompletevectornode)])
+    append!(xf, [leafpartition(ptype), map(incompletevectornode)])
+    ptype = VectorNode{ptype}
   end
 
-  first(into(emptyvector, ∘(xf...) , args))
+  transduce(∘(xf...), lastarg, nil, args)
 end
 
 
