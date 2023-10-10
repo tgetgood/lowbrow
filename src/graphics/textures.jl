@@ -40,7 +40,6 @@ function profile(system, config, k = 18)
       image[1:2^i]
     )
     out = convert(Base.Vector{UInt8}, rgb)
-    @info typeof(out)
     nothing
   end
 end

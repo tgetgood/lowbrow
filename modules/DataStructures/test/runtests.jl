@@ -21,5 +21,3 @@ import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, Emp
 include("./vectortests.jl")
 include("./maptests.jl")
 include("xformtests.jl")
-
-# into(emptyvector, ds.seqcompose(vector(take(2), take(4), take(1))), 1:10)

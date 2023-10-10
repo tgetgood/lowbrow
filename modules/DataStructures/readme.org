@@ -478,3 +478,25 @@
   parallelise mapish operations without too much ado.
 
   Now do I really want to try and implement something along the lines of Cilk?
+* history of a waste of time
+  I just removed the depth parameter from VectorNodes to see if the space
+  savings (N/31 bytes for N elements in large vectors) was worth it. Why?
+  Because I got carried away. Turns out I carried the depth around because I
+  needed it to avoid doing a bunch of logarithms in nth and conj.
+
+  Times for creation/nth/conj before "improvement"
+
+  0.178549 seconds (8.79 M allocations: 503.427 MiB, 12.87% gc time)
+  0.000755 seconds (22.00 k allocations: 453.109 KiB)
+  0.000498 seconds (16.49 k allocations: 867.016 KiB)
+
+  And times after:
+
+  0.195730 seconds (8.79 M allocations: 503.385 MiB, 18.36% gc time)
+  0.001861 seconds (32.44 k allocations: 930.531 KiB)
+  0.000568 seconds (21.49 k allocations: 851.391 KiB)
+
+  It actually needs more allocations to save a marginal amount of space.
+
+  I just reverted all changes locally. I should have kept them in git for my own
+  future reference. Should I have?
