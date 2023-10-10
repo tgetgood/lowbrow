@@ -89,10 +89,14 @@ eltype(v::VectorLeaf{T}) where T = T
 
 function eltype(v::VectorNode{T}) where T
   S = T
-  while length(S.parameters) > 0
-    S = S.parameters[1]
+  try
+    while length(S.parameters) > 0
+      S = S.parameters[1]
+    end
+    S
+  catch e
+    Any
   end
-  S
 end
 
 const emptyvector = EmptyVector()
@@ -281,35 +285,60 @@ vec(v::Vector) = v
 # you add a UInt16 to a vector of UInt32s it boxes everything instead of padding
 # the UInt16. Again, I don't need this yet.
 
-function leafpartition(T; init=[])
-  acc = Base.Vector{T}(undef, nodelength)
-  for j in 1:length(init)
-    acc[j] = init[j]
-  end
+function leafpartition(; init=[])
+  acc::Ref{Any} = 0
   i = length(init)
+  if i > 0
+    t = Base.Vector{eltype(init)}(undef, nodelength)
+    for j in 1:i
+      t[j] = init[j]
+    end
+    acc[] = t
+  end
   function (emit)
     function inner()
       emit()
     end
     function inner(result)
-      if i > 0
-        emit(emit(result, [acc[j] for j in 1:i]))
+      if acc[] !== 0 && i > 0
+        emit(emit(result, [acc[][j] for j in 1:i]))
       else
         emit(result)
       end
     end
     function inner(result, next)
-      i+= 1
-      acc[i] = next
-      if i === length(acc)
-        t = copy(acc)
+      if acc[] === 0
+        t = Base.Vector{typeof(next)}(undef, nodelength)
+        acc[] = t
+      end
+      i += 1
+      try
+        acc[][i] = next
+      catch e
+        # One strike and you're boxed
+        if e isa MethodError && e.f == convert
+
+          # TODO: Performance warnings flag and macro. Sometimes you just need
+          # reflection and don't want to get swamped with warnings.
+          @warn "Heterogeneous type, boxing values."
+
+          t = Base.Vector{Any}(undef, nodelength)
+          for j in 1:i-1
+            t[j] = acc[][j]
+          end
+          t[i] = next
+          acc[] = t
+        else
+          throw(e)
+        end
+      end
+      if nodelength === i
         i = 0
-        emit(result, t)
+        emit(result, copy(acc[]))
       else
         result
       end
     end
-    return inner
   end
 end
 
@@ -325,26 +354,37 @@ function vec(args)
   if length(args) <= nodelength
     vectorleaf(args)
   else
-    largevec(args)
+    intoemptyvec(identity, args)
   end
 end
 
-function vecbuilder(xform, to, from)
-  T = eltype(args)
+# function vecbuilder(xform, to, from)
+#   T = typejoin(eltype(to), eltype(from))
 
-end
 
-function largevec(args)
-  T = eltype(args)
-  xf = [leafpartition(T), map(vectorleaf)]
-  ptype = VectorLeaf{T}
+
+# end
+
+# function into(x::EmptyVector, xform, from)
+#   intoemptyvec(xform, from)
+# end
+
+# function into(x::EmptyVector, T, from)
+#   intoemptyvec(identity, from)
+# end
+
+
+function intoemptyvec(xform, args)
+
+  xf = [leafpartition(), map(vectorleaf)]
 
   for i = 2:ceil(log(nodelength, length(args)))
-    append!(xf, [leafpartition(ptype), map(incompletevectornode)])
-    ptype = VectorNode{ptype}
+    append!(xf, [leafpartition(), map(incompletevectornode)])
   end
 
-  transduce(∘(xf...), lastarg, nil, args)
+  # REVIEW: We ought to be able to do type inference via the composed chain of
+  # transforms. That seems like a lot of work though.
+  transduce(∘(xform, xf...), lastarg, nil, args)
 end
 
 

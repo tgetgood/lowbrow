@@ -39,7 +39,6 @@ function profile(system, config, k = 18)
       ds.cat(),
       image[1:2^i]
     )
-    out = convert(Base.Vector{UInt8}, rgb)
     nothing
   end
 end
