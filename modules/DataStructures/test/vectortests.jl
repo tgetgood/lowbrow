@@ -44,6 +44,11 @@
 
   @test count(conj(vec(1:33), "asd")) == 34
 
+  g::Base.Vector{Any} = [i for i in 1:33]
+  @test eltype(vec(g)) == Int64
+
+  push!(g, "asd")
+  @test eltype(vec(g)) == Any
 end
 
 @testset "Balanced Trees" begin
