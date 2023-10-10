@@ -182,10 +182,10 @@ end
 
 empty(v::TransientVector) = tv(transientemptyvector)
 
-# function into(to::PersistentVector, xform, from...)
-#   persist!(transduce(xform, conj!, transient!(to), from...))
-# end
+function into(to::PersistentVector, xform, from...)
+  persist!(transduce(xform, conj!, transient!(to), from...))
+end
 
-# function into(to::PersistentVector, from)
-#   persist!(reduce(conj!, transient!(to), from))
-# end
+function into(to::PersistentVector, from)
+  persist!(reduce(conj!, transient!(to), from))
+end

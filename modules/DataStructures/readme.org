@@ -500,3 +500,94 @@
 
   I just reverted all changes locally. I should have kept them in git for my own
   future reference. Should I have?
+* Overriding =into= for =EmptyVector=
+  I feel like an idiot for not thinking of this before. (into [] xs) is the same
+  as vec(xs), so why not dispatch that way?
+
+  standard benchmark:
+  2:   0.000073 seconds (80 allocations: 2.625 KiB)
+  4:   0.000020 seconds (126 allocations: 4.062 KiB)
+  8:   0.000017 seconds (216 allocations: 6.875 KiB)
+  16:   0.000031 seconds (570 allocations: 15.250 KiB)
+  32:   0.000038 seconds (1.28 k allocations: 32.016 KiB)
+  64:   0.000119 seconds (1.70 k allocations: 80.125 KiB)
+  128:   0.000135 seconds (3.34 k allocations: 156.766 KiB)
+  256:   0.000242 seconds (6.59 k allocations: 311.406 KiB)
+  512:   0.000492 seconds (16.99 k allocations: 718.578 KiB)
+  1024:   0.000990 seconds (37.79 k allocations: 1.497 MiB)
+  2048:   0.002113 seconds (52.35 k allocations: 2.670 MiB)
+  4096:   0.004327 seconds (104.62 k allocations: 5.345 MiB)
+  8192:   0.008454 seconds (209.11 k allocations: 10.704 MiB)
+  16384:   0.022399 seconds (542.04 k allocations: 25.210 MiB, 21.70% gc time)
+  32768:   0.037470 seconds (1.21 M allocations: 54.223 MiB, 11.95% gc time)
+  65536:   0.085009 seconds (1.75 M allocations: 121.065 MiB, 14.83% gc time)
+  131072:   0.169703 seconds (3.49 M allocations: 242.178 MiB, 12.29% gc time)
+  262144:   0.348428 seconds (6.98 M allocations: 484.417 MiB, 13.00% gc time)
+  524288:   0.690695 seconds (18.75 M allocations: 1.087 GiB, 13.53% gc time)
+  1048576:   1.360049 seconds (42.30 M allocations: 2.314 GiB, 13.18% gc time)
+
+  vs transients:
+
+  2:   0.000038 seconds (81 allocations: 2.375 KiB)
+  4:   0.000015 seconds (142 allocations: 4.141 KiB)
+  8:   0.000011 seconds (262 allocations: 7.547 KiB)
+  16:   0.000055 seconds (525 allocations: 15.328 KiB)
+  32:   0.000056 seconds (1.02 k allocations: 29.344 KiB)
+  64:   0.000085 seconds (2.00 k allocations: 57.938 KiB)
+  128:   0.000158 seconds (3.96 k allocations: 114.047 KiB)
+  256:   0.000315 seconds (8.39 k allocations: 235.531 KiB)
+  512:   0.000735 seconds (19.34 k allocations: 512.375 KiB)
+  1024:   0.001510 seconds (41.21 k allocations: 1.040 MiB)
+  2048:   0.003107 seconds (84.94 k allocations: 2.103 MiB)
+  4096:   0.006271 seconds (172.41 k allocations: 4.255 MiB)
+  8192:   0.012618 seconds (347.33 k allocations: 8.566 MiB)
+  16384:   0.036978 seconds (794.50 k allocations: 18.686 MiB, 22.71% gc time)
+  32768:   0.066359 seconds (1.69 M allocations: 38.665 MiB, 11.21% gc time)
+  65536:   0.126810 seconds (3.48 M allocations: 78.894 MiB, 5.65% gc time)
+  131072:   0.273211 seconds (7.05 M allocations: 159.365 MiB, 10.78% gc time)
+  262144:   0.545332 seconds (14.21 M allocations: 320.323 MiB, 10.57% gc time)
+  524288:   1.211752 seconds (31.66 M allocations: 689.117 MiB, 11.48% gc time)
+  1048576:   2.509304 seconds (66.57 M allocations: 1.393 GiB, 12.58% gc time)
+
+  These are both so much beter than the naive persistent reduction I won't even
+  add it in.
+
+  So the tranduction builder is about twice as fast and makes fewer allocations,
+  but uses more scratch space. But the speedup is after the additional GC
+  overhead.
+
+  Ahh, there's an insidious bug in the above: the transform pipeline that builds
+  the vector is based on the length of the input, but the prior pipeline is 4:1,
+  thus the builder pipeline can only accomodate 1/4 of the data.
+
+  Fixing this by hardcoding the correct number of layers gives us:
+
+  2:   0.000152 seconds (177 allocations: 11.484 KiB)
+  4:   0.000067 seconds (221 allocations: 15.281 KiB)
+  8:   0.000065 seconds (304 allocations: 22.766 KiB)
+  16:   0.000084 seconds (498 allocations: 39.703 KiB)
+  32:   0.000097 seconds (860 allocations: 70.516 KiB)
+  64:   0.000119 seconds (1.58 k allocations: 132.859 KiB)
+  128:   0.000176 seconds (3.03 k allocations: 256.125 KiB)
+  256:   0.000284 seconds (5.89 k allocations: 503.984 KiB)
+  512:   0.000522 seconds (11.67 k allocations: 1002.172 KiB)
+  1024:   0.000964 seconds (23.20 k allocations: 1.950 MiB)
+  2048:   0.001869 seconds (46.26 k allocations: 3.874 MiB)
+  4096:   0.007182 seconds (92.38 k allocations: 7.749 MiB, 48.77% gc time)
+  8192:   0.007224 seconds (184.59 k allocations: 15.507 MiB)
+  16384:   0.018153 seconds (369.05 k allocations: 31.036 MiB, 20.55% gc time)
+  32768:   0.032288 seconds (737.96 k allocations: 61.833 MiB, 11.53% gc time)
+  65536:   0.067171 seconds (1.48 M allocations: 123.697 MiB, 15.47% gc time)
+  131072:   0.133401 seconds (2.95 M allocations: 247.439 MiB, 14.19% gc time)
+  262144:   0.262998 seconds (5.90 M allocations: 494.937 MiB, 13.02% gc time)
+  524288:   0.525131 seconds (11.81 M allocations: 988.827 M
+  1048576:   1.052119 seconds (23.61 M allocations: 1.930 GiB, 13.67% gc time)
+
+  which is a considerable improvement.
+
+  Unfortunately, I'm at something of a loss as to how to dynamically create the
+  correct pipeline. The problem with transducers is that once they start,
+  they're locked because the reducer is passed in and so you can't add more
+  steps at the end without unapplying that reducing function.
+
+  Maybe I can create a clever reducing function...

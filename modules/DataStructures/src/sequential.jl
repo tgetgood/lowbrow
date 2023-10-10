@@ -35,19 +35,21 @@ end
 
 empty(x::Nothing) = nothing
 
+function handleabort(r::EarlyTermination)
+  if r.value === none
+    none
+  else
+    r.value
+  end
+end
+
+handleabort(r) = throw(r)
+
 function reduce(f, init, coll...)
   try
     ireduce(f, init, coll...)
   catch r
-    if r isa EarlyTermination
-      if r.value === none
-        none
-      else
-        r.value
-      end
-    else
-      throw(r)
-    end
+    handleabort(r)
   end
 end
 
@@ -71,20 +73,20 @@ end
 ##### TODO: split/join funcitons for the from/to collections to allow parallel
 ##### transduction. This will require knowing which transducers can be run in
 ##### parallel.
-function transduce(xform, f, to, from)
+function transduce(xform, f, to, from...)
   g = xform(f)
   # Don't forget to flush state after input terminates
-  g(reduce(g, to, from))
+  try
+    # So why does the `catch` in `reduce` catch this?
+    g(reduce(g, to, from...))
+  catch e
+    handleabort(e)
+  end
 end
 
 function transduce(xform, f, from)
   g = xform(f)
   g(reduce(g, g(), from))
-end
-
-function transduce(xform, f, to, from...)
-  g = xform(f)
-  g(reduce(g, to, from...))
 end
 
 ## Fallback `into` implementations.

@@ -28,7 +28,7 @@ function profile(system, config, k = 18)
 
   for i in 1:k
     print(string(2^i) * ": ")
-    @time rgb = ds.into(
+    @time rgb::Vector{UInt8} = ds.into(
       ds.emptyvector,
       map(bgr)
       ∘

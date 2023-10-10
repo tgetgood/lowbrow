@@ -275,8 +275,8 @@ vec(v::Vector) = v
 # a vector of homogenous bits type?
 #
 # Would that ever be useful in real life? I haven't come across that need, so
-# these vectors are still fully homogeneous (though possibly not just bits types
-# since we use `typejoin` when needed.
+# these vectors are still homogeneous at a given level (though possibly not just
+# bits types since we use `typejoin` when needed).
 #
 # But so far, for my purposes, a vector is either homogeneous
 # ints/floats/etc. or effectively Any.
@@ -343,7 +343,7 @@ function leafpartition(; init=[])
 end
 
 function incompletevectornode(nodes)
-   vectornode(
+  vectornode(
     nodes,
     sum(count, nodes; init = 0),
     depth(nodes[1]) + 1
@@ -360,31 +360,38 @@ end
 
 # function vecbuilder(xform, to, from)
 #   T = typejoin(eltype(to), eltype(from))
-
-
-
 # end
 
-# function into(x::EmptyVector, xform, from)
-#   intoemptyvec(xform, from)
-# end
+function into(x::EmptyVector, xform, from)
+  intoemptyvec(xform, from)
+end
 
-# function into(x::EmptyVector, T, from)
-#   intoemptyvec(identity, from)
-# end
+function into(x::EmptyVector, from)
+  intoemptyvec(identity, from)
+end
 
 
-function intoemptyvec(xform, args)
+function intoemptyvec(outerxform, args)
 
-  xf = [leafpartition(), map(vectorleaf)]
+  xf = outerxform ∘ leafpartition() ∘ map(vectorleaf)
 
-  for i = 2:ceil(log(nodelength, length(args)))
-    append!(xf, [leafpartition(), map(incompletevectornode)])
+  step() = leafpartition() ∘ map(incompletevectornode)
+
+  tailxform = step()
+
+  red(x) = tailxform(lastarg)(x)
+  function red(res, x)
+    v = tailxform(lastarg)(res, x)
+    if v === res
+      return v
+    else
+      s = step()
+      tailxform = tailxform ∘ s
+      s(lastarg)(res, v)
+    end
   end
 
-  # REVIEW: We ought to be able to do type inference via the composed chain of
-  # transforms. That seems like a lot of work though.
-  transduce(∘(xform, xf...), lastarg, nil, args)
+  transduce(xf, red, nil, args)
 end
 
 
