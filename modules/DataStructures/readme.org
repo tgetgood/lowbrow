@@ -591,3 +591,61 @@
   steps at the end without unapplying that reducing function.
 
   Maybe I can create a clever reducing function...
+
+  ...And a clever reducing function is the secret. *But* you have to make sure
+  all state in stateful transducers is stored in the first inner closure, that
+  way you can repeatedly apply the reducer without clearing the state.
+
+  New times:
+
+  2:   0.000065 seconds (100 allocations: 3.656 KiB)
+  4:   0.000015 seconds (150 allocations: 5.453 KiB)
+  8:   0.000018 seconds (246 allocations: 8.969 KiB)
+  16:   0.000021 seconds (453 allocations: 16.469 KiB)
+  32:   0.000036 seconds (867 allocations: 31.188 KiB)
+  64:   0.000062 seconds (1.70 k allocations: 61.344 KiB)
+  128:   0.000120 seconds (3.35 k allocations: 120.250 KiB)
+  256:   0.000244 seconds (6.65 k allocations: 240.906 KiB)
+  512:   0.000463 seconds (13.31 k allocations: 483.188 KiB)
+  1024:   0.000912 seconds (26.63 k allocations: 968.234 KiB)
+  2048:   0.001819 seconds (53.28 k allocations: 1.876 MiB)
+  4096:   0.003708 seconds (106.57 k allocations: 3.762 MiB)
+  8192:   0.007357 seconds (213.13 k allocations: 7.544 MiB)
+  16384:   0.018811 seconds (428.30 k allocations: 15.259 MiB, 21.92% gc time)
+  32768:   0.029789 seconds (858.64 k allocations: 30.430 MiB)
+  65536:   0.067130 seconds (1.72 M allocations: 61.042 MiB, 11.79% gc time)
+  131072:   0.129509 seconds (3.44 M allocations: 122.280 MiB, 8.24% gc time)
+  262144:   0.256636 seconds (6.88 M allocations: 244.771 MiB, 7.31% gc time)
+  524288:   0.527511 seconds (13.83 M allocations: 494.662 MiB, 8.60% gc time)
+  1048576:   1.049643 seconds (27.74 M allocations: 994.445 MiB, 8.07% gc time)
+
+  which is now faster than transients and use less ram. Given there's also a bug
+  in transients that leads to a use after free (presumably something isn't being
+  copied properly), I'm tempted to just cut them out entirely. They have some
+  uses though.
+
+  The times above involve calling transduce with a fixed xform and a funky
+  reducer, but why not just call reduce? Effect:
+
+  2:   0.000062 seconds (87 allocations: 2.766 KiB)
+  4:   0.000015 seconds (145 allocations: 4.547 KiB)
+  8:   0.000036 seconds (275 allocations: 8.938 KiB)
+  16:   0.000046 seconds (530 allocations: 20.469 KiB)
+  32:   0.000067 seconds (1.04 k allocations: 43.125 KiB)
+  64:   0.000126 seconds (2.05 k allocations: 89.156 KiB)
+  128:   0.000243 seconds (4.07 k allocations: 179.797 KiB)
+  256:   0.000497 seconds (8.10 k allocations: 364.062 KiB)
+  512:   0.001089 seconds (16.69 k allocations: 839.438 KiB)
+  1024:   0.002231 seconds (33.85 k allocations: 1.749 MiB)
+  2048:   0.004557 seconds (68.18 k allocations: 3.589 MiB)
+  4096:   0.009160 seconds (136.84 k allocations: 7.296 MiB)
+  8192:   0.019003 seconds (274.13 k allocations: 14.720 MiB)
+  16384:   0.042296 seconds (581.53 k allocations: 36.219 MiB, 11.67% gc time)
+  32768:   0.086952 seconds (1.20 M allocations: 78.958 MiB, 10.31% gc time)
+  65536:   0.174166 seconds (2.43 M allocations: 164.707 MiB, 8.94% gc time)
+  131072:   0.343993 seconds (4.89 M allocations: 336.218 MiB, 7.48% gc time)
+  262144:   0.695022 seconds (9.80 M allocations: 679.257 MiB, 8.00% gc time)
+  524288:   1.589509 seconds (20.16 M allocations: 1.470 GiB, 9.17% gc time)
+  1048576:   3.353290 seconds (40.89 M allocations: 3.083 GiB, 10.07% gc time)
+
+  What the hell?

@@ -343,11 +343,11 @@ function leafpartition(; init=[])
 end
 
 function incompletevectornode(nodes)
-  vectornode(
-    nodes,
-    sum(count, nodes; init = 0),
-    depth(nodes[1]) + 1
-  )
+  if length(nodes) === 1 && 1 === count(nodes[1])
+    nodes[1]
+  else
+    vectornode(nodes, sum(count, nodes; init=0), depth(nodes[1]) + 1)
+  end
 end
 
 function vec(args)
@@ -369,7 +369,6 @@ end
 function into(x::EmptyVector, from)
   intoemptyvec(identity, from)
 end
-
 
 function intoemptyvec(outerxform, args)
 
@@ -393,7 +392,6 @@ function intoemptyvec(outerxform, args)
 
   transduce(xf, red, nil, args)
 end
-
 
 reverse(v::EmptyVector) = v
 
