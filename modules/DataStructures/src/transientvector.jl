@@ -182,10 +182,13 @@ end
 
 empty(v::TransientVector) = tv(transientemptyvector)
 
-function into(to::PersistentVector, xform, from...)
-  persist!(transduce(xform, conj!, transient!(to), from...))
-end
+# I'm getting use after free errors out of vulkan while using these methods. I
+# can't tell why, every test I've cooked up passes. Needs more investigation.
 
-function into(to::PersistentVector, from)
-  persist!(reduce(conj!, transient!(to), from))
-end
+# function into(to::PersistentVector, xform, from...)
+#   persist!(transduce(xform, conj!, transient!(to), from...))
+# end
+
+# function into(to::PersistentVector, from)
+#   persist!(reduce(conj!, transient!(to), from))
+# end
