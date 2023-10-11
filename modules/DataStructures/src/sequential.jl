@@ -35,16 +35,15 @@ end
 
 empty(x::Nothing) = nothing
 
-function handleabort(r::EarlyTermination)
+function handleabort(default, r::EarlyTermination)
   if r.value === none
-
-    none
+    default
   else
     r.value
   end
 end
 
-function handleabort(r)
+function handleabort(_, r)
   throw(r)
 end
 
@@ -52,7 +51,7 @@ function reduce(f, init, coll...)
   try
     ireduce(f, init, coll...)
   catch r
-    handleabort(r)
+    handleabort(init, r)
   end
 end
 
@@ -73,27 +72,24 @@ function ireduce(f, acc, lists...)
   end
 end
 
-##### TODO: split/join funcitons for the from/to collections to allow parallel
-##### transduction. This will require knowing which transducers can be run in
-##### parallel.
-function transduce(xform, f, to, from...)
-  g = xform(f)
-  # Don't forget to flush state after input terminates
+function itransduce(g, to, from...)
   try
-    # So why does the `catch` in `reduce` not catch this?
-    g(reduce(g, to, from...))
+    g(ireduce(g, to, from...))
   catch e
-    handleabort(e)
+    handleabort(to, e)
   end
 end
 
-function transduce(xform, f, from)
+##### TODO: split/join functions for the from/to collections to allow parallel
+##### transduction. This will require knowing which transducers can be run in
+##### parallel.
+function transduce(xform, f, to, from...)
+  itransduce(xform(f), to, from...)
+end
+
+function transduce(xform, f, from...)
   g = xform(f)
-  try
-    g(reduce(g, g(), from))
-  catch e
-    handleabort(e)
-  end
+  itransduce(g, g(), from...)
 end
 
 ## Fallback `into` implementations.
@@ -161,17 +157,23 @@ concat(xs, ys) = into(xs, ys)
 # downstream computation the first time `p` evaluates to `false`. I think that's
 # the correct behaviour, but it's still weird...
 function every(p)
+  aborted = false
   function (emit)
     function inner()
       emit()
     end
     function inner(result)
-      emit(result)
+      if aborted
+        emit(none)
+      else
+        emit(result)
+      end
     end
     function inner(result, next)
       if p(next)
         emit(result, next)
       else
+        aborted = true
         reduced(none, next)
       end
     end
@@ -180,7 +182,8 @@ function every(p)
 end
 
 lastarg(xs...) = xs[end]
-every(p, xs) = transduce(every(p), lastarg, nil, xs) !== none
+every(p, xs) = emptyp(xs) ||
+               transduce(every(p), lastarg, :falsemarker, xs) !== :falsemarker
 
 function cat()
   function (emit)
@@ -444,7 +447,7 @@ function inject(ys)
   end
 end
 
-maybe(emit , v::NoEmission) = emit(result)
+maybe(emit, result, v::NoEmission) = emit(result)
 maybe(emit, result, v) = emit(result, v)
 
 stateupdate(_, _, a) = a

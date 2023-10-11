@@ -659,6 +659,7 @@
    a fixed pipeline as much as possible and go dynamic only at need.
 
    Just caching =tailxform(lastarg)= instead of apply it at every step gets us:
+
    2:   0.000077 seconds (98 allocations: 3.781 KiB)
    4:   0.000015 seconds (144 allocations: 5.578 KiB)
    8:   0.000017 seconds (230 allocations: 9.031 KiB)
@@ -682,3 +683,27 @@
 
    5% memory savings, essentially the same times. I need a more deterministic
    harness.
+
+   After cleaning up some corner case bugs around aborted transduction, the
+   memory requirements are back where they were, but it's faster. Go figure:
+
+   2:   0.000076 seconds (105 allocations: 3.922 KiB)
+   4:   0.000018 seconds (159 allocations: 5.859 KiB)
+   8:   0.000016 seconds (262 allocations: 9.594 KiB)
+   16:   0.000025 seconds (486 allocations: 17.641 KiB)
+   32:   0.000036 seconds (930 allocations: 33.328 KiB)
+   64:   0.000074 seconds (1.82 k allocations: 65.422 KiB)
+   128:   0.000122 seconds (3.60 k allocations: 128.188 KiB)
+   256:   0.000263 seconds (7.13 k allocations: 256.562 KiB)
+   512:   0.000514 seconds (14.21 k allocations: 511.406 KiB)
+   1024:   0.000936 seconds (28.36 k allocations: 1021.453 KiB)
+   2048:   0.001871 seconds (56.67 k allocations: 1.977 MiB)
+   4096:   0.003713 seconds (113.29 k allocations: 3.961 MiB)
+   8192:   0.011464 seconds (226.51 k allocations: 7.938 MiB, 35.49% gc time)
+   16384:   0.014529 seconds (452.94 k allocations: 15.903 MiB)
+   32768:   0.033638 seconds (905.82 k allocations: 31.574 MiB, 12.76% gc time)
+   65536:   0.062521 seconds (1.81 M allocations: 63.186 MiB, 6.75% gc time)
+   131072:   0.128986 seconds (3.62 M allocations: 126.424 MiB, 9.16% gc time)
+   262144:   0.260248 seconds (7.25 M allocations: 252.915 MiB, 9.14% gc time)
+   524288:   0.516125 seconds (14.49 M allocations: 504.806 MiB, 8.50% gc time)
+   1048576:   1.030130 seconds (28.98 M allocations: 1008.589 MiB, 8.89% gc time)

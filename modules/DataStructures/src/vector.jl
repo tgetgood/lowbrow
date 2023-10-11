@@ -392,7 +392,6 @@ function dynamicvecbuilder(emit)
 end
 
 function intoemptyvec(outerxform, from)
-
   xf = outerxform ∘ leafpartition() ∘ map(vectorleaf)
   # The xform tower above will sometimes wrap a vector in a superfluous extra
   # VectorNode.

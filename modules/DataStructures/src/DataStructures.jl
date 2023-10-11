@@ -22,7 +22,7 @@ include("./queue.jl")
 include("./juliatypes.jl")
 
 # Sequential
-export first, rest, take, drop, reduce, transduce, into, map, filter, interpose, dup, cat, partition, seq, none, seqcompose, zip, split, interleave, inject, takewhile, dropwhile
+export first, rest, take, drop, reduce, transduce, into, map, filter, interpose, dup, cat, partition, seq, seqcompose, zip, split, interleave, inject, takewhile, dropwhile
 
 # Vectors
 export emptyvector, nth, vec, vector
