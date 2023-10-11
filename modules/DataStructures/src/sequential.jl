@@ -77,7 +77,7 @@ function transduce(xform, f, to, from...)
   g = xform(f)
   # Don't forget to flush state after input terminates
   try
-    # So why does the `catch` in `reduce` catch this?
+    # So why does the `catch` in `reduce` not catch this?
     g(reduce(g, to, from...))
   catch e
     handleabort(e)
@@ -86,7 +86,11 @@ end
 
 function transduce(xform, f, from)
   g = xform(f)
-  g(reduce(g, g(), from))
+  try
+    g(reduce(g, g(), from))
+  catch e
+    handleabort(e)
+  end
 end
 
 ## Fallback `into` implementations.
@@ -415,6 +419,7 @@ more argument at each step.
 Terminates pipeline when `ys` is exhausted.
 """
 function inject(ys)
+  # REVIEW: Is is better to create a local or box the argument?
   function (emit)
     function inner()
       emit()
@@ -426,6 +431,7 @@ function inject(ys)
       y = first(ys)
       ys = rest(ys)
       v = emit(result, x..., y)
+
       if emptyp(ys)
         reduced(emit(v))
       else
@@ -435,7 +441,13 @@ function inject(ys)
   end
 end
 
+function maybe(emit)
+  maybeemit(result, v::NoEmission) = emit(result)
+  maybeemit(result, v) = emit(result, v)
+end
 
+stateupdate(_, _, a) = a
+stateupdate(x::PushbackReduced, g, a) = g(a, x.unconsumed...)
 
 """
 Breaks a stream into a stream of streams, each the output of one
@@ -461,6 +473,24 @@ function seqcompose(xforms...)
   active = first(xforms)
   g = active[1](active[2])
   acc = active[3]
+
+  handler(_, r) = throw(r)
+  function handler(emit, result, r::EarlyTermination)
+    v = g(r.value)
+    ret = maybe(emit)(result, v)
+    xforms = rest(xforms)
+    if emptyp(xforms)
+      acc = none
+      reduced(ret)
+    else
+      active = first(xforms)
+      g = active[1](active[2])
+      acc = stateupdate(r, g, active[3])
+
+      ret
+    end
+  end
+
   function (emit)
     function inner()
       emit()
@@ -477,27 +507,7 @@ function seqcompose(xforms...)
         acc = g(acc, xs...)
         result
       catch r
-        # FIXME: branching on `isa` is poor design
-        if r isa EarlyTermination
-          v = g(r.value)
-          xforms = rest(xforms)
-          if emptyp(xforms)
-            acc = none
-            reduced(emit(result, v))
-          else
-            active = first(xforms)
-            g = active[1](active[2])
-            acc = active[3]
-            if r isa PushbackReduced
-              acc = g(acc, r.unconsumed...)
-            end
-            if v isa NoEmission
-              emit(result)
-            else
-              emit(result, v)
-            end
-          end
-        end
+        handler(emit, result, r)
       end
     end
   end

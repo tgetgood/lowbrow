@@ -9,7 +9,6 @@ even(x) = x % 2 == 0
 end
 
 vs(x) = into(emptyvector, map(vec), x)
-intov(args...) = into(emptyvector, args...)
 
 @testset "Early Abort" begin
   @test take(5, 1:2^60) == vec(1:5)
@@ -25,7 +24,7 @@ intov(args...) = into(emptyvector, args...)
 
   xform() = every(even) ∘ map(x -> x^2) ∘ take(4)
 
-  @test into(emptyvector, xform(), 2:100) == none
+  @test into(emptyvector, xform(), 2:100) == emptyvector
   @test into(emptyvector, xform(), 2:2:100) == vector(4, 16, 36, 64)
 
   @test into(emptyvector, take(5) ∘ take(5) ∘ take(5), vec(1:1000)) == vec(1:5)
@@ -47,17 +46,17 @@ end
   xform() = seqcompose(
     (take(2), conj, emptyvector),
     (take(4) ∘ map(inc), conj, emptyvector),
-    (take(3) ∘ map(x -> (x,x)), conj, emptymap)
+    (map(x -> (x,x)) ∘ take(3), conj, emptymap)
   )
 
-  @test intov(xform(), 1:5) == vs([[1,2], [4,5,6]])
+  @test intoemptyvec(xform(), 1:5) == vs([[1,2], [4,5,6]])
 
   # Here's a curious case. If a transform starts, but gets no input, does it
   # emit nothing, or never exist at all? I'm going the emit nothing (empty
   # stream) route until I see a reason to change that.
-  @test intov(xform(), 1:2) == vs([[1,2], []])
+  @test intoemptyvec(xform(), 1:2) == vs([[1,2], []])
 
-  @test intov(xform(), 1:10) == vec([
+  @test intoemptyvec(xform(), 1:10) == vec([
     vector(1, 2),
     vector(4, 5, 6, 7),
     hashmap(7,7,8,8,9,9)
@@ -70,7 +69,7 @@ end
     (take(3), conj, emptyvector)
   ) ∘ map(sum)
 
-  @test intov(xform2(), 1:1000) == vector(3, 18, 24)
+  @test intoemptyvec(xform2(), 1:1000) == vector(3, 18, 24)
 
   v = [2,4,6,7,8,9,0]
 

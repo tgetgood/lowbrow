@@ -301,7 +301,11 @@ function leafpartition(; init=[])
     end
     function inner(result)
       if acc[] !== 0 && i > 0
-        emit(emit(result, [acc[][j] for j in 1:i]))
+        t = [acc[][j] for j in 1:i]
+        # Need to guard against multiple finalisation calls.
+        # REVIEW: Every transducer is idempotent at cleanup, isn't it?
+        acc[] = 0
+        emit(emit(result, t))
       else
         emit(result)
       end
@@ -343,11 +347,7 @@ function leafpartition(; init=[])
 end
 
 function incompletevectornode(nodes)
-  if length(nodes) === 1 && 1 === count(nodes[1])
-    nodes[1]
-  else
-    vectornode(nodes, sum(count, nodes; init=0), depth(nodes[1]) + 1)
-  end
+  vectornode(nodes, sum(count, nodes; init=0), depth(nodes[1]) + 1)
 end
 
 function vec(args)
@@ -358,9 +358,43 @@ function vec(args)
   end
 end
 
-# function vecbuilder(xform, to, from)
-#   T = typejoin(eltype(to), eltype(from))
-# end
+prune(x::EmptyVector) = x
+prune(x::VectorLeaf) = x
+
+function prune(x::VectorNode)
+  while length(x.elements) === 1
+    x = x.elements[1]
+  end
+  return x
+end
+
+vecbuilderstep() = leafpartition() ∘ map(incompletevectornode)
+
+function dynamicvecbuilder()
+  tailxform = vecbuilderstep()
+  tr = tailxform(lastarg)
+
+  red(x) = tr(x)
+  red(x::NoEmission) = emptyvector
+  function red(res, x)
+    v = tr(res, x)
+    if v === res
+      return v
+    else
+      s = vecbuilderstep()
+      tailxform = tailxform ∘ s
+      tr = tailxform(lastarg)
+      s(lastarg)(res, v)
+    end
+  end
+end
+
+function intoemptyvec(outerxform, from)
+  xf = outerxform ∘ leafpartition() ∘ map(vectorleaf)
+  # The xform tower above will sometimes wrap a vector in a superfluous extra
+  # VectorNode.
+  prune(transduce(xf, dynamicvecbuilder(), nil, from))
+end
 
 function into(x::EmptyVector, xform, from)
   intoemptyvec(xform, from)
@@ -370,27 +404,23 @@ function into(x::EmptyVector, from)
   intoemptyvec(identity, from)
 end
 
-function intoemptyvec(outerxform, args)
+function rightmost(v, depth)
+  if depth === 1
+    v.elements[end]
+  else
+    rightmost(v.elements[end], depth - 1)
+  end
+end
 
-  xf = outerxform ∘ leafpartition() ∘ map(vectorleaf)
-
-  step() = leafpartition() ∘ map(incompletevectornode)
-
-  tailxform = step()
-
-  red(x) = tailxform(lastarg)(x)
-  function red(res, x)
-    v = tailxform(lastarg)(res, x)
-    if v === res
-      return v
-    else
-      s = step()
-      tailxform = tailxform ∘ s
-      s(lastarg)(res, v)
-    end
+function intononemptyvec(xform, to, from)
+  c = count(from)
+  d = from.depth
+  xf = xform
+  while c !== 0
+    (c, r) = divrem(c, nodelength)
+    t = rightmost
   end
 
-  transduce(xf, red, nil, args)
 end
 
 reverse(v::EmptyVector) = v
