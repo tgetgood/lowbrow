@@ -37,13 +37,16 @@ empty(x::Nothing) = nothing
 
 function handleabort(r::EarlyTermination)
   if r.value === none
+
     none
   else
     r.value
   end
 end
 
-handleabort(r) = throw(r)
+function handleabort(r)
+  throw(r)
+end
 
 function reduce(f, init, coll...)
   try
@@ -441,10 +444,8 @@ function inject(ys)
   end
 end
 
-function maybe(emit)
-  maybeemit(result, v::NoEmission) = emit(result)
-  maybeemit(result, v) = emit(result, v)
-end
+maybe(emit , v::NoEmission) = emit(result)
+maybe(emit, result, v) = emit(result, v)
 
 stateupdate(_, _, a) = a
 stateupdate(x::PushbackReduced, g, a) = g(a, x.unconsumed...)
@@ -474,10 +475,10 @@ function seqcompose(xforms...)
   g = active[1](active[2])
   acc = active[3]
 
-  handler(_, r) = throw(r)
+  handler(_, _, r) = throw(r)
   function handler(emit, result, r::EarlyTermination)
     v = g(r.value)
-    ret = maybe(emit)(result, v)
+    ret = maybe(emit, result, v)
     xforms = rest(xforms)
     if emptyp(xforms)
       acc = none
@@ -486,9 +487,8 @@ function seqcompose(xforms...)
       active = first(xforms)
       g = active[1](active[2])
       acc = stateupdate(r, g, active[3])
-
-      ret
     end
+    return ret
   end
 
   function (emit)
@@ -499,7 +499,13 @@ function seqcompose(xforms...)
       if acc === none
         emit(result)
       else
-        emit(result, acc)
+        t = g(acc)
+        acc = none
+        if t === none
+          emit(result)
+        else
+          emit(emit(result, t))
+        end
       end
     end
     function inner(result, xs...)
