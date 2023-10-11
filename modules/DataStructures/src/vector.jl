@@ -362,38 +362,41 @@ prune(x::EmptyVector) = x
 prune(x::VectorLeaf) = x
 
 function prune(x::VectorNode)
-  while length(x.elements) === 1
-    x = x.elements[1]
+  if length(x.elements) === 1
+    prune(x.elements[1])
+  else
+    x
   end
-  return x
 end
 
 vecbuilderstep() = leafpartition() ∘ map(incompletevectornode)
 
-function dynamicvecbuilder()
+function dynamicvecbuilder(emit)
   tailxform = vecbuilderstep()
-  tr = tailxform(lastarg)
+  tr = tailxform(emit)
 
   red(x) = tr(x)
   red(x::NoEmission) = emptyvector
   function red(res, x)
     v = tr(res, x)
+
     if v === res
       return v
     else
       s = vecbuilderstep()
       tailxform = tailxform ∘ s
-      tr = tailxform(lastarg)
-      s(lastarg)(res, v)
+      tr = tailxform(emit)
+      s(emit)(res, v)
     end
   end
 end
 
 function intoemptyvec(outerxform, from)
+
   xf = outerxform ∘ leafpartition() ∘ map(vectorleaf)
   # The xform tower above will sometimes wrap a vector in a superfluous extra
   # VectorNode.
-  prune(transduce(xf, dynamicvecbuilder(), nil, from))
+  prune(transduce(xf, dynamicvecbuilder(lastarg), nil, from))
 end
 
 function into(x::EmptyVector, xform, from)
