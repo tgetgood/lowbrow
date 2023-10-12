@@ -176,9 +176,8 @@ first(v::EmptyVector) = nothing
 first(v::VectorLeaf) = v.elements[begin]
 first(v::VectorNode) = first(v.elements[begin])
 
-function nth(v::VectorLeaf, n)
-  v.elements[n]
-end
+nth(v::VectorLeaf, n) = v.elements[n]
+nth(v::EmptyVector, n) = throw(BoundsError(v, n))
 
 """
 Returns the nth element (starting at 1) of vector v.
@@ -372,12 +371,16 @@ end
 vecbuilderstep() = leafpartition() ∘ map(incompletevectornode)
 
 function dynamicvecbuilder(emit)
-  tailxform = vecbuilderstep()
+  tailxform = identity
   tr = tailxform(emit)
 
   red(x) = tr(x)
-  red(x::NoEmission) = emptyvector
+  red(_::NoEmission) = emptyvector
   function red(res, x)
+    if tailxform === identity
+      tailxform = vecbuilderstep()
+      tr = tailxform(emit)
+    end
     v = tr(res, x)
 
     if v === res
@@ -395,14 +398,14 @@ function intoemptyvec(outerxform, from)
   xf = outerxform ∘ leafpartition() ∘ map(vectorleaf)
   # The xform tower above will sometimes wrap a vector in a superfluous extra
   # VectorNode.
-  prune(transduce(xf, dynamicvecbuilder(lastarg), nil, from))
+  prune(transduce(xf, dynamicvecbuilder(lastarg), emptyvector, from))
 end
 
-function into(x::EmptyVector, xform, from)
+function into(_::EmptyVector, xform, from)
   intoemptyvec(xform, from)
 end
 
-function into(x::EmptyVector, from)
+function into(_::EmptyVector, from)
   intoemptyvec(identity, from)
 end
 
@@ -414,16 +417,21 @@ function rightmost(v, depth)
   end
 end
 
-function intononemptyvec(xform, to, from)
-  c = count(from)
-  d = from.depth
-  xf = xform
-  while c !== 0
-    (c, r) = divrem(c, nodelength)
-    t = rightmost
-  end
+# REVIEW: RRB tries make this unnecessary. But rrb tries with lots of catenation
+# have high constants, so this might still be faster.
+#
+# Mostly I'm curious if it will work or not.
 
-end
+# function intononemptyvec(xform, to, from)
+#   c = count(from)
+#   d = from.depth
+#   xf = xform
+#   while c !== 0
+#     (c, r) = divrem(c, nodelength)
+#     t = rightmost
+#   end
+
+# end
 
 reverse(v::EmptyVector) = v
 
@@ -452,11 +460,11 @@ function printvec(io::IO, v)
   print(io, transduce(interpose("\n ") ∘ map(string), *, "", v))
 end
 
-function show(io::IO, mime::MIME"text/plain", v::EmptyVector)
+function show(io::IO, _::MIME"text/plain", _::EmptyVector)
   print(io, "[]")
 end
 
-function show(io::IO, mime::MIME"text/plain", v::Vector)
+function show(io::IO, _::MIME"text/plain", v::Vector)
   print(io, string(count(v)) * "-element DataStructures.Vector: [\n ")
 
   # REVIEW: Why 33? Because it had to be something...
@@ -475,7 +483,7 @@ function iterate(v::Vector)
   first(v), rest(v)
 end
 
-function iterate(v::Vector, state)
+function iterate(_::Vector, state)
   if count(state) == 0
     nothing
   else

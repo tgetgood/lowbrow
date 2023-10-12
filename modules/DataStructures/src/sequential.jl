@@ -19,7 +19,7 @@ end
 struct NoEmission end
 const none = NoEmission()
 
-conj(c, x::NoEmission) = c
+conj(c, _::NoEmission) = c
 
 function reduced(x)
   throw(Reduced(x))
@@ -33,7 +33,7 @@ function reduce(f, coll)
   reduce(f, f(), coll)
 end
 
-empty(x::Nothing) = nothing
+empty(_::Nothing) = nothing
 
 function handleabort(default, r::EarlyTermination)
   if r.value === none
@@ -47,9 +47,12 @@ function handleabort(_, r)
   throw(r)
 end
 
+defaultreturn(default, _::NoEmission) = default
+defaultreturn(_, v) = v
+
 function reduce(f, init, coll...)
   try
-    ireduce(f, init, coll...)
+    defaultreturn(init, ireduce(f, init, coll...))
   catch r
     handleabort(init, r)
   end
@@ -64,6 +67,7 @@ function ireduce(f, init, coll)
   end
 end
 
+# Fallback impl for multiple generic sequences
 function ireduce(f, acc, lists...)
   if every(!emptyp, lists)
     ireduce(f, f(acc, map(first, lists)...), map(rest, lists)...)
@@ -72,17 +76,13 @@ function ireduce(f, acc, lists...)
   end
 end
 
-function itransduce(g, to, from...)
-  try
-    g(ireduce(g, to, from...))
-  catch e
-    handleabort(to, e)
-  end
-end
-
 ##### TODO: split/join functions for the from/to collections to allow parallel
 ##### transduction. This will require knowing which transducers can be run in
 ##### parallel.
+function itransduce(g, to, from...)
+  defaultreturn(to, g(reduce(g, to, from...)))
+end
+
 function transduce(xform, f, to, from...)
   itransduce(xform(f), to, from...)
 end
@@ -383,7 +383,7 @@ end
 emptyp(s::RepeatingSeq) = false
 
 # Actually it's infinite... but `Inf` is a float thing
-count(s::RepeatingSeq) = typemax(Int)
+count(_::RepeatingSeq) = typemax(Int)
 
 
 function interleave()
