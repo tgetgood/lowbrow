@@ -74,7 +74,7 @@ function textureimage(system, config)
     ds.emptyvector,
     map(bgr)
     ∘
-    ds.inject(ds.repeat(ds.conj(ds.emptyvector, 0xff)))
+    ds.inject(ds.repeat(ds.vector(0xff)))
     ∘
     ds.interleave()
     ∘

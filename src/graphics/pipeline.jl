@@ -7,7 +7,7 @@ import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, mapindexed
 
 function glslc(src, out)
-  run(`glslc $(@__DIR__)/../../shaders/$src -o $out`)
+  run(`glslc $(@__DIR__)/../shaders/$src -o $out`)
 end
 
 function compileshader(system, fname)
