@@ -42,7 +42,46 @@ function copybuffertoimage(cmd, system, src, dst, size, qf=:transfer)
   )
 end
 
-function transitionimage(cmd, system::ds.Map, config)
+function mipblit(cmd, config)
+  gd(x, k) = get(x, k, [0,1])
+
+  function gd(k)
+    x = get(config, k)
+    return (
+      [gd(x, :x)[1], gd(x, :y)[1], gd(x, :z)[1]],
+      [gd(x, :x)[2], gd(x, :y)[2], gd(x, :z)[2]]
+    )
+  end
+
+  (x, y) = get(config, :size)
+
+  b = vk.ImageBlit(
+    vk.ImageSubresourceLayers(
+      vk.IMAGE_ASPECT_COLOR_BIT,
+      get(config, :level),
+      0, 1
+    ),
+    (vk.Offset3D(0,0,0), vk.Offset3D(x, y, 1)),
+    vk.ImageSubresourceLayers(
+      vk.IMAGE_ASPECT_COLOR_BIT,
+      get(config, :level) + 1,
+      0, 1
+    ),
+    (vk.Offset3D(0,0,0), vk.Offset3D(div(x, 2), div(y, 2), 1))
+  )
+
+  vk.cmd_blit_image(
+    cmd,
+    getin(config, [:image, :image]),
+    vk.IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    getin(config, [:image, :image]),
+    vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    [b],
+    vk.FILTER_LINEAR
+  )
+end
+
+function transitionimage(cmd::vk.CommandBuffer, config)
   aspect = get(config, :aspect, vk.IMAGE_ASPECT_COLOR_BIT)
 
   barrier = vk.unwrap(vk.ImageMemoryBarrier(
@@ -53,7 +92,12 @@ function transitionimage(cmd, system::ds.Map, config)
     get(config, :srcqueue, vk.QUEUE_FAMILY_IGNORED),
     get(config, :dstqueue, vk.QUEUE_FAMILY_IGNORED),
     ds.getin(config, [:image, :image]),
-    vk.ImageSubresourceRange(aspect, 0, ds.getin(config, [:image, :mips], 1), 0, 1)))
+    vk.ImageSubresourceRange(
+      aspect,
+      ds.get(config, :basemiplevel, 0),
+      ds.get(config, :miplevels, 1),
+      0, 1
+    )))
 
   vk.cmd_pipeline_barrier(
     cmd, [], [], [barrier];
@@ -64,7 +108,7 @@ end
 
 function transitionimage(system::ds.Map, config)
   cmdseq(system, get(config, :qf)) do cmd
-    transitionimage(cmd, system, config)
+    transitionimage(cmd, config)
   end
 end
 

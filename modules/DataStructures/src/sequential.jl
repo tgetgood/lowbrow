@@ -287,6 +287,9 @@ function interpose(delim)
   end
 end
 
+remove(p) = filter(!p)
+remove(p, xs) = filter(!p, xs)
+
 function aftereach(delim)
   function (emit)
     function inner()

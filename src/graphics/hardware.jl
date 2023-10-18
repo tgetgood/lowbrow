@@ -284,7 +284,7 @@ function imageview(system, config, image)
     vk.ImageSubresourceRange(
       get(config, :aspect, vk.IMAGE_ASPECT_COLOR_BIT),
       0,
-      get(image, :mips, 1),
+      get(image, :miplevels, 1),
       0,
       1
     )
@@ -406,7 +406,7 @@ end
 
 function createimage(system, config)
   dev = get(system, :device)
-  mips = get(config, :mips, 1)
+  mips = get(config, :miplevels, 1)
 
   queues::Vector{UInt32} = ds.into(
     [], map(x -> ds.getin(system, [:queues, x])), get(config, :queues)
@@ -444,7 +444,13 @@ function createimage(system, config)
 
   vk.unwrap(vk.bind_image_memory(dev, image, memory, 0))
 
-  hashmap(:image, image, :memory, memory, :size, memreq.size, :mips, mips)
+  hashmap(
+    :image, image,
+    :memory, memory,
+    :size, memreq.size,
+    :miplevels, mips,
+    :resolution, get(config, :size)
+  )
 end
 
 function texturesampler(system, config)

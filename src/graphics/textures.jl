@@ -61,6 +61,61 @@ function profile2(system, config, k=20)
   end
 end
 
+function generatemipmaps(vkim, system, config)
+  mips = get(vkim, :miplevels)
+
+  barrier = ds.hashmap(
+    :image, vkim,
+    :srclayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    :dstlayout, vk.IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    :srcaccess, vk.ACCESS_TRANSFER_WRITE_BIT,
+    :dstaccess, vk.ACCESS_TRANSFER_READ_BIT,
+    :srcstage, vk.PIPELINE_STAGE_TRANSFER_BIT,
+    :dststage, vk.PIPELINE_STAGE_TRANSFER_BIT,
+    :qf, :graphics
+  )
+
+  postbarrier = ds.hashmap(
+    :srclayout, vk.IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    :dstlayout, vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    :srcaccess, vk.ACCESS_TRANSFER_READ_BIT,
+    :dstaccess, vk.ACCESS_SHADER_READ_BIT,
+    :dststage, vk.PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+  )
+
+  mipconstruct = ds.into(
+    ds.emptyvector,
+    map(i -> ds.hashmap(
+      :prebarrier, ds.assoc(barrier, :basemiplevel, i),
+      :blit, ds.hashmap(
+        :image, vkim,
+        :level, i,
+        :size, map(x -> div(x, (2^i)), get(vkim, :resolution))
+      ),
+    )) ∘
+    map(x -> ds.assoc(
+      x, :postbarrier, merge(get(x, :prebarrier), postbarrier)
+    )),
+    0:mips-2 # mip levels start at zero
+  )
+
+  commands.cmdseq(system, :graphics) do cmd
+    ds.reduce(0, mipconstruct) do _, x
+      commands.transitionimage(cmd, get(x, :prebarrier))
+      commands.mipblit(cmd, get(x, :blit))
+      commands.transitionimage(cmd, get(x, :postbarrier))
+    end
+
+    commands.transitionimage(
+      cmd,
+      ds.merge(
+        barrier,
+        ds.selectkeys(postbarrier, [:dstlayout, :dstaccess, :dststage]),
+        ds.hashmap(:basemiplevel, mips-1))
+    )
+  end
+end
+
 function textureimage(system, config)
   dev = get(system, :device)
 
@@ -68,7 +123,7 @@ function textureimage(system, config)
 
   pixels = reduce(*, size(image))
 
-  mips = Int(1 + floor(log2(max(size(image)...))))
+  mips = Int(1 + floor(log2(min(size(image)...))))
 
   rgb::Vector{UInt8} = ds.into(
     ds.emptyvector,
@@ -99,7 +154,7 @@ function textureimage(system, config)
     :format, vk.FORMAT_B8G8R8A8_SRGB,
     :queues, [:transfer, :graphics],
     :size, size(image),
-    :mips, mips,
+    :miplevels, mips,
     :sharingmode, vk.SHARING_MODE_EXCLUSIVE,
     :usage, vk.IMAGE_USAGE_TRANSFER_SRC_BIT |
             vk.IMAGE_USAGE_TRANSFER_DST_BIT |
@@ -108,8 +163,9 @@ function textureimage(system, config)
   ))
 
   commands.cmdseq(system, :transfer) do cmd
-    commands.transitionimage(cmd, system, ds.hashmap(
+    commands.transitionimage(cmd, ds.hashmap(
       :image, vkim,
+      :miplevels, mips,
       :srclayout, vk.IMAGE_LAYOUT_UNDEFINED,
       :dstlayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       :dstaccess, vk.ACCESS_TRANSFER_WRITE_BIT,
@@ -121,7 +177,7 @@ function textureimage(system, config)
       cmd, system, get(staging, :buffer), get(vkim, :image), size(image)
     )
 
-    commands.transitionimage(cmd, system, ds.hashmap(
+    commands.transitionimage(cmd, ds.hashmap(
       :image, vkim,
       :srclayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       :dstlayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -132,21 +188,13 @@ function textureimage(system, config)
       :srcqueue, ds.getin(system, [:queues, :transfer]),
       :dstqueue, ds.getin(system, [:queues, :graphics])
     ))
+
   end
 
-  commands.transitionimage(system, ds.hashmap(
-    :image, vkim,
-    :srclayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    :dstlayout, vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    :srcaccess, vk.ACCESS_TRANSFER_WRITE_BIT,
-    :dstaccess, vk.ACCESS_SHADER_READ_BIT,
-    :srcstage, vk.PIPELINE_STAGE_TRANSFER_BIT,
-    :dststage, vk.PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-    :qf, :graphics
-  ))
+  generatemipmaps(vkim, system, config)
 
   view = hw.imageview(
-      system,
+    system,
       ds.hashmap(:format, hw.findformat(system, config).format),
       vkim,
     )

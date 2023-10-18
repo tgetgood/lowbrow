@@ -340,8 +340,6 @@ end
 
 # These have limited size, so the simplicity of this method trumps efficiency
 merge(x::PersistentArrayMap, y::PersistentArrayMap) = into(x, y)
-merge(x::PersistentArrayMap, y::PersistentHashMap ) = into(y, x)
-merge(x::PersistentHashMap,  y::PersistentArrayMap) = into(x, y)
 
 function Base.:(==)(x::PersistentArrayMap, y::PersistentArrayMap)
   if x === y
@@ -432,10 +430,11 @@ function seq(m::PersistentHashMap)
   gather(emptyvector, m.root)
 end
 
-function merge(x::Map, y::Map)
-  into(x, y)
-end
-
+# REVIEW: There's a more efficient way to merge N hashmaps in one downward
+# pass. Currently I'm not seeing merge performance as any kind of bottleneck,
+# but this is the kind of thing a more mature datastructures lib would think
+# about.
+# Something like:
 # function merge(x::PersistentHashMap, y::PersistentHashMap)
 #   ht = []
 #   for i in 1::nodelength
@@ -447,6 +446,29 @@ end
 #   end
 #   PersistentHashMap(PersistentHashNode(ht, sum(count, m.ht), x.level))
 # end
+
+merge(x::PersistentArrayMap, y::PersistentHashMap ) = into(y, x)
+merge(x::PersistentHashMap,  y::PersistentArrayMap) = into(x, y)
+
+merge() = emptymap
+merge(xs::Map...) = reduce(merge, xs)
+
+function selectkey(m::Map, k)
+  v = get(m, k, emptymarker)
+  if v === emptymarker
+    nil
+  else
+    MapEntry(k, v)
+  end
+end
+
+# N.B.: This assumes that you're selecting a relatively small number of keys. If
+# you're selecting a lot of keys from a huge map, this will not do so well.
+#
+# REVIEW: will that ever be a problem?
+function selectkeys(m::Map, ks)
+  into(emptymap, map(x -> selectkey(m, x)) ∘ remove(x -> x === nil), ks)
+end
 
 function Base.:(==)(x::PersistentHashMap, y::PersistentHashMap)
   if count(x) !== count(y)
