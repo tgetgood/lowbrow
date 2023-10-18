@@ -449,6 +449,7 @@ function createimage(system, config)
     :memory, memory,
     :size, memreq.size,
     :miplevels, mips,
+    :format, get(config, :format),
     :resolution, get(config, :size)
   )
 end
@@ -471,7 +472,7 @@ function texturesampler(system, config)
     false,
     vk.COMPARE_OP_ALWAYS,
     0,
-    0,
+    get(config, :miplevels, 0),
     vk.BORDER_COLOR_INT_OPAQUE_BLACK,
     false
   ))

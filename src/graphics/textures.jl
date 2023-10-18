@@ -62,6 +62,18 @@ function profile2(system, config, k=20)
 end
 
 function generatemipmaps(vkim, system, config)
+
+  props = vk.get_physical_device_format_properties(
+    get(system, :physicaldevice),
+    get(vkim, :format)
+  )
+
+  if (props.optimal_tiling_features &
+      vk.FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT).val == 0
+    @warn "Linear blit not supported, mipmaps won't be generated!"
+    return
+  end
+
   mips = get(vkim, :miplevels)
 
   barrier = ds.hashmap(
@@ -202,7 +214,7 @@ function textureimage(system, config)
   return ds.hashmap(
     :texture, vkim,
     :textureimageview, view,
-    :sampler, hw.texturesampler(system, config)
+    :sampler, hw.texturesampler(system, ds.hashmap(:miplevels, mips))
   )
 end
 
