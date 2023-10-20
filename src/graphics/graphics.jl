@@ -66,7 +66,7 @@ function scale(x::Real)
 end
 
 
-x = pi/3
+x = 0 # pi/3
 function configure()
   staticconfig = hashmap(
     :shaders, hashmap(:vert, "ex1.vert", :frag, "ex1.frag"),
@@ -91,27 +91,27 @@ function configure()
     ),
     :concurrent_frames, 2,
     :vertex_data, [
-      [[-0.5, -0.5, 0.3], [1, 0, 0], [0, 0]],
+      [[-0.6, -0.6, 0.3], [1, 0, 0], [0, 0]],
       [[0.5, -0.5, 0.3], [0, 1, 0], [1, 0]],
-      [[0.5, 0.5, 0.3], [0, 0, 1], [1, 1]],
+      [[0.3, 0.3, 0.3], [0, 0, 1], [1, 1]],
       [[-0.5, 0.5, 0.3], [1, 1, 1], [0, 1]],
 
-      [[-0.5, -0.5, 0.7], [1, 1, 1], [0, 0]],
-      [[0.5, -0.5, 0.7], [0, 1, 0], [1, 0]],
-      [[0.5, 0.5, 0.7], [0, 1, 0], [1, 1]],
-      [[-0.5, 0.5, 0.7], [0, 0, 1], [0, 1]],
+      # [[-0.5, -0.5, 0.7], [1, 1, 1], [0, 0]],
+      # [[0.5, -0.5, 0.7], [0, 1, 0], [1, 0]],
+      # [[0.5, 0.5, 0.7], [0, 1, 0], [1, 1]],
+      # [[-0.5, 0.5, 0.7], [0, 0, 1], [0, 1]],
     ],
     :indicies, [
-      0, 1, 2, 2, 3, 0,
-      4, 5, 6, 6, 7, 4,
+      0, 3, 2, 2, 1, 0,
+      # 4, 5, 6, 6, 7, 4,
     ],
     :texture_file, *(@__DIR__, "/../../assets/viking_room.png"),
     :model_file, *(@__DIR__, "/../../assets/viking_room.obj"),
     :ubo, hashmap(
       :model, [
         1 0 0 0
-        0 cos(x) -sin(x) 0
-        0 sin(x) cos(x) 0
+        0 1 0 0
+        0 0 1 0
         0 0 0 1
       ],
       :view, [
@@ -120,14 +120,19 @@ function configure()
         0 0 1 0
         0 0 0 1
       ],
-      :projection, rotateY(pi/3)
+      :projection, [
+        1 0 0 0
+        0 1 0 0
+        0 0 1 0
+        0 0 0 1
+      ]
     )
   )
 
   ds.reduce((s, f) -> f(s), staticconfig, [
     window.configure,
     debug.configure,
-    # vertex.configure,
+    vertex.configure,
     uniform.configure
   ])
 end
@@ -141,11 +146,11 @@ function staticinit(config)
     hw.createdevice,
     hw.createcommandpools,
     hw.createdescriptorpools,
-    model.load,
+    # model.load,
     gp.renderpass,
     draw.commandbuffers,
-    # (x, y) -> vertex.vertexbuffer(x, get(y, :vertex_data)),
-    # (x, y) -> vertex.indexbuffer(x, get(y, :indicies)),
+    (x, y) -> vertex.vertexbuffer(x, get(y, :vertex_data)),
+    (x, y) -> vertex.indexbuffer(x, get(y, :indicies)),
     uniform.allocatebuffers,
     # uniform.allocatesets,
     textures.textureimage,
@@ -206,7 +211,7 @@ function main(system, config)
         (ubuff, dset) = dsets(system, config, i)
 
         if !window.minimised(get(system, :window))
-          uniform.setubo!(config, ubuff)
+          # uniform.setubo!(config, ubuff)
           res = draw.draw(system, buffers[i+1], dset)
 
           if res == vk.ERROR_OUT_OF_DATE_KHR ||
