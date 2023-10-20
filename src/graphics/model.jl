@@ -33,11 +33,20 @@ function tofloat(v)
 end
 
 function triplev(f, vs, ts)
-  t = map(x -> parse(Int, x), split(f, "/"))
+  t = map(x -> parse(Int, x), f)
   tex = ts[t[2]]
   vert(vs[t[1]], (1f0-tex[2], tex[1]))
 end
 
+function gather((vmap, indicies), f)
+  if ds.containsp(vmap, f)
+    (vmap, ds.conj(indicies, get(vmap, f)))
+  else
+    n = ds.count(vmap)
+    (ds.assoc(vmap, f, n), ds.conj(indicies, n))
+  end
+end
+gather(x) = x
 
 function load(system, config)
   filename = get(config, :model_file)
@@ -47,24 +56,20 @@ function load(system, config)
   vs = tofloat(get(objs, "v"))
   ts = tofloat(get(objs, "vt"))
 
-  vmap::ds.Map = ds.emptymap
-  indicies::ds.Vector = ds.emptyvector
-
-
-  for facet in get(objs, "f")
-    fs = map(x -> triplev(x, vs, ts), facet)
-    for f in fs
-      if ds.containsp(vmap, f)
-        indicies = ds.conj(indicies, get(vmap, f))
-      else
-        n = ds.count(vmap)
-        vmap = ds.assoc(vmap, f, n)
-        indicies = ds.conj(indicies, n)
-      end
-    end
-  end
+  (vmap, indicies) = ds.transduce(
+    ds.cat()
+    ∘
+    map(x -> split(x, "/"))
+    ∘
+    map(x -> triplev(x, vs, ts))
+    ,
+    gather,
+    (ds.emptymap, ds.emptyvector),
+    get(objs, "f")
+  )
 
   verticies = Vector{Vertex}(undef, ds.count(vmap))
+
   for e in ds.seq(vmap)
     verticies[ds.val(e)+1] = ds.key(e)
   end
