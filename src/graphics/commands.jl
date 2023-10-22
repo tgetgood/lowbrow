@@ -20,19 +20,16 @@ function cmdseq(body, system, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
 
   vk.end_command_buffer(cmd)
 
-  finished = vk.unwrap(vk.create_fence(get(system, :device)))
+  vk.queue_submit(queue, [vk.SubmitInfo([],[],[cmd],[])])
 
-  vk.queue_submit(queue, [vk.SubmitInfo([],[],[cmd],[])]; fence=finished)
+  # FIXME: Waiting for the queue to be idle is wrong. My attempt to use a fence
+  # caused some exciting errors, but that's probably my fault.
+  #
+  # At least use @async so that we don't block the main render thread while this
+  # waits to clean up.
+  vk.queue_wait_idle(queue)
 
-  # vk.queue_wait_idle(queue)
-  try
-    vk.wait_for_fences(get(system, :device), [finished], true, typemax(Int))
-    # REVIEW: Something throws if you teardown a running program and so this
-    # `finally` construct appears necessary. I don't understand it more than
-    # superficially though.
-  finally
-    vk.free_command_buffers(get(system, :device), pool, cmds)
-  end
+  vk.free_command_buffers(get(system, :device), pool, cmds)
 end
 
 function copybuffertoimage(cmd, system, src, dst, size, qf=:transfer)
