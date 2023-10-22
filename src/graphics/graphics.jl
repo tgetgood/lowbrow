@@ -66,7 +66,7 @@ function scale(x::Real)
 end
 
 
-x = 0 # pi/3
+x = pi/3
 function configure()
   staticconfig = hashmap(
     :shaders, hashmap(:vert, "ex1.vert", :frag, "ex1.frag"),
@@ -116,8 +116,8 @@ function configure()
       ],
       :view, [
         1 0 0 0
-        0 1 0 0
-        0 0 1 0
+        0 cos(x) -sin(x) 0
+        0 sin(x) cos(x) 0
         0 0 0 1
       ],
       :projection, [
@@ -132,7 +132,7 @@ function configure()
   ds.reduce((s, f) -> f(s), staticconfig, [
     window.configure,
     debug.configure,
-    vertex.configure,
+    # vertex.configure,
     uniform.configure
   ])
 end
@@ -146,26 +146,27 @@ function staticinit(config)
     hw.createdevice,
     hw.createcommandpools,
     hw.createdescriptorpools,
-    # model.load,
-    gp.renderpass,
+    model.load,
     draw.commandbuffers,
-    (x, y) -> vertex.vertexbuffer(x, get(y, :vertex_data)),
-    (x, y) -> vertex.indexbuffer(x, get(y, :indicies)),
+    # (x, y) -> vertex.vertexbuffer(x, get(y, :vertex_data)),
+    # (x, y) -> vertex.indexbuffer(x, get(y, :indicies)),
     uniform.allocatebuffers,
     # uniform.allocatesets,
     textures.textureimage,
     textures.allocatesets,
   ]
 
-  ds.reduce((s, f) -> merge(s, f(s, config)), emptymap, steps)
+  ds.reduce((s, f) -> begin @info f; merge(s, f(s, config)) end, emptymap, steps)
 end
 
 function dynamicinit(system, config)
+  # FIXME: This is probably why resizing is so unresponsive.
   vk.device_wait_idle(get(system, :device))
 
   steps = [
     hw.createswapchain,
     hw.createimageviews,
+    gp.renderpass,
     gp.createpipelines,
     gp.createframebuffers,
   ]
@@ -211,7 +212,7 @@ function main(system, config)
         (ubuff, dset) = dsets(system, config, i)
 
         if !window.minimised(get(system, :window))
-          # uniform.setubo!(config, ubuff)
+          uniform.setubo!(config, ubuff)
           res = draw.draw(system, buffers[i+1], dset)
 
           if res == vk.ERROR_OUT_OF_DATE_KHR ||

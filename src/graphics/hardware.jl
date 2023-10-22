@@ -197,12 +197,21 @@ function findqueues(system, device)
   )
 end
 
+function multisamplemax(device)
+  props = vk.get_physical_device_properties(device)
+  depth = props.limits.framebuffer_depth_sample_counts
+  colour = props.limits.framebuffer_color_sample_counts
+
+  vk.SampleCountFlag(1 << (ndigits((depth&colour).val, base=2) - 1))
+end
+
 function pdevice(system, config)
   potential = into(
     emptyvector,
     map(x -> merge(system, hashmap(
       :physicaldevice, x,
-      :queues, findqueues(system, x)
+      :queues, findqueues(system, x),
+      :max_msaa, multisamplemax(x)
     )))
     ∘ filter(system -> checkdevice(system, config)),
     vk.unwrap(vk.enumerate_physical_devices(get(system, :instance)))
@@ -406,7 +415,7 @@ end
 
 function createimage(system, config)
   dev = get(system, :device)
-  mips = get(config, :miplevels, 1)
+  samples = get(config, :samples, vk.SAMPLE_COUNT_1_BIT)
 
   queues::Vector{UInt32} = ds.into(
     [], map(x -> ds.getin(system, [:queues, x])), get(config, :queues)
@@ -421,9 +430,9 @@ function createimage(system, config)
     vk.IMAGE_TYPE_2D,
     get(config, :format),
     vk.Extent3D(get(config, :size)..., 1),
-    mips,
+    get(config, :miplevels, 1),
     1,
-    vk.SAMPLE_COUNT_1_BIT,
+    samples,
     get(config, :tiling, vk.IMAGE_TILING_OPTIMAL),
     get(config, :usage),
     sharingmode,
@@ -448,10 +457,30 @@ function createimage(system, config)
     :image, image,
     :memory, memory,
     :size, memreq.size,
-    :miplevels, mips,
+    :miplevels, get(config, :miplevels, 1),
+    :samples, samples,
     :format, get(config, :format),
     :resolution, get(config, :size)
   )
+end
+
+function colourresources(system, config)
+  format = getin(config, [:swapchain, :format])
+  ext = get(system, :extent)
+
+  image = createimage(system, hashmap(
+    :size, [ext.width, ext.height],
+    :format, format,
+    :samples, get(system, :max_msaa),
+    :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    :queues, [:graphics],
+    :usage, vk.IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+            vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+  ))
+
+  view = imageview(system, hashmap(:format, format), image)
+
+  assoc(image, :view, view)
 end
 
 function texturesampler(system, config)
@@ -525,6 +554,7 @@ function depthresources(system, config)
     hashmap(
       :tiling, vk.IMAGE_TILING_OPTIMAL,
       :format, format,
+      :samples, get(system, :max_msaa),
       :size, [ex.width, ex.height],
       :usage, vk.IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
       :queues, [:graphics],
@@ -557,7 +587,8 @@ function createimageviews(system, config)
       )),
       vk.unwrap(vk.get_swapchain_images_khr(dev, get(system, :swapchain)))
     ),
-    :depth, depthresources(system, config)
+    :depth, depthresources(system, config),
+    :colour, colourresources(system, config)
   )
 end
 

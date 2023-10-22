@@ -44,23 +44,33 @@ function renderpass(system, config)
       [
         vk.AttachmentDescription(
           getin(config, [:swapchain, :format]),
-          vk.SAMPLE_COUNT_1_BIT,
+          getin(system, [:colour, :samples]),
           vk.ATTACHMENT_LOAD_OP_CLEAR,
           vk.ATTACHMENT_STORE_OP_STORE,
           vk.ATTACHMENT_LOAD_OP_DONT_CARE,
           vk.ATTACHMENT_STORE_OP_DONT_CARE,
           vk.IMAGE_LAYOUT_UNDEFINED,
-          vk.IMAGE_LAYOUT_PRESENT_SRC_KHR
+          vk.IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
         ),
         vk.AttachmentDescription(
           hw.optdepthformat(system),
-          vk.SAMPLE_COUNT_1_BIT,
+          getin(system, [:depth, :samples]),
           vk.ATTACHMENT_LOAD_OP_CLEAR,
           vk.ATTACHMENT_STORE_OP_DONT_CARE,
           vk.ATTACHMENT_LOAD_OP_DONT_CARE,
           vk.ATTACHMENT_STORE_OP_DONT_CARE,
           vk.IMAGE_LAYOUT_UNDEFINED,
           vk.IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        ),
+        vk.AttachmentDescription(
+          getin(config, [:swapchain, :format]),
+          vk.SAMPLE_COUNT_1_BIT,
+          vk.ATTACHMENT_LOAD_OP_DONT_CARE,
+          vk.ATTACHMENT_STORE_OP_STORE,
+          vk.ATTACHMENT_LOAD_OP_DONT_CARE,
+          vk.ATTACHMENT_STORE_OP_DONT_CARE,
+          vk.IMAGE_LAYOUT_UNDEFINED,
+          vk.IMAGE_LAYOUT_PRESENT_SRC_KHR
         )
       ],
       [vk.SubpassDescription(
@@ -71,7 +81,12 @@ function renderpass(system, config)
         depth_stencil_attachment=vk.AttachmentReference(
           1,
           vk.IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-        )
+        ),
+        resolve_attachments=[vk.AttachmentReference(
+          2,
+          vk.IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        )]
+
       )],
       [vk.SubpassDependency(
         vk.SUBPASS_EXTERNAL,
@@ -170,7 +185,7 @@ function createpipelines(system, config)
   )
 
   multisample_state = vk.PipelineMultisampleStateCreateInfo(
-    vk.SAMPLE_COUNT_1_BIT,
+    getin(system, [:colour, :samples]),
     false,
     1,
     false,
@@ -263,6 +278,7 @@ function createframebuffers(system, config)
   pass = get(system, :renderpass)
   extent = get(system, :extent)
   depthview = ds.getin(system, [:depth, :view])
+  colourview = ds.getin(system, [:colour, :view])
 
   hashmap(
     :framebuffers,
@@ -271,11 +287,12 @@ function createframebuffers(system, config)
       map(image -> vk.create_framebuffer(
         dev,
         pass,
-        [image, depthview],
+        [colourview, depthview, image],
         extent.width,
         extent.height,
         1
-      )) ∘
+      ))
+      ∘
       map(vk.unwrap),
       images
     )
