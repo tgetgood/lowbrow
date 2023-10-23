@@ -70,35 +70,66 @@ function findpresentationqueue(system, device)
 end
 
 function findtransferqueue(device)
-  families = ds.mapindexed(
-    (x, i) -> (x, i - 1),
+  transferqs = into(
+    emptyvector,
+    ds.mapindexed((x, i) -> (x, i - 1))
+    ∘
+    filter(x -> (x[1].queue_flags & vk.QUEUE_TRANSFER_BIT).val > 0)
+    ,
     vk.get_physical_device_queue_family_properties(device)
   )
 
-  dedicated = filter(
-    x -> (x[1].queue_flags & vk.QUEUE_TRANSFER_BIT) > 0 &&
-    (x[1].queue_flags & (vk.QUEUE_GRAPHICS_BIT | vk.QUEUE_COMPUTE_BIT)).val == 0,
-    families
+  # REVIEW: Is this productive? I.e. could there be a case where we have an
+  # async compute queue that can be used for transfers, but no dedicated
+  # transfer queue? In theory yes. But if we did only have compute and graphics
+  # queues, which one do we want to transfer on? That would be load dependent.
+  nog = filter(
+    x -> (x[1].queue_flags & vk.QUEUE_GRAPHICS_BIT).val == 0,
+    transferqs
   )
 
-  if length(dedicated) > 0
-    return first(dedicated)[2]
-  else
+  noc = filter(
+    x -> (x[1].queue_flags & vk.QUEUE_COMPUTE_BIT).val == 0,
+    nog
+  )
 
-    nongraphics = filter(
-      x -> (x[1].queue_flags & vk.QUEUE_TRANSFER_BIT) > 0 &&
-        (x[1].queue_flags & vk.QUEUE_GRAPHICS_BIT).val == 0,
-      families
-    )
-
-    if length(nongraphics) > 0
-      return first(nongraphics)[2]
+  if ds.emptyp(noc)
+    if ds.emptyp(nog)
+      first(transferqs)[2]
     else
-      return findgraphicsqueue(device)
+      first(nog)[2]
     end
+  else
+    first(noc)[2]
   end
 end
 
+function findcomputequeue(device)
+  computeqs = into(
+    emptyvector,
+    ds.mapindexed((x, i) -> (x, i - 1))
+    ∘
+    filter(x -> (x[1].queue_flags & vk.QUEUE_COMPUTE_BIT).val > 0)
+    ,
+    vk.get_physical_device_queue_family_properties(device)
+  )
+
+  if ds.emptyp(computeqs)
+    @error "device does not support compute. Vulkan requires that it does."
+    throw("Unreachable")
+  end
+
+  dedicated = filter(
+    x -> (x[1].queue_flags & vk.QUEUE_GRAPHICS_BIT).val == 0,
+    computeqs
+  )
+
+  if ds.emptyp(dedicated)
+    first(computeqs)[2]
+  else
+    first(dedicated)[2]
+  end
+end
 
 function swapchainsupport(system)
   dev = get(system, :physicaldevice)
@@ -193,7 +224,8 @@ function findqueues(system, device)
   hashmap(
     :graphics, findgraphicsqueue(device),
     :presentation, findpresentationqueue(system, device),
-    :transfer, findtransferqueue(device)
+    :transfer, findtransferqueue(device),
+    :compute, findcomputequeue(device)
   )
 end
 
