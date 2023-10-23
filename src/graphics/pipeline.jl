@@ -20,20 +20,22 @@ function compileshader(system, fname)
   vk.unwrap(vk.create_shader_module(get(system, :device), size, code))
 end
 
+const shadertypes = hashmap(
+  :vertex, vk.SHADER_STAGE_VERTEX_BIT,
+  :fragment, vk.SHADER_STAGE_FRAGMENT_BIT,
+  :compute, vk.SHADER_STAGE_COMPUTE_BIT
+)
+
 function shaders(system, config)
-  vert = vk.PipelineShaderStageCreateInfo(
-    vk.SHADER_STAGE_VERTEX_BIT,
-    compileshader(system, getin(config, [:shaders, :vert])),
-    "main"
+  into(
+    [],
+    map(e -> vk.PipelineShaderStageCreateInfo(
+      get(shadertypes, ds.key(e)),
+      compileshader(system, ds.val(e)),
+      "main" # TODO: This should be overridable
+    )),
+    get(config, :shaders)
   )
-
-  frag = vk.PipelineShaderStageCreateInfo(
-    vk.SHADER_STAGE_FRAGMENT_BIT,
-    compileshader(system, getin(config, [:shaders, :frag])),
-    "main"
-  )
-
-  [vert, frag]
 end
 
 function renderpass(system, config)
