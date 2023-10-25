@@ -47,6 +47,7 @@ function copybuffertoimage(cmd, system, src, dst, size, qf=:transfer)
   )
 end
 
+
 function mipblit(cmd, config)
   gd(x, k) = get(x, k, [0,1])
 
@@ -128,4 +129,29 @@ function copybuffer(cmd::vk.CommandBuffer, system, src, dst, size,
     vk.cmd_copy_buffer(cmd, src, dst, [vk.BufferCopy(0,0,size)])
 end
 
+function todevicelocal(system, data, buffers...)
+  staging = hw.transferbuffer(system, sizeof(data))
+
+  memptr::Ptr{eltype(data)} = vk.unwrap(vk.map_memory(
+    get(system, :device), get(staging, :memory), 0, sizeof(data)
+  ))
+
+  unsafe_copyto!(memptr, pointer(data), length(data))
+
+  vk.unmap_memory(get(system, :device), get(staging, :memory))
+
+  cmdseq(system, :transfer) do cmd
+    for buffer in buffers
+      copybuffer(
+        cmd,
+        system,
+        get(staging, :buffer),
+        get(buffer, :buffer),
+        get(staging, :size),
+        :transfer
+      )
+    end
+  end
 end
+
+end # module

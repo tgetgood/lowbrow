@@ -397,11 +397,17 @@ end
 function buffer(system, config)
   dev = get(system, :device)
 
+  queues = into([], map(x -> getin(system, [:queues, x]), get(config, :queues)))
+
+  mode = get(config, :sharingmode,
+    length(queues) == 1 ? vk.SHARING_MODE_EXCLUSIVE : vk.SHARING_MODE_CONCURRENT
+  )
+
   bci = vk.BufferCreateInfo(
     get(config, :size),
     get(config, :usage),
-    get(config, :mode),
-    into([], map(x -> getin(system, [:queues, x]), get(config, :queues)))
+    mode,
+    queues
   )
 
   buffer = vk.unwrap(vk.create_buffer(dev, bci))
@@ -428,7 +434,6 @@ function transferbuffer(system, size)
     ds.hashmap(
       :size, size,
       :usage, vk.BUFFER_USAGE_TRANSFER_SRC_BIT,
-      :mode, vk.SHARING_MODE_EXCLUSIVE,
       :queues, [:transfer],
       :memoryflags, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT |
                     vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT

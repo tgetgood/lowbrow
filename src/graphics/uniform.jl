@@ -35,7 +35,6 @@ function allocatebuffers(system, config)
       map(_ -> hw.buffer(system, ds.hashmap(
         :size, sizeof(MVP),
         :usage, vk.BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        :mode, vk.SHARING_MODE_EXCLUSIVE,
         :queues, [:graphics],
         :memoryflags, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT |
                       vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT

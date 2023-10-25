@@ -1,9 +1,11 @@
 module vertex
 
+import Vulkan as vk
+
 import DataStructures as ds
+
 import hardware as hw
 import commands
-import Vulkan as vk
 
 struct Vertex
   position::NTuple{3, Float32}
@@ -20,35 +22,18 @@ function verticies(xs)::Vector{Vertex}
 end
 
 function vertexbuffer(system, data)
-  staging = hw.transferbuffer(system, sizeof(data))
-
-  memptr::Ptr{eltype(data)} = vk.unwrap(vk.map_memory(
-    get(system, :device), get(staging, :memory), 0, sizeof(data)
-  ))
-
-  unsafe_copyto!(memptr, pointer(data), length(data))
-
-  vk.unmap_memory(get(system, :device), get(staging, :memory))
-
   buffer = hw.buffer(
     system,
     ds.hashmap(
       :size, sizeof(data),
       :usage, vk.BUFFER_USAGE_VERTEX_BUFFER_BIT |
               vk.BUFFER_USAGE_TRANSFER_DST_BIT,
-      :mode, vk.SHARING_MODE_CONCURRENT,
       :queues, [:graphics, :transfer],
       :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     )
   )
 
-  commands.copybuffer(
-    system,
-    get(staging, :buffer),
-    get(buffer, :buffer),
-    get(staging, :size),
-    :transfer
-  )
+  commands.todevicelocal(system, data, buffer)
 
   ds.hashmap(:vertexbuffer, ds.assoc(buffer,
     :verticies, length(data),
@@ -81,7 +66,6 @@ function indexbuffer(system, xs)
       :size, bytes,
       :usage, vk.BUFFER_USAGE_INDEX_BUFFER_BIT |
               vk.BUFFER_USAGE_TRANSFER_DST_BIT,
-      :mode, vk.SHARING_MODE_CONCURRENT,
       :queues, [:graphics, :transfer],
       :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     )
