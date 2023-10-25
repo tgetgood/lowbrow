@@ -27,15 +27,13 @@ const shadertypes = hashmap(
 )
 
 function shaders(system, config)
-  into(
-    [],
-    map(e -> vk.PipelineShaderStageCreateInfo(
-      get(shadertypes, ds.key(e)),
-      compileshader(system, ds.val(e)),
-      "main" # TODO: This should be overridable
-    )),
-    get(config, :shaders)
-  )
+  hashmap(:shaders,
+    map(e -> (ds.key(e), vk.PipelineShaderStageCreateInfo(
+        get(shadertypes, ds.key(e)),
+        compileshader(system, ds.val(e)),
+        "main" # TODO: This should be overridable
+      )),
+      get(config, :shaders)))
 end
 
 function renderpass(system, config)
@@ -243,10 +241,11 @@ function createpipelines(system, config)
     1
   )
 
+  shaders = ds.vals(ds.selectkeys(get(system, :shaders), [:vertex, :fragment]))
   ps = vk.unwrap(vk.create_graphics_pipelines(
     get(system, :device),
     [vk.GraphicsPipelineCreateInfo(
-      shaders(system, config),
+      shaders,
       vk.PipelineRasterizationStateCreateInfo(
         false,
         false,
@@ -302,4 +301,19 @@ function createframebuffers(system, config)
   )
 end
 
+function computelayout(buffers)
 end
+
+function computepipeline(system, config)
+  layout = computelayout(get(system, :particle_buffers))
+  pipeline = vk.unwrap(vk.create_compute_pipelines(
+    get(system, :device),
+    [vk.ComputePipelineCreateInfo(
+      ds.getin(system, [:shaders, :compute]),
+      vk.PipelineLayoutCreateInfo(layout, [])
+    )]
+  ))
+  hashmap(:compute, hashmap(:pipeline, pipeline, :layout, layout))
+end
+
+end #module
