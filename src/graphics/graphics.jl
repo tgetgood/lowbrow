@@ -69,16 +69,18 @@ end
 x = pi/3
 function configure()
   staticconfig = hashmap(
-    :shaders, hashmap(:vert, "ex1.vert", :frag, "ex1.frag"),
+    :shaders, hashmap(
+      :vertex, "ex1.vert",
+      :fragment, "ex1.frag",
+      # :compute, "particles.comp"
+    ),
     :instance, hashmap(
-      :extensions, [
-        "VK_EXT_debug_utils"
-      ],
+      :extensions, ["VK_EXT_debug_utils"],
       :validation, ["VK_LAYER_KHRONOS_validation"]
     ),
     :device, hashmap(
       :features, [:sampler_anisotropy],
-      :extensions, ["VK_KHR_swapchain"],
+      :extensions, ["VK_KHR_swapchain", "VK_KHR_shader_float16_int8"],
       :validation, ["VK_LAYER_KHRONOS_validation"]
     ),
     :debuglevel, vk.DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
@@ -87,9 +89,12 @@ function configure()
       :format, vk.FORMAT_B8G8R8A8_SRGB,
       :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
       :presentmode, vk.PRESENT_MODE_FIFO_KHR,
-      :images, 3
+      :images, 2
     ),
     :concurrent_frames, 2,
+    :particles, hashmap(
+      :count, 4096
+    ),
     :vertex_data, [
       [[-0.6, -0.6, 0.3], [1, 0, 0], [0, 0]],
       [[0.5, -0.5, 0.3], [0, 1, 0], [1, 0]],
@@ -146,12 +151,13 @@ function staticinit(config)
     hw.createdevice,
     hw.createcommandpools,
     hw.createdescriptorpools,
+    gp.shaders,
     model.load,
     draw.commandbuffers,
     # (x, y) -> vertex.vertexbuffer(x, get(y, :vertex_data)),
     # (x, y) -> vertex.indexbuffer(x, get(y, :indicies)),
     uniform.allocatebuffers,
-    # uniform.allocatesets,
+    uniform.allocatesets,
     textures.textureimage,
     textures.allocatesets,
   ]

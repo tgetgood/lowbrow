@@ -349,6 +349,39 @@ function createcommandpools(system, config)
   )
 end
 
+"""
+Returns Vector{DescriptorSetLayoutBinding} for data of `types` at `stages`.
+
+Three different aspects of the render have to come together for descriptors: the
+actual data blobs, the use to which each blob will be put, and the stages at
+which it will be used.
+
+The second two are essentially static in a given pipeline and can be computed
+ahead of time.
+"""
+function descriptorsetlayout(types, stages)
+  into([], ds.mapindexed((i, type, stage) -> vk.DescriptorSetLayoutBinding(
+      i - 1, type, stage; descriptor_count=1
+    )),
+    types, stages)
+end
+
+"""
+Returns a DescriptorPoolCreateInfo appropriate to the given layout and config.
+"""
+function descriptorpool(layout, config)
+  frames = get(config, :concurrent_frames)
+  vk.DescriptorPoolCreateInfo(
+    frames * length(layout),
+    into([], map(x -> vk.DescriptorPoolSize(
+        x.descriptor_type,
+        x.descriptor_count * frames
+      )),
+      layout
+    )
+  )
+end
+
 function createdescriptorpools(system, config)
   n = get(config, :concurrent_frames)
 
