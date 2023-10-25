@@ -134,30 +134,31 @@ end
 """
 Generates PiplineVertexInputStateCreateInfo from struct `T` via reflection.
 
-N.B.: The location pragmata in the shaders are assumed to follow the order of
-the fields in the struct.
-
-TODO: Add 2 arg version that allows overriding location order.
+N.B.: The location pragmata in the shaders are assumed to follow the order in
+`fields` which defaults to the fieldnames in order as defined in `T`.
 """
-function vertex_input_state(T)
+function vertex_input_state(T, fields)
   vk.PipelineVertexInputStateCreateInfo(
     [vk.VertexInputBindingDescription(
       0, sizeof(T), vk.VERTEX_INPUT_RATE_VERTEX
     )],
     into(
       [],
-      mapindexed(
-        (field, i) -> vk.VertexInputAttributeDescription(
-          i - 1,
-          0,
-          typeformat(fieldtype(T, field)),
-          fieldoffset(T, i)
-        )
-      ),
-      fieldnames(T)
+      mapindexed((i, field) -> vk.VertexInputAttributeDescription(
+        i - 1,
+        0,
+        typeformat(fieldtype(T, field)),
+        fieldoffset(T, i)
+      )),
+      fields
     )
   )
 end
+
+function vertex_input_state(T)
+  vertex_input_state(T, fieldnames(T))
+end
+
 
 function aggregatedsets(system, config)
   [

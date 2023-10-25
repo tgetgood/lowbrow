@@ -231,16 +231,16 @@ function mapindexed(f::Function)
     function inner(result)
       emit(result)
     end
-    function inner(result, next)
+    function inner(result, next...)
       index += 1
-      emit(result, f(next, index))
+      emit(result, f(index, next...))
     end
     inner
   end
 end
 
-function mapindexed(f::Function, xs::Union{Base.Vector, Sequential})
-  into(empty(xs), mapindexed(f), xs)
+function mapindexed(f::Function, xs::Union{Base.Vector, Sequential}...)
+  into(empty(xs), mapindexed(f), xs...)
 end
 
 function filter(p::Function)

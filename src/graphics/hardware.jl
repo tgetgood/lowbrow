@@ -72,7 +72,7 @@ end
 function findtransferqueue(device)
   transferqs = into(
     emptyvector,
-    ds.mapindexed((x, i) -> (x, i - 1))
+    ds.mapindexed((i, x) -> (x, i - 1))
     ∘
     filter(x -> (x[1].queue_flags & vk.QUEUE_TRANSFER_BIT).val > 0)
     ,
@@ -107,7 +107,7 @@ end
 function findcomputequeue(device)
   computeqs = into(
     emptyvector,
-    ds.mapindexed((x, i) -> (x, i - 1))
+    ds.mapindexed((i, x) -> (x, i - 1))
     ∘
     filter(x -> (x[1].queue_flags & vk.QUEUE_COMPUTE_BIT).val > 0)
     ,
@@ -382,7 +382,7 @@ function findmemtype(system, config)
 
   mt = into(
     [],
-    ds.mapindexed((x, i) -> (x, i-1))
+    ds.mapindexed((i, x) -> (x, i-1))
     ∘ filter(x -> (mask & (1 << x[2])) > 0)
     ∘ filter(x -> (x[1].property_flags & flags) == flags)
     ,
