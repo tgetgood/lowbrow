@@ -7,19 +7,8 @@ import DataStructures as ds
 import hardware as hw
 import commands
 
-struct Vertex
-  position::NTuple{3, Float32}
-  colour::NTuple{3, Float32}
-  texuture_coordinates::NTuple{2, Float32}
-end
-
-function vert(pos, colour, tex)
-  Vertex(tuple(pos...), tuple(colour...), tuple(tex...))
-end
-
-function verticies(xs)::Vector{Vertex}
-  ds.into([], map(x -> vert(x...)), xs)
-end
+# TODO: These buffers should both use SHARING_MODE_EXCLUSIVE and be returned
+# after transfer to the graphics queue.
 
 function vertexbuffer(system, data)
   buffer = hw.buffer(
@@ -82,10 +71,6 @@ function indexbuffer(system, xs)
       :verticies, length(indicies),
       :type, T == UInt16 ? vk.INDEX_TYPE_UINT16 : vk.INDEX_TYPE_UINT32)
   )
-end
-
-function configure(config)
-  ds.update(config, :vertex_data, verticies)
 end
 
 end # module

@@ -23,6 +23,18 @@ function pack(x::MVP)
   vcat(x.model..., x.view..., x.projection...)
 end
 
+const descriptors = [ds.hashmap(
+  :eltype, MVP,
+  :size, 1,
+  :memory_mapped, true,
+  :buffer, ds.hashmap(
+    :usage, vk.BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    :queues, [:graphics],
+    :memoryflags, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT |
+                  vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
+  )
+)]
+
 function configure(config)
   ds.update(config, :ubo, ubo)
 end
@@ -110,6 +122,22 @@ function setubo!(config, buffer)
   u2 = MVP(u.model, u.view, tuple(p...))
 
   unsafe_copyto!(get(buffer, :memptr), pointer([u2]), 1)
+end
+
+function timerotate(u)
+  u = u[1]
+  t = time()
+  c = cos(t)
+  s = sin(t)
+
+  p::Matrix{Float32} = [
+    c 0 s 0
+    0 1 0 0
+    -s 0 c 0.6
+    0 0 0 1
+  ]
+
+  [MVP(u.model, u.view, tuple(p...))]
 end
 
 end

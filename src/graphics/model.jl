@@ -1,9 +1,6 @@
 module model
 
 import DataStructures as ds
-import hardware as hw
-import commands
-import vertex
 import Vulkan as vk
 
 struct Vertex
@@ -48,15 +45,13 @@ function gather((vmap, indicies), f)
 end
 gather(x) = x
 
-function load(system, config)
-  filename = get(config, :model_file)
-
+function load(filename)
   objs = typesort(eachline(filename))
 
   vs = tofloat(get(objs, "v"))
   ts = tofloat(get(objs, "vt"))
 
-  (vmap, indicies) = ds.transduce(
+  (vmap, indicies::Vector{UInt}) = ds.transduce(
     ds.cat()
     ∘
     map(x -> split(x, "/"))
@@ -74,15 +69,7 @@ function load(system, config)
     verticies[ds.val(e)+1] = ds.key(e)
   end
 
-  ds.merge(
-    vertex.vertexbuffer(system, verticies),
-    vertex.indexbuffer(system, ds.into(Vector{UInt}(), indicies))
-  )
-end
-
-function profile(system, config)
-  @time load(system, config)
-  nothing
+  ds.hashmap(:verticies, verticies, :indicies, indicies)
 end
 
 end

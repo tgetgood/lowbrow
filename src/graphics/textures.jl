@@ -21,47 +21,7 @@ function bgr(p)
   )
 end
 
-function profile(system, config, k = 18)
-  dev = get(system, :device)
-
-  image = load(get(config, :texture_file))
-
-  for i in 1:k
-    print(string(2^i) * ": ")
-    @time rgb::Vector{UInt8} = ds.into(
-      ds.emptyvector,
-      map(bgr)
-      ∘
-      ds.inject(ds.repeat(ds.conj(ds.emptyvector, 0xff)))
-      ∘
-      ds.interleave()
-      ∘
-      ds.cat(),
-      image[1:2^i]
-    )
-    nothing
-  end
-end
-
-function profile2(system, config, k=20)
-  dev = get(system, :device)
-
-  image = load(get(config, :texture_file))
-
-  for i in 1:k
-    print(string(2^i)*": ")
-    @time rgb::Vector{UInt8} = reduce(vcat,
-      map(p -> [
-          reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r),
-          0xff
-        ],
-        image[1:2^i]
-      )
-    )
-  end
-end
-
-function generatemipmaps(vkim, system, config)
+function generatemipmaps(vkim, system)
 
   props = vk.get_physical_device_format_properties(
     get(system, :physicaldevice),
@@ -203,7 +163,7 @@ function textureimage(system, config)
 
   end
 
-  generatemipmaps(vkim, system, config)
+  generatemipmaps(vkim, system)
 
   view = hw.imageview(
     system,
