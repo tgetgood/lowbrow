@@ -40,7 +40,7 @@ function allocatebuffers(system, config)
                       vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
       )))
       ∘ map(x -> ds.assoc(x,
-        :memptr, Ptr{Float32}(vk.unwrap(vk.map_memory(
+        :memptr, Ptr{MVP}(vk.unwrap(vk.map_memory(
           get(system, :device), get(x, :memory), 0, get(x, :size)
         )))
       )),
@@ -109,7 +109,7 @@ function setubo!(config, buffer)
 
   u2 = MVP(u.model, u.view, tuple(p...))
 
-  unsafe_copyto!(get(buffer, :memptr), pointer(pack(u2)), 48)
+  unsafe_copyto!(get(buffer, :memptr), pointer([u2]), 1)
 end
 
 end

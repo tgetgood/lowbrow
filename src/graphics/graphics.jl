@@ -157,7 +157,7 @@ function staticinit(config)
     # (x, y) -> vertex.vertexbuffer(x, get(y, :vertex_data)),
     # (x, y) -> vertex.indexbuffer(x, get(y, :indicies)),
     uniform.allocatebuffers,
-    uniform.allocatesets,
+    # uniform.allocatesets,
     textures.textureimage,
     textures.allocatesets,
   ]
