@@ -5,7 +5,7 @@ struct PersistentQueue <: Queue
   back
 end
 
-emptyqueue = PersistentQueue(emptyvector, emptyvector)
+const emptyqueue = PersistentQueue(emptyvector, emptyvector)
 
 function queue(seq)
   PersistentQueue(seq, emptyqueue)
@@ -54,7 +54,7 @@ struct ClosedQueue <: Queue
   elements
 end
 
-closedempty = ClosedQueue(emptyqueue)
+const closedempty = ClosedQueue(emptyqueue)
 
 function closedp(q::ClosedQueue)
   true
