@@ -11,14 +11,8 @@ import Vulkan as vk
 import DataStructures as ds
 import DataStructures: hashmap, emptymap
 
-x = pi/3
 function configure()
   staticconfig = hashmap(
-    :shaders, hashmap(
-      :vertex, "ex1.vert",
-      :fragment, "ex1.frag",
-      # :compute, "particles.comp"
-    ),
     :instance, hashmap(
       :extensions, ["VK_EXT_debug_utils"],
       :validation, ["VK_LAYER_KHRONOS_validation"]
@@ -31,58 +25,20 @@ function configure()
     :debuglevel, vk.DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
     :window, hashmap(:width, 1600, :height, 1200),
     :swapchain, hashmap(
+      # TODO: Fallback formats and init time selection.
       :format, vk.FORMAT_B8G8R8A8_SRGB,
       :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
       :presentmode, vk.PRESENT_MODE_FIFO_KHR,
       :images, 2
     ),
-    :concurrent_frames, 2,
-    :particles, hashmap(
-      :count, 4096
-    ),
-    :vertex_data, [
-      [[-0.6, -0.6, 0.3], [1, 0, 0], [0, 0]],
-      [[0.5, -0.5, 0.3], [0, 1, 0], [1, 0]],
-      [[0.3, 0.3, 0.3], [0, 0, 1], [1, 1]],
-      [[-0.5, 0.5, 0.3], [1, 1, 1], [0, 1]],
-
-      # [[-0.5, -0.5, 0.7], [1, 1, 1], [0, 0]],
-      # [[0.5, -0.5, 0.7], [0, 1, 0], [1, 0]],
-      # [[0.5, 0.5, 0.7], [0, 1, 0], [1, 1]],
-      # [[-0.5, 0.5, 0.7], [0, 0, 1], [0, 1]],
-    ],
-    :indicies, [
-      0, 3, 2, 2, 1, 0,
-      # 4, 5, 6, 6, 7, 4,
-    ],
-    :texture_file, *(@__DIR__, "/../../assets/viking_room.png"),
-    :model_file, *(@__DIR__, "/../../assets/viking_room.obj"),
-    :ubo, hashmap(
-      :model, [
-        1 0 0 0
-        0 1 0 0
-        0 0 1 0
-        0 0 0 1
-      ],
-      :view, [
-        1 0 0 0
-        0 cos(x) -sin(x) 0
-        0 sin(x) cos(x) 0
-        0 0 0 1
-      ],
-      :projection, [
-        1 0 0 0
-        0 1 0 0
-        0 0 1 0
-        0 0 0 1
-      ]
-    )
+    :concurrent_frames, 2
   )
 
-  ds.reduce((s, f) -> f(s), staticconfig, [
+  config = merge(staticconfig, vertex.program)
+
+  ds.reduce((s, f) -> f(s), config, [
     window.configure,
-    debug.configure,
-    uniform.configure
+    debug.configure
   ])
 end
 
@@ -95,12 +51,13 @@ function staticinit(config)
     hw.createdevice,
     hw.createcommandpools,
     hw.createdescriptorpools,
-    gp.shaders,
+    # gp.shaders,
     # model.load,
     draw.commandbuffers,
-    uniform.allocatebuffers,
-    textures.textureimage,
-    textures.allocatesets,
+    # TODO: There's so much config in the renderpass, it shouldn't be hardcoded.
+    # uniform.allocatebuffers,
+    # textures.textureimage,
+    # textures.allocatesets,
   ]
 
   ds.reduce((s, f) -> begin @info f; merge(s, f(s, config)) end, emptymap, steps)
@@ -114,11 +71,11 @@ function dynamicinit(system, config)
     hw.createswapchain,
     hw.createimageviews,
     gp.renderpass,
-    gp.createpipelines,
+    gp.creategraphicspipeline,
     gp.createframebuffers,
   ]
 
-  ds.reduce((s, f) -> merge(s, f(s, config)), system, steps)
+  ds.reduce((s, f) -> begin @info f; merge(s, f(s, config)) end, system, steps)
 end
 
 # FIXME: These should be inside `main`, but it's convenient for repl purposes to
@@ -130,21 +87,15 @@ system = dynamicinit(system, config)
 
 @info "Ready"
 
-function dsets(system, config, i)
-  ubuff = get(system, :uniformbuffers)[i+1]
-  dset = [
-    ds.getin(system, [:dsets, :descriptorsets])[i+1],
-  ]
-
-  (ubuff, dset)
-end
-
 function main(system, config, program=ds.emptymap)
   sigkill = Channel()
 
   # The number of some types of Vulkan objects that can be created is
   # limited. Make sure finalisers run to clean up between iterations.
   GC.gc()
+
+  configcache = config
+  renderstate = vertex.assemblerender(system, config)
 
   handle = Threads.@spawn begin
     try
@@ -156,15 +107,19 @@ function main(system, config, program=ds.emptymap)
       while !window.closep(get(system, :window)) && !isready(sigkill)
         window.poll()
 
-        (ubuff, dset) = dsets(system, config, i)
+        if config !== configcache
+          renderstate = vertex.assemblerender(system, config)
+          configcache = config
+        end
 
         if !window.minimised(get(system, :window))
-          uniform.setubo!(config, ubuff)
-          res = draw.draw(system, buffers[i+1], dset)
+          res = draw.draw(system, buffers[i+1], renderstate)
 
           if res == vk.ERROR_OUT_OF_DATE_KHR ||
              res == vk.SUBOPTIMAL_KHR ||
              get(system, :resizecb)()
+
+            system = ds.assoc(system, :window_size, window.size(get(system, :window)))
             system = dynamicinit(system, config)
           end
           i = (i + 1) % get(config, :concurrent_frames)

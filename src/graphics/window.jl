@@ -49,17 +49,16 @@ function createwindow(system, config)
   glfw.WindowHint(glfw.RESIZABLE, true)
   glfw.WindowHint(glfw.REFRESH_RATE, glfw.DONT_CARE)
 
-  window = glfw.CreateWindow(
-    getin(config, [:window, :width]),
-    getin(config, [:window, :height]),
-    "not quite a browser"
-  )
+  width = getin(config, [:window, :width])
+  height = getin(config, [:window, :height])
+
+  window = glfw.CreateWindow(width, height, get(config, :name, "dev"))
 
   ch = Channel()
 
   glfw.SetFramebufferSizeCallback(window, resizecb(ch))
 
-  hashmap(:window, window, :resizecb, resized(ch))
+  hashmap(:window, window, :resizecb, resized(ch), :window_size, (;width, height))
 end
 
 function createsurface(system, config)

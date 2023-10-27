@@ -1,6 +1,5 @@
 module hardware
 
-import window
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
@@ -34,14 +33,14 @@ function instance(_, config)
     v"0.0.0",
     v"0.0.0",
     v"1.3";
-    application_name="brow",
-    engine_name="integrated"
+    application_name=get(config, :name, "dev"),
+    engine_name="TBD"
   )
 
   inst = vk.unwrap(vk.create_instance(
     validationlayers,
     extensions;
-    next=ds.containsp(config, :debuginfo) ? get(config, :debuginfo) : C_NULL,
+    next=get(config, :debuginfo, C_NULL),
     application_info=appinfo
   ))
 
@@ -198,7 +197,7 @@ function findextent(system, config)
     get(system, :surface)
   ))
 
-  win = window.size(get(system, :window))
+  win = get(system, :window_size)
 
   vk.Extent2D(
     clamp(win.width, sc.min_image_extent.width, sc.max_image_extent.width),
@@ -346,39 +345,6 @@ function createcommandpools(system, config)
         )),
       qfs
     ))
-  )
-end
-
-"""
-Returns Vector{DescriptorSetLayoutBinding} for data of `types` at `stages`.
-
-Three different aspects of the render have to come together for descriptors: the
-actual data blobs, the use to which each blob will be put, and the stages at
-which it will be used.
-
-The second two are essentially static in a given pipeline and can be computed
-ahead of time.
-"""
-function descriptorsetlayout(types, stages)
-  into([], ds.mapindexed((i, type, stage) -> vk.DescriptorSetLayoutBinding(
-      i - 1, type, stage; descriptor_count=1
-    )),
-    types, stages)
-end
-
-"""
-Returns a DescriptorPoolCreateInfo appropriate to the given layout and config.
-"""
-function descriptorpool(layout, config)
-  frames = get(config, :concurrent_frames)
-  vk.DescriptorPoolCreateInfo(
-    frames * length(layout),
-    into([], map(x -> vk.DescriptorPoolSize(
-        x.descriptor_type,
-        x.descriptor_count * frames
-      )),
-      layout
-    )
   )
 end
 

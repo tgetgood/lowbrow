@@ -1,7 +1,8 @@
 module pipeline
 
-import window
 import hardware as hw
+import resources
+
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, mapindexed
@@ -27,13 +28,16 @@ const shadertypes = hashmap(
 )
 
 function shaders(system, config)
-  hashmap(:shaders,
-    map(e -> (ds.key(e), vk.PipelineShaderStageCreateInfo(
-        get(shadertypes, ds.key(e)),
-        compileshader(system, ds.val(e)),
-        "main" # TODO: This should be overridable
-      )),
-      get(config, :shaders)))
+  # FIXME: This only allows one shader of a given type per pipeline. That's
+  # probably wrong.
+  into(
+    [],
+    map(e -> vk.PipelineShaderStageCreateInfo(
+      get(shadertypes, ds.key(e)),
+      compileshader(system, ds.val(e)),
+      "main" # TODO: This should be overridable
+    )),
+    get(config, :shaders))
 end
 
 function renderpass(system, config)
@@ -103,12 +107,11 @@ function renderpass(system, config)
   )
 end
 
-
 function channels(n, w)
   ds.reduce(*, "", ds.take(n, map(s -> s*w, ["R", "G", "B", "A"])))
 end
 
-typenames = hashmap(
+const typenames = hashmap(
   Signed, "SINT",
   Unsigned, "UINT",
   AbstractFloat, "SFLOAT"
@@ -157,14 +160,19 @@ function vertex_input_state(T)
   vertex_input_state(T, fieldnames(T))
 end
 
+function pipelinelayout(system, config)
+  dev = get(system, :device)
 
-function aggregatedsets(system, config)
-  [
-    ds.getin(system, [:dsets, :descriptorsetlayout])
-   ]
+  dl = vk.unwrap(vk.create_descriptor_set_layout(
+    dev,
+    resources.descriptorsetlayout(get(config, :bindings, []))
+  ))
+
+  vk.unwrap(vk.create_pipeline_layout(dev, [dl], []))
+
 end
 
-function createpipelines(system, config)
+function creategraphicspipeline(system, config)
   dynamic_state = vk.PipelineDynamicStateCreateInfo([
     vk.DYNAMIC_STATE_SCISSOR,
     vk.DYNAMIC_STATE_VIEWPORT
@@ -175,7 +183,7 @@ function createpipelines(system, config)
     false
   )
 
-  win = window.size(get(system, :window))
+  win = get(system, :window_size)
 
   viewports = [vk.Viewport(0, 0, win.width, win.height, 0, 1)]
   scissors = [vk.Rect2D(vk.Offset2D(0, 0), get(system, :extent))]
@@ -214,12 +222,6 @@ function createpipelines(system, config)
     NTuple{4, Float32}((0,0,0,0))
   )
 
-  layout = vk.unwrap(vk.create_pipeline_layout(
-    get(system, :device),
-    aggregatedsets(system, config),
-    []
-  ))
-
   stencil_stub = vk.StencilOpState(
     vk.StencilOp(0),
     vk.StencilOp(0),
@@ -241,16 +243,17 @@ function createpipelines(system, config)
     1
   )
 
-  shaders = ds.vals(ds.selectkeys(get(system, :shaders), [:vertex, :fragment]))
+  layout = pipelinelayout(system, config)
+
   ps = vk.unwrap(vk.create_graphics_pipelines(
     get(system, :device),
     [vk.GraphicsPipelineCreateInfo(
-      shaders,
+      shaders(system, config),
       vk.PipelineRasterizationStateCreateInfo(
         false,
         false,
         vk.POLYGON_MODE_FILL,
-        vk.FRONT_FACE_COUNTER_CLOCKWISE,
+        vk.FRONT_FACE_CLOCKWISE,
         false,
         0.0, 0.0, 0.0,
         1.0;
@@ -259,8 +262,10 @@ function createpipelines(system, config)
       layout,
       0,
       -1;
-      vertex_input_state=vertex_input_state(ds.getin(system, [:vertexbuffer, :type])),
-     input_assembly_state,
+      vertex_input_state=vertex_input_state(
+        ds.getin(config, [:verticies, :type])
+      ),
+      input_assembly_state,
       viewport_state,
       multisample_state,
       color_blend_state,
