@@ -104,6 +104,8 @@ end
 
   @test assoc(emptyhashmap, a, 1) == assoc(emptyhashmap, c, 1)
 
+  @test merge(c, c) == c
+
 end
 
 @testset "merging maps" begin

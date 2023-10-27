@@ -397,9 +397,15 @@ function addtomap(m::PersistentHashNode, e::MapEntry, _=0)
   PersistentHashNode(ht, m.level, m.count + 1)
 end
 
-function addtomap(m::EmptyMarker, e::MapEntry, _)
-  e
-end
+addtomap(x::MapEntry, y::PersistentHashNode, l) = addtomap(y, x, l)
+
+addtomap(m::PersistentHashNode, e::EmptyMarker, _=0) = m
+addtomap(e::EmptyMarker, m::PersistentHashNode, _=0) = m
+
+addtomap(m::EmptyMarker, e::MapEntry, _=0) = e
+addtomap(e::MapEntry, m::EmptyMarker, _=0) = e
+
+addtomap(x::EmptyMarker, y::EmptyMarker, _=0) = x
 
 function addtomap(e1::MapEntry, e2::MapEntry, l)
   if key(e1) == key(e2)
@@ -418,6 +424,30 @@ function conj(m::PersistentHashMap, e::MapEntry)
   end
 end
 
+function addtomap(x::PersistentHashNode, y::PersistentHashNode, l)
+  ht = Base.Vector{MapNode}(undef, nodelength)
+
+  for i in 1:nodelength
+    ht[i] = addtomap(x.ht[i], y.ht[i], l)
+  end
+
+  PersistentHashNode(ht, l, sum(count, ht))
+end
+
+function merge(x::PersistentHashMap, y::PersistentHashMap)
+  PersistentHashMap(addtomap(x.root, y.root, 1))
+end
+
+merge(x::PersistentArrayMap, y::PersistentHashMap ) = into(y, x)
+merge(x::PersistentHashMap,  y::PersistentArrayMap) = into(x, y)
+
+merge() = emptymap
+# REVIEW: There's a more efficient way to merge N hashmaps in one downward
+# pass. Currently I'm not seeing merge performance as any kind of bottleneck,
+# but this is the kind of thing a more mature datastructures lib would think
+# about.
+merge(xs::Map...) = reduce(merge, xs)
+
 function dissoc(m::PersistentHashMap, k)
   throw("not implemented")
 end
@@ -429,29 +459,6 @@ gather(acc, m::PersistentHashNode) = reduce(gather, acc, m.ht)
 function seq(m::PersistentHashMap)
   gather(emptyvector, m.root)
 end
-
-# REVIEW: There's a more efficient way to merge N hashmaps in one downward
-# pass. Currently I'm not seeing merge performance as any kind of bottleneck,
-# but this is the kind of thing a more mature datastructures lib would think
-# about.
-# Something like:
-# function merge(x::PersistentHashMap, y::PersistentHashMap)
-#   ht = []
-#   for i in 1::nodelength
-#     if x.ht[i] == y.ht[i]
-#       ht[i] = x.ht[i]
-#     else
-#       ht[i] = merge(x.ht[i], y.ht[i])
-#     end
-#   end
-#   PersistentHashMap(PersistentHashNode(ht, sum(count, m.ht), x.level))
-# end
-
-merge(x::PersistentArrayMap, y::PersistentHashMap ) = into(y, x)
-merge(x::PersistentHashMap,  y::PersistentArrayMap) = into(x, y)
-
-merge() = emptymap
-merge(xs::Map...) = reduce(merge, xs)
 
 function selectkey(m::Map, k)
   v = get(m, k, emptymarker)

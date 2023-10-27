@@ -214,12 +214,15 @@ function map(f::Function)
     function inner(result, next)
       emit(result, f(next))
     end
+    function inner(result, next...)
+      emit(result, f(next...))
+    end
     inner
   end
 end
 
-function map(f, xs::Sequential)
-  into(empty(xs), map(f), xs)
+function map(f, xs::Sequential...)
+  into(empty(xs), map(f), xs...)
 end
 
 function mapindexed(f::Function)
