@@ -78,6 +78,12 @@ end
     (vector(1, 2, 3), assoc(emptyhashmap, :some, "string"))]
   )
 
+  m = emptyhashmap
+  m = conj(m, (1,2))
+  m = conj(m, (1,2))
+
+  @test count(m) == 1
+
   @test get(c, [1,2,3]) === Base.Vector
   @test get(c, "string") === complex(1f0, 13f-2)
   @test getin(c, [vec(1:3), :some]) == "string"

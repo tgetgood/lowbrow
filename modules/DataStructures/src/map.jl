@@ -384,6 +384,11 @@ function getindexed(m::PersistentHashMap, k, default=nil)
   getindexed(m.root, k, default, 1)
 end
 
+function containsp(m::PersistentHashNode, e::MapEntry)
+  (v, i) = getindexed(m, key(e), :notfound, m.level)
+  i !== :notfound && v == val(e)
+end
+
 assoc(m::PersistentHashMap, k, v) = conj(m, MapEntry(k, v))
 
 function addtomap(m::PersistentHashNode, e::MapEntry, _=0)
@@ -394,7 +399,7 @@ function addtomap(m::PersistentHashNode, e::MapEntry, _=0)
   ht = copy(m.ht)
   ht[h] = submap
 
-  PersistentHashNode(ht, m.level, m.count + 1)
+  PersistentHashNode(ht, m.level, sum(count, ht))
 end
 
 addtomap(x::MapEntry, y::PersistentHashNode, l) = addtomap(y, x, l)

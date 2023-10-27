@@ -221,8 +221,12 @@ function map(f::Function)
   end
 end
 
-function map(f, xs::Sequential...)
-  into(empty(xs), map(f), xs...)
+function map(f, xs::Sequential)
+  into(empty(xs), map(f), xs)
+end
+
+function map(f, xs::Sequential, more::Sequential...)
+  into(empty(xs), map(f), xs, more...)
 end
 
 function mapindexed(f::Function)
