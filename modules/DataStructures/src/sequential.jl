@@ -157,24 +157,32 @@ concat(xs, ys) = into(xs, ys)
 # downstream computation the first time `p` evaluates to `false`. I think that's
 # the correct behaviour, but it's still weird...
 function every(p)
+  started = false
   aborted = false
   function (emit)
     function inner()
       emit()
     end
     function inner(result)
-      if aborted
+      # Universal quantification over the empty set
+      if !started
+        # REVIEW: `true` might be the wrong thing to return here. I don't know.
+        # I think I'll need to bump into this particular corner before I know
+        # how to fix it.
+        emit(true)
+      elseif aborted
         emit(none)
       else
         emit(result)
       end
     end
-    function inner(result, next)
-      if p(next)
-        emit(result, next)
+    function inner(result, next...)
+      started = true
+      if p(next...)
+        emit(result, next...)
       else
         aborted = true
-        reduced(none, next)
+        reduced(none, next...)
       end
     end
     return inner
@@ -182,8 +190,23 @@ function every(p)
 end
 
 lastarg(xs...) = xs[end]
-every(p, xs) = emptyp(xs) ||
-               transduce(every(p), lastarg, :falsemarker, xs) !== :falsemarker
+
+function every(p, xs...)
+  marker = gensym()
+  transduce(every(p), lastarg, marker, xs...) !== marker
+end
+
+# REVIEW: I could make this a transducer, but do I have any use for that?
+#
+# Early abort seems like it would be incorrect in this case since we want the
+# downstream computation to consume the entire input stream even if `any` is
+# good to return after the first element.
+#
+# This is the first time I've come across a transducer whose behaviour might be
+# different if it has a downstream computation vs not having one. That's a
+# little unsettling. It violates the autonomy from within of the computational
+# units.
+any(p, xs::Sequential...) = !every(!p, xs...)
 
 function cat()
   function (emit)

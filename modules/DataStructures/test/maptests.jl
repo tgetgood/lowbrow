@@ -78,6 +78,8 @@ end
     (vector(1, 2, 3), assoc(emptyhashmap, :some, "string"))]
   )
 
+  @test c == merge(c,c)
+
   m = emptyhashmap
   m = conj(m, (1,2))
   m = conj(m, (1,2))

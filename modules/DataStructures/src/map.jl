@@ -483,18 +483,14 @@ function selectkeys(m::Map, ks)
 end
 
 function Base.:(==)(x::PersistentHashMap, y::PersistentHashMap)
-  if count(x) !== count(y)
-    return false
-  else
-    every(t -> t[1] == t[2], zip(x.root.ht, y.root.ht))
-  end
+  x.root == y.root
 end
 
 function Base.:(==)(x::PersistentHashNode, y::PersistentHashNode)
   if count(x) !== count(y)
     return false
   else
-    every(t -> t[1] == t[2], zip(x.ht, y.ht))
+    every(==, x.ht, y.ht)
   end
 end
 
