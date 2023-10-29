@@ -612,7 +612,7 @@ function showseq(io, depth, seq)
 end
 
 function showrecur(io::IO, depth, x::Base.Vector)
-  print(io, string(count(x)) * "-element Base.Vector: [\n")
+  print(io, string(count(x)) * "-element " * string(typeof(x)) * ": [\n")
   indent(io, depth)
 
   showseq(io, depth, x)

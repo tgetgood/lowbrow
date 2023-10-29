@@ -192,7 +192,7 @@ function showrecur(io::IO, depth, m::EmptyMap)
 end
 
 function showrecur(io::IO, depth, m::Map)
-  print(io, string(count(m)) * "-element DataStructures.Map: {\n")
+  print(io, string(count(m)) * "-element PersistentMap: {\n")
   indent(io, depth)
 
   s = seq(m)

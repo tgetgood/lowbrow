@@ -461,7 +461,7 @@ function showrecur(io::IO, depth, _::EmptyVector)
 end
 
 function showrecur(io::IO, depth, v::Vector)
-  print(io, string(count(v)) * "-element DataStructures.Vector: [\n")
+  print(io, string(count(v)) * "-element PersistentVector{" * string(eltype(v)) * "}: [\n")
   indent(io, depth)
 
   # REVIEW: Why 33? Because it had to be something...
