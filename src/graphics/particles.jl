@@ -84,3 +84,12 @@ function buffers(system, config)
 
   hashmap(:particle_buffers, into(ds.vec(ubometa), ssbos))
 end
+
+config = hashmap(
+  :particles, 4096,
+  :shaders, hashmap(
+    :vertex, "particles.vert",
+    :fragment, "particles.frag",
+    :compute, "particles.comp"
+  ),
+)

@@ -37,7 +37,7 @@ end
 """
 Returns a DescriptorPoolCreateInfo appropriate to the given layout and config.
 """
-function descriptorpool(layout, frames=1)
+function descriptorpool(layout, frames)
   vk.DescriptorPoolCreateInfo(
     frames * length(layout.bindings),
     into([], map(x -> vk.DescriptorPoolSize(
@@ -46,6 +46,28 @@ function descriptorpool(layout, frames=1)
       )),
       layout.bindings
     )
+  )
+end
+
+function descriptorsetallocate(layout, frames)
+  v
+end
+
+rasterizationstatedefaults = ds.hashmap(
+)
+
+function rasterizationstate(config)
+  config = merge(rasterizationstatedefaults, config)
+
+  vk.PipelineRasterizationStateCreateInfo(
+    false,
+    false,
+    vk.POLYGON_MODE_FILL,
+    vk.FRONT_FACE_CLOCKWISE,
+    false,
+    0.0, 0.0, 0.0,
+    1.0;
+    cull_mode=vk.CULL_MODE_BACK_BIT
   )
 end
 

@@ -161,15 +161,10 @@ function vertex_input_state(T)
 end
 
 function pipelinelayout(system, config)
+  dl = get(config, :descriptorsetlayout)
   dev = get(system, :device)
 
-  dl = vk.unwrap(vk.create_descriptor_set_layout(
-    dev,
-    resources.descriptorsetlayout(get(config, :bindings, []))
-  ))
-
   vk.unwrap(vk.create_pipeline_layout(dev, [dl], []))
-
 end
 
 function creategraphicspipeline(system, config)
@@ -253,7 +248,7 @@ function creategraphicspipeline(system, config)
         false,
         false,
         vk.POLYGON_MODE_FILL,
-        vk.FRONT_FACE_CLOCKWISE,
+        vk.FRONT_FACE_COUNTER_CLOCKWISE,
         false,
         0.0, 0.0, 0.0,
         1.0;
@@ -263,7 +258,7 @@ function creategraphicspipeline(system, config)
       0,
       -1;
       vertex_input_state=vertex_input_state(
-        ds.getin(config, [:verticies, :type])
+        ds.getin(config, [:model, :vertex_type])
       ),
       input_assembly_state,
       viewport_state,

@@ -16,11 +16,17 @@ fnil(f, default) = (acc, x) -> x === nothing ? f(acc, default) : f(acc, x)
 
 function typesort(lines)
   res = ds.emptymap
+  l = 1
   for line in lines
+    l = line
     s = split(line, " ")
     tag = first(s)
     val = ds.rest(s)
-    res = ds.update(res, tag, fnil(ds.conj, ds.emptyvector), val)
+    if !ds.containsp(res, tag)
+      res = ds.assoc(res, tag, ds.vector(val))
+    else
+      res = ds.assoc(res, tag, ds.conj(get(res, tag), val))
+    end
   end
   return res
 end
@@ -45,13 +51,14 @@ function gather((vmap, indicies), f)
 end
 gather(x) = x
 
-function load(filename)
+function load(config)
+  filename = ds.getin(config, [:model, :file])
   objs = typesort(eachline(filename))
 
   vs = tofloat(get(objs, "v"))
   ts = tofloat(get(objs, "vt"))
 
-  (vmap, indicies::Vector{UInt}) = ds.transduce(
+  (vmap, indicies) = ds.transduce(
     ds.cat()
     ∘
     map(x -> split(x, "/"))
@@ -69,7 +76,13 @@ function load(filename)
     verticies[ds.val(e)+1] = ds.key(e)
   end
 
-  ds.hashmap(:verticies, verticies, :indicies, indicies)
+  if length(verticies) < typemax(UInt16)
+    T = UInt16
+  else
+    T = UInt32
+  end
+
+  ds.hashmap(:verticies, verticies, :indicies, convert(Vector{T}, indicies))
 end
 
 end

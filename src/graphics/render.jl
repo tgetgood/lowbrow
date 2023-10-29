@@ -86,7 +86,7 @@ function recorder(cmd, framebuffer, config)
         vk.PIPELINE_BIND_POINT_GRAPHICS,
         get(config, :pipelinelayout),
         0,
-        descriptorsets,
+        [descriptorsets[1]],
         []
       )
     end

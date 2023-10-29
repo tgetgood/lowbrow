@@ -88,10 +88,10 @@ function generatemipmaps(vkim, system)
   end
 end
 
-function textureimage(system, config)
+function textureimage(system, config, opt)
   dev = get(system, :device)
 
-  image = load(get(config, :texture_file))
+  image = load(get(opt, :texture_file))
 
   pixels = reduce(*, size(image))
 
@@ -178,70 +178,4 @@ function textureimage(system, config)
   )
 end
 
-# TODO: The uniform and texture sampler are confounded here. They need to be
-# allocated together, so that should happen around pipeline creation from specs
-# created elsewhere.
-function allocatesets(system, config)
-  dev = get(system, :device)
-
-  layout = vk.unwrap(vk.create_descriptor_set_layout(
-    dev,
-    [vk.DescriptorSetLayoutBinding(
-        0,
-        vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        vk.SHADER_STAGE_VERTEX_BIT;
-        descriptor_count=1
-      ),
-      vk.DescriptorSetLayoutBinding(
-        1,
-        vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        vk.SHADER_STAGE_FRAGMENT_BIT;
-        descriptor_count=1
-      )]
-  ))
-
-  dsets = vk.unwrap(vk.allocate_descriptor_sets(
-    dev,
-    vk.DescriptorSetAllocateInfo(get(system, :descriptorpool), [layout, layout])
-  ))
-
-  sam = get(system, :sampler)
-  image = get(system, :textureimageview)
-
-   map(x -> vk.update_descriptor_sets(
-    dev,
-    [vk.WriteDescriptorSet(
-        x[1],
-        0,
-        0,
-        vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        [],
-        [vk.DescriptorBufferInfo(0, get(x[2], :size); buffer=get(x[2], :buffer))],
-        []
-      ),
-      vk.WriteDescriptorSet(
-        x[1],
-        1,
-        0,
-        vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        [vk.DescriptorImageInfo(
-          sam, image, vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        )],
-        [],
-        []
-      )
-    ],
-    []
-  ),
-  zip(dsets, get(system, :uniformbuffers))
-  )
-
-  ds.hashmap(
-    :dsets, ds.hashmap(
-      :descriptorsetlayout, layout,
-      :descriptorsets, dsets
-    )
-  )
-end
-
-end
+end #module

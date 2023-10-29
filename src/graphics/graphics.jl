@@ -7,6 +7,9 @@ import render as draw
 import debug
 import window
 import textures
+import framework as fw
+import viking
+
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: hashmap, emptymap
@@ -34,7 +37,7 @@ function configure()
     :concurrent_frames, 2
   )
 
-  config = merge(staticconfig, vertex.program)
+  config = merge(staticconfig, viking.program)
 
   ds.reduce((s, f) -> f(s), config, [
     window.configure,
@@ -49,8 +52,18 @@ function staticinit(config)
     window.createwindow,
     window.createsurface,
     hw.createdevice,
+
+    # This ^ is the core setup.
+    #
+    # We need to break the config up logically so that we perform 4
+    # negotiations.
+    # 1. Negotiate the instance, AKA choose the best API version and
+    # extensions that are available.
+    # 2. Negotiate with the window tool (GLFW, et al.)
+    # 3.
+
     hw.createcommandpools,
-    hw.createdescriptorpools,
+    # hw.createdescriptorpools,
     # gp.shaders,
     # model.load,
     draw.commandbuffers,
@@ -83,9 +96,8 @@ end
 
 config = configure()
 system = staticinit(config)
-system = dynamicinit(system, config)
 
-@info "Ready"
+@info "Static Loaded"
 
 function main(system, config, program=ds.emptymap)
   sigkill = Channel()
@@ -94,17 +106,35 @@ function main(system, config, program=ds.emptymap)
   # limited. Make sure finalisers run to clean up between iterations.
   GC.gc()
 
+  @info "loading model"
+  config = fw.model(system, config)
+
+  @info "loading descriptors"
+  config = fw.descriptors(system, config)
+
+  system = dynamicinit(system, config)
+
+  @info "loading buffers"
+  config = fw.buffers(system, config)
+
+  @info "binding descriptors"
+  fw.binddescriptors(system, config)
+
+  frameupdater = fw.frameupdater(system, config)
+
   configcache = config
-  renderstate = vertex.assemblerender(system, config)
+  renderstate = fw.assemblerender(system, config)
 
   handle = Threads.@spawn begin
     try
       @info "starting main loop"
       buffers = get(system, :commandbuffers)
       i = 0
-      frames = 0
+      frames = get(config, :concurrent_frames, 1)
       t = time()
       while !window.closep(get(system, :window)) && !isready(sigkill)
+        i = (i % frames) + 1
+
         window.poll()
 
         if config !== configcache
@@ -113,7 +143,9 @@ function main(system, config, program=ds.emptymap)
         end
 
         if !window.minimised(get(system, :window))
-          res = draw.draw(system, buffers[i+1], renderstate)
+
+          frameupdater(i, renderstate)
+          res = draw.draw(system, buffers[i], renderstate)
 
           if res == vk.ERROR_OUT_OF_DATE_KHR ||
              res == vk.SUBOPTIMAL_KHR ||
@@ -122,7 +154,6 @@ function main(system, config, program=ds.emptymap)
             system = ds.assoc(system, :window_size, window.size(get(system, :window)))
             system = dynamicinit(system, config)
           end
-          i = (i + 1) % get(config, :concurrent_frames)
         end
       end
 
