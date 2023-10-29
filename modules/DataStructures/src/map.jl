@@ -167,8 +167,14 @@ function hashmap(args...)
   into(emptymap, partition(2), args)
 end
 
-function string(x::MapEntry)
-  string(x.key) * ": " * string(x.value)
+# function string(x::MapEntry)
+#   string(x.key) * ": " * string(x.value)
+# end
+
+function showrecur(io::IO, depth, e::MapEntry)
+  showrecur(io, depth, e.key)
+  print(io, ": ")
+  showrecur(io, depth, e.value)
 end
 
 function string(m::Map)
@@ -181,27 +187,30 @@ function string(m::Map)
   return "{" * inner * "}"
 end
 
-function printmap(io, m)
-  print(io, transduce(interpose("\n ") ∘ map(string), *, "", m))
-end
-
-function show(io::IO, mime::MIME"text/plain", m::EmptyMap)
+function showrecur(io::IO, depth, m::EmptyMap)
   print(io, "{}")
 end
 
-function show(io::IO, mime::MIME"text/plain", m::Map)
-  print(io, string(count(m)) * "-element DataStructures.Map: {\n ")
+function showrecur(io::IO, depth, m::Map)
+  print(io, string(count(m)) * "-element DataStructures.Map: {\n")
+  indent(io, depth)
+
   s = seq(m)
   if count(m) > 33
-    s = seq(m)
-    printmap(io, take(16, s))
+    showseq(io, depth, take(16, s))
     print(io, "\n ...\n")
-    printmap(io, drop(count(m) - 16, s))
+    indent(io, depth)
+    showseq(io, depth, drop(count(m) - 16, s))
   else
-    printmap(io, s)
+    showseq(io, depth, s)
   end
+  print(io, "\n")
+  indent(io, depth-1)
+  print(io, "}")
+end
 
-  print(io, "\n}")
+function show(io::IO, mime::MIME"text/plain", s::Map)
+  showrecur(io, 1, s)
 end
 
 function keys(m::Map)
@@ -213,7 +222,7 @@ function vals(m::Map)
 end
 
 function zipmap(x, y)
-  into(emptymap, zip(), x, y)
+  reduce(assoc, emptymap, x, y)
 end
 
 ## FIXME: Sooo much boilerplate. I need to write macros for building xforms.

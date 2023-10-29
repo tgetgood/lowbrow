@@ -590,3 +590,23 @@ dropwhile(p) = seqcompose(
 
 takewhile(p, coll) = into(empty(coll), takewhile(p), coll)
 dropwhile(p, coll) = into(empty(coll), dropwhile(p), coll)
+
+function showrecur(io::IO, depth, x::Any)
+  @assert !isa(x, Vector) && !isa(x, Map)
+
+  show(io, "text/plain", x)
+end
+
+indent(io, depth) = print(io, repeat("  ", depth))
+
+function showseq(io, depth, seq)
+  start = false
+  for x in seq
+    if start
+      print(io, "\n")
+      indent(io, depth)
+    end
+    start = true
+    showrecur(io, depth+1, x)
+  end
+end

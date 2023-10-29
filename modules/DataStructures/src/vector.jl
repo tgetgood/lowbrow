@@ -456,27 +456,32 @@ function takelast(n, v::Vector)
   end
 end
 
-function printvec(io::IO, v)
-  print(io, transduce(interpose("\n ") ∘ map(string), *, "", v))
-end
-
-function show(io::IO, _::MIME"text/plain", _::EmptyVector)
+function showrecur(io::IO, depth, _::EmptyVector)
   print(io, "[]")
 end
 
-function show(io::IO, _::MIME"text/plain", v::Vector)
-  print(io, string(count(v)) * "-element DataStructures.Vector: [\n ")
+function showrecur(io::IO, depth, v::Vector)
+  print(io, string(count(v)) * "-element DataStructures.Vector: [\n")
+  indent(io, depth)
 
   # REVIEW: Why 33? Because it had to be something...
   if count(v) > 33
-    printvec(io, take(16, v))
-    print(io, "\n ...\n ")
-    printvec(io, takelast(16, v))
+    showseq(io, depth, take(16, v))
+    print(io, "\n ...\n")
+    indent(io, depth)
+    showseq(io, depth, takelast(16, v))
   else
-    printvec(io, v)
+    showseq(io, depth, v)
   end
 
-  print(io, "\n]")
+  print(io, "\n")
+  indent(io, depth-1)
+  print(io, "]")
+end
+
+function show(io::IO, mime::MIME"text/plain", s::Vector)
+  @info "v"
+  showrecur(io, 1, s)
 end
 
 function iterate(v::Vector)
