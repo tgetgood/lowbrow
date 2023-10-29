@@ -173,7 +173,7 @@ end
 
 function showrecur(io::IO, depth, e::MapEntry)
   showrecur(io, depth, e.key)
-  print(io, ": ")
+  print(io, " -> ")
   showrecur(io, depth, e.value)
 end
 
