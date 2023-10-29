@@ -610,3 +610,14 @@ function showseq(io, depth, seq)
     showrecur(io, depth+1, x)
   end
 end
+
+function showrecur(io::IO, depth, x::Base.Vector)
+  print(io, string(count(x)) * "-element Base.Vector: [\n")
+  indent(io, depth)
+
+  showseq(io, depth, x)
+
+  print(io, "\n")
+  indent(io, depth-1)
+  print(io, "]")
+end
