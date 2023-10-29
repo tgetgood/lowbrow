@@ -167,9 +167,9 @@ function hashmap(args...)
   into(emptymap, partition(2), args)
 end
 
-# function string(x::MapEntry)
-#   string(x.key) * ": " * string(x.value)
-# end
+function string(x::MapEntry)
+  string(x.key) * ": " * string(x.value)
+end
 
 function showrecur(io::IO, depth, e::MapEntry)
   showrecur(io, depth, e.key)
@@ -512,5 +512,33 @@ function Base.:(==)(x::PersistentHashMap, y::PersistentArrayMap)
     return false
   else
     every(k -> get(x, k) == get(y, k), keys(y))
+  end
+end
+
+iterate(m::EmptyMap) = nothing
+
+function iterate(m::PersistentArrayMap)
+  first(m), 2
+end
+
+function iterate(m::PersistentArrayMap, k)
+  if k > count(m)
+    nothing
+  else
+    MapEntry(m.kvs[2*k-1], m.kvs[2*k]), k+1
+  end
+end
+
+function iterate(m::PersistentHashMap)
+  first(m), rest(seq(m))
+end
+
+# FIXME: This is very inefficient. Store a cursor or something. Better yet let
+# the head get collected, but that won't help in this case...
+function iterate(m::PersistentHashMap, state)
+  if emptyp(state)
+    nothine
+  else
+    first(state), rest(state)
   end
 end
