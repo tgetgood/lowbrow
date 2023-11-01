@@ -2,7 +2,7 @@ module window
 
 import Vulkan as vk
 import GLFW.GLFW as glfw
-import DataStructures: getin, hashmap, assoc, into, emptymap, updatein
+import DataStructures as ds
 
 function size(window)
   glfw.GetFramebufferSize(window)
@@ -49,8 +49,8 @@ function createwindow(system, config)
   glfw.WindowHint(glfw.RESIZABLE, true)
   glfw.WindowHint(glfw.REFRESH_RATE, glfw.DONT_CARE)
 
-  width = getin(config, [:window, :width])
-  height = getin(config, [:window, :height])
+  width = ds.getin(config, [:window, :width])
+  height = ds.getin(config, [:window, :height])
 
   window = glfw.CreateWindow(width, height, get(config, :name, "dev"))
 
@@ -58,7 +58,7 @@ function createwindow(system, config)
 
   glfw.SetFramebufferSizeCallback(window, resizecb(ch))
 
-  hashmap(:window, window, :resizecb, resized(ch), :window_size, (;width, height))
+  ds.hashmap(:window, window, :resizecb, resized(ch), :window_size, (;width, height))
 end
 
 function createsurface(system, config)
@@ -75,18 +75,17 @@ function createsurface(system, config)
     Base.Threads.Atomic{UInt64}(0)
   )
 
-  hashmap(:surface, surface)
+  ds.hashmap(:surface, surface)
 end
 
-function configure(config)
+function configure()
   # FIXME: This is an odd place to do side effects, but I don't see anywhere
   # better to do this. Explicit window.init() is not a good alternative.
   glfw.Init()
 
-  updatein(
-    config,
+  ds.associn(
+    ds.emptymap,
     [:instance, :extensions],
-    vcat,
     glfw.GetRequiredInstanceExtensions()
   )
 end

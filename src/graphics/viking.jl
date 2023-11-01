@@ -1,11 +1,8 @@
-module viking
-
 import DataStructures as ds
 import uniform
 import model
 import textures
-import resources
-import framework as fw
+import resources as rd
 
 import Vulkan as vk
 
@@ -42,11 +39,15 @@ function timerotate(u)
     0 0 0 1
   ]
 
-  ubo(ds.assoc(u, :projection, p))
+  MVP(u.model, u.view, tuple(p...))
 end
 
-function dataload(config)
-  ds.update(config, :ubo, ubo)
+function load(config)
+  merge(
+    ds.update(config, :ubo, ubo),
+    model.load(config),
+    ds.hashmap(:vertex_input_state, rd.vertex_input_state(model.Vertex))
+  )
 end
 
 ##### Main definition
@@ -57,14 +58,8 @@ x = pi/3
 Static description of the program to be run. Pure data. Shouldn't invoke
 anything.
 """
-program = ds.hashmap(
-  :model, ds.hashmap(
-    :file, *(@__DIR__, "/../../assets/viking_room.obj"),
-    # `loader` returns a map with keys :verticies and optional :indicies.
-    # N.B.: These are not vulkan buffers, just cpu arrays.
-    :loader, model.load,
-    :vertex_type, model.Vertex
-  ),
+config = ds.hashmap(
+  :model_file, *(@__DIR__, "/../../assets/viking_room.obj"),
   :shaders, ds.hashmap(
     :vertex, "viking.vert",
     :fragment, "viking.frag"
@@ -94,7 +89,6 @@ program = ds.hashmap(
       :type, :uniform,
       :name, :projection,
       :loader, ubo,
-      :initial_value, :ubo,
       # magically applies `f` to current binding and updates
       :update, timerotate,
       :allocate, uniform.allocatebuffers,
@@ -114,4 +108,19 @@ program = ds.hashmap(
   ]
 )
 
-end # module
+function main()
+  state = graphics.configure(load(config))
+
+  system, state = graphics.instantiate(state)
+
+  ubobuff = ds.getin(state, [:vbuffers, :projection])
+
+  graphics.renderloop(system, state) do i, renderstate
+
+    # TODO: Some sort of framestate abstraction so that we don't have to
+    # manually juggle this index.
+    uniform.setubo!(ubobuff[i], timerotate(get(state, :ubo)))
+  end
+end
+
+repl_teardown = main()

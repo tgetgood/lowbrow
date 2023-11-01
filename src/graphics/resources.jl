@@ -49,10 +49,6 @@ function descriptorpool(layout, frames)
   )
 end
 
-function descriptorsetallocate(layout, frames)
-  v
-end
-
 rasterizationstatedefaults = ds.hashmap(
 )
 
@@ -69,6 +65,61 @@ function rasterizationstate(config)
     1.0;
     cull_mode=vk.CULL_MODE_BACK_BIT
   )
+end
+
+##### Graphics Pipeline
+
+function channels(n, w)
+  ds.reduce(*, "", ds.take(n, map(s -> s*w, ["R", "G", "B", "A"])))
+end
+
+const typenames = hashmap(
+  Signed, "SINT",
+  Unsigned, "UINT",
+  AbstractFloat, "SFLOAT"
+)
+
+"""
+Returns the Vulkan Format for julia type `T`.
+
+`T` must have fixed size.
+
+Not tested for completeness.
+"""
+function typeformat(T)
+  n = Int(sizeof(T) / sizeof(eltype(T)))
+  w = string(sizeof(eltype(T)) * 8)
+  t = get(typenames, supertype(eltype(T)))
+
+  getfield(vk, Symbol("FORMAT_" * channels(n, w) * "_" * t))
+end
+
+"""
+Generates PiplineVertexInputStateCreateInfo from struct `T` via reflection.
+
+N.B.: The location pragmata in the shaders are assumed to follow the order in
+`fields` which defaults to the fieldnames in order as defined in `T`.
+"""
+function vertex_input_state(T, fields)
+  vk.PipelineVertexInputStateCreateInfo(
+    [vk.VertexInputBindingDescription(
+      0, sizeof(T), vk.VERTEX_INPUT_RATE_VERTEX
+    )],
+    ds.into(
+      [],
+      ds.mapindexed((i, field) -> vk.VertexInputAttributeDescription(
+        i - 1,
+        0,
+        typeformat(fieldtype(T, field)),
+        fieldoffset(T, i)
+      )),
+      fields
+    )
+  )
+end
+
+function vertex_input_state(T)
+  vertex_input_state(T, fieldnames(T))
 end
 
 end

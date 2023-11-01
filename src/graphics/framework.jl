@@ -27,17 +27,7 @@ function binding(system, config, binding)
   # REVIEW: Probably ought to use type tags instead of binding
   # functions. Functions --- compiled functions anyway --- aren't data in the
   # sense I need for the bigger picture.
-  buffers = get(binding, :allocate)(system, config, binding)
-
-  if get(binding, :type) === :uniform
-    data = get(binding, :loader)(get(config, get(binding, :initial_value)))
-
-    for buff in buffers
-      uniform.setubo!(buff, data)
-    end
-  end
-
-  buffers
+   get(binding, :allocate)(system, config, binding)
 end
 
 function model(system, config)
@@ -59,25 +49,29 @@ function descriptors(system, config)
   dev = get(system, :device)
   frames = get(config, :concurrent_frames, 1)
 
-  layoutci = rd.descriptorsetlayout(get(config, :bindings, []))
-  poolci = rd.descriptorpool(layoutci, frames)
+  if ds.containsp(config, :bindings) && length(get(config, :bindings)) > 0
+    layoutci = rd.descriptorsetlayout(get(config, :bindings, []))
+    poolci = rd.descriptorpool(layoutci, frames)
 
-  layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
+    layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
 
-  pool = vk.unwrap(vk.create_descriptor_pool(dev, poolci))
+    pool = vk.unwrap(vk.create_descriptor_pool(dev, poolci))
 
-  sets = vk.unwrap(vk.allocate_descriptor_sets(
-    dev,
-    vk.DescriptorSetAllocateInfo(
-      pool,
-      ds.into([], ds.take(frames), ds.repeat(layout))
+    sets = vk.unwrap(vk.allocate_descriptor_sets(
+      dev,
+      vk.DescriptorSetAllocateInfo(
+        pool,
+        ds.into([], ds.take(frames), ds.repeat(layout))
+      )
+    ))
+
+    ds.assoc(config,
+      :descriptorsetlayout, layout,
+      :descriptorsets, sets
     )
-  ))
-
-  ds.assoc(config,
-    :descriptorsetlayout, layout,
-    :descriptorsets, sets
-  )
+  else
+    config
+  end
 end
 
 function descriptorinfos(binding, data, i)
@@ -108,8 +102,8 @@ end
 
 function binddescriptors(system, config)
   dev = get(system, :device)
-  buffers = get(config, :vbuffers)
-  dsets = get(config, :descriptorsets)
+  buffers = get(config, :vbuffers, [])
+  dsets = get(config, :descriptorsets, [])
 
   for i = 1:length(dsets)
     vk.update_descriptor_sets(

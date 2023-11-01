@@ -107,64 +107,14 @@ function renderpass(system, config)
   )
 end
 
-function channels(n, w)
-  ds.reduce(*, "", ds.take(n, map(s -> s*w, ["R", "G", "B", "A"])))
-end
-
-const typenames = hashmap(
-  Signed, "SINT",
-  Unsigned, "UINT",
-  AbstractFloat, "SFLOAT"
-)
-
-"""
-Returns the Vulkan Format for julia type `T`.
-
-`T` must have fixed size.
-
-Not tested for completeness.
-"""
-function typeformat(T)
-  n = Int(sizeof(T) / sizeof(eltype(T)))
-  w = string(sizeof(eltype(T)) * 8)
-  t = get(typenames, supertype(eltype(T)))
-
-  getfield(vk, Symbol("FORMAT_" * channels(n, w) * "_" * t))
-end
-
-"""
-Generates PiplineVertexInputStateCreateInfo from struct `T` via reflection.
-
-N.B.: The location pragmata in the shaders are assumed to follow the order in
-`fields` which defaults to the fieldnames in order as defined in `T`.
-"""
-function vertex_input_state(T, fields)
-  vk.PipelineVertexInputStateCreateInfo(
-    [vk.VertexInputBindingDescription(
-      0, sizeof(T), vk.VERTEX_INPUT_RATE_VERTEX
-    )],
-    into(
-      [],
-      mapindexed((i, field) -> vk.VertexInputAttributeDescription(
-        i - 1,
-        0,
-        typeformat(fieldtype(T, field)),
-        fieldoffset(T, i)
-      )),
-      fields
-    )
-  )
-end
-
-function vertex_input_state(T)
-  vertex_input_state(T, fieldnames(T))
-end
-
 function pipelinelayout(system, config)
-  dl = get(config, :descriptorsetlayout)
+  dl = get(config, :descriptorsetlayout, nothing)
+  dl = dl === nothing ? [] : [dl]
   dev = get(system, :device)
 
-  vk.unwrap(vk.create_pipeline_layout(dev, [dl], []))
+  @info dl
+
+  vk.unwrap(vk.create_pipeline_layout(dev, dl, []))
 end
 
 function creategraphicspipeline(system, config)
@@ -178,6 +128,8 @@ function creategraphicspipeline(system, config)
     false
   )
 
+  # FIXME: It's possible for :window_size and :extent to get out of sync, which
+  # crashes the program.
   win = get(system, :window_size)
 
   viewports = [vk.Viewport(0, 0, win.width, win.height, 0, 1)]
@@ -226,6 +178,7 @@ function creategraphicspipeline(system, config)
     0,
     0
   )
+
   depth_stencil_state = vk.PipelineDepthStencilStateCreateInfo(
     true,
     true,
@@ -237,6 +190,8 @@ function creategraphicspipeline(system, config)
     0,
     1
   )
+
+  vertex_input_state = get(config, :vertex_input_state)
 
   layout = pipelinelayout(system, config)
 
@@ -257,9 +212,7 @@ function creategraphicspipeline(system, config)
       layout,
       0,
       -1;
-      vertex_input_state=vertex_input_state(
-        ds.getin(config, [:model, :vertex_type])
-      ),
+      vertex_input_state,
       input_assembly_state,
       viewport_state,
       multisample_state,

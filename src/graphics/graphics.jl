@@ -1,48 +1,74 @@
+module graphics
+
 import hardware as hw
 import pipeline as gp
-import uniform
-import vertex
-import model
 import render as draw
 import debug
 import window
-import textures
 import framework as fw
-import viking
 
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: hashmap, emptymap
 
-function configure()
-  staticconfig = hashmap(
-    :instance, hashmap(
-      :extensions, ["VK_EXT_debug_utils"],
-      :validation, ["VK_LAYER_KHRONOS_validation"]
-    ),
-    :device, hashmap(
-      :features, [:sampler_anisotropy],
-      :extensions, ["VK_KHR_swapchain", "VK_KHR_shader_float16_int8"],
-      :validation, ["VK_LAYER_KHRONOS_validation"]
-    ),
-    :debuglevel, vk.DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
-    :window, hashmap(:width, 1600, :height, 1200),
-    :swapchain, hashmap(
-      # TODO: Fallback formats and init time selection.
-      :format, vk.FORMAT_B8G8R8A8_SRGB,
-      :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
-      :presentmode, vk.PRESENT_MODE_FIFO_KHR,
-      :images, 2
-    ),
-    :concurrent_frames, 2
+VS = Union{Vector, ds.Vector}
+
+mergeconfig(x, y) = y
+mergeconfig(x::ds.Map, y::ds.Map) = ds.mergewith(mergeconfig, x, y)
+mergeconfig(x::VS, y::VS) = ds.into(y, x)
+
+
+defaults = hashmap(
+  :dev_tools, true,
+  :debuglevel, vk.DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
+  :device, hashmap(
+    :features, [:sampler_anisotropy],
+    # FIXME: logically these are sets. How does vk handle repeats?
+    :extensions, ["VK_KHR_swapchain", "VK_KHR_shader_float16_int8"]
+  ),
+  :window, hashmap(:width, 1600, :height, 1200),
+  :swapchain, hashmap(
+    # TODO: Fallback formats and init time selection.
+    :format, vk.FORMAT_B8G8R8A8_SRGB,
+    :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
+    :presentmode, vk.PRESENT_MODE_FIFO_KHR,
+    :images, 2
+  ),
+  :concurrent_frames, 2
+)
+
+devtooling = ds.hashmap(
+  :instance, hashmap(
+    :extensions, ["VK_EXT_debug_utils"],
+    :validation, ["VK_LAYER_KHRONOS_validation"]
+  ),
+  :device, hashmap(
+    :validation, ["VK_LAYER_KHRONOS_validation"]
+  )
+)
+
+function configure(prog)
+  devcfg = ds.transduce(
+    map(x -> ds.selectkeys(x, [:dev_tools, :debuglevel])),
+    merge,
+    ds.emptymap,
+    [defaults, prog]
   )
 
-  config = merge(staticconfig, viking.program)
+  devmode = get(devcfg, :dev_tools, false)
 
-  ds.reduce((s, f) -> f(s), config, [
-    window.configure,
-    debug.configure
-  ])
+  ds.reduce(
+    mergeconfig,
+    defaults,
+    ds.vector(
+      # Only configure logging in dev mode.
+      devmode ? debug.configure(devcfg) : ds.emptymap,
+      devmode ? devtooling : ds.emptymap,
+
+      window.configure(),
+      prog # Input potentially overrides everything. What could go wrong?
+    )
+  )
 end
 
 function staticinit(config)
@@ -51,23 +77,29 @@ function staticinit(config)
     debug.debugmsgr,
     window.createwindow,
     window.createsurface,
+
+    # REVIEW: Decide which kinds of queues we're going to need before we create
+    # the device, or just create all of the queues I might need and a command
+    # pool for each? Right now the latter is simpler, but it might not be a good
+    # choice.
     hw.createdevice,
 
     # This ^ is the core setup.
     #
-    # We need to break the config up logically so that we perform 4
-    # negotiations.
+    # We need to break the config up logically so that we perform 3
+    # rounds of negotiations.
     # 1. Negotiate the instance, AKA choose the best API version and
-    # extensions that are available.
-    # 2. Negotiate with the window tool (GLFW, et al.)
-    # 3.
+    # extensions that are available. And make sure we can open a window and
+    # create a render surface.
+    # 2. Negotiate (and possibly choose) the physical and logical devices based
+    # on the desired and available extentions. Then choose the best config
+    # available.
 
     hw.createcommandpools,
     # hw.createdescriptorpools,
     # gp.shaders,
     # model.load,
     draw.commandbuffers,
-    # TODO: There's so much config in the renderpass, it shouldn't be hardcoded.
     # uniform.allocatebuffers,
     # textures.textureimage,
     # textures.allocatesets,
@@ -83,6 +115,7 @@ function dynamicinit(system, config)
   steps = [
     hw.createswapchain,
     hw.createimageviews,
+    # TODO: There's so much config in the renderpass, it shouldn't be hardcoded.
     gp.renderpass,
     gp.creategraphicspipeline,
     gp.createframebuffers,
@@ -91,36 +124,31 @@ function dynamicinit(system, config)
   ds.reduce((s, f) -> begin @info f; merge(s, f(s, config)) end, system, steps)
 end
 
-# FIXME: These should be inside `main`, but it's convenient for repl purposes to
-# make them global during development.
+# TODO: This is where the config negotiation will happen
+function instantiate(config)
+  system = staticinit(config)
 
-config = configure()
-system = staticinit(config)
+  config = fw.descriptors(system, config)
 
-@info "Static Loaded"
+  system = dynamicinit(system, config)
 
-function main(system, config, program=ds.emptymap)
+  config = fw.buffers(system, config)
+
+  fw.binddescriptors(system, config)
+
+  return system, config
+end
+
+tear_down = Ref{Function}(() -> nothing)
+
+function renderloop(framefn, system, config)
+  tear_down[]()
+
   sigkill = Channel()
 
   # The number of some types of Vulkan objects that can be created is
   # limited. Make sure finalisers run to clean up between iterations.
   GC.gc()
-
-  @info "loading model"
-  config = fw.model(system, config)
-
-  @info "loading descriptors"
-  config = fw.descriptors(system, config)
-
-  system = dynamicinit(system, config)
-
-  @info "loading buffers"
-  config = fw.buffers(system, config)
-
-  @info "binding descriptors"
-  fw.binddescriptors(system, config)
-
-  frameupdater = fw.frameupdater(system, config)
 
   configcache = config
   renderstate = fw.assemblerender(system, config)
@@ -144,7 +172,7 @@ function main(system, config, program=ds.emptymap)
 
         if !window.minimised(get(system, :window))
 
-          frameupdater(i, renderstate)
+          framefn(i, renderstate)
           res = draw.draw(system, buffers[i], renderstate)
 
           if res == vk.ERROR_OUT_OF_DATE_KHR ||
@@ -173,11 +201,11 @@ function main(system, config, program=ds.emptymap)
   end
 
   @info "returning control"
-  return function repl_teardown()
+  tear_down[] = function repl_teardown()
     if istaskstarted(handle) && !istaskdone(handle)
       put!(sigkill, true)
     end
   end
 end
 
-repl_teardown = main(system, config)
+end # module

@@ -1,7 +1,7 @@
 module debug
 
 import Vulkan as vk
-import DataStructures: assoc
+import DataStructures: assoc, hashmap
 
 dumcd = vk.vk.LibVulkan.VkDebugUtilsMessengerCallbackDataEXT
 
@@ -52,7 +52,10 @@ function debugcb(severity, type, datap::Ptr{dumcd}, userData::Ptr{Cvoid})
 end
 
 function debuginfo(config)
-  data = Base.cconvert(Int64, get(config, :debuglevel).val)
+  data = Base.cconvert(
+    Int64,
+    get(config, :debuglevel, vk.DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT).val
+  )
   user_data = Ptr{Cvoid}(data)
 
   vk.DebugUtilsMessengerCreateInfoEXT(
@@ -67,7 +70,7 @@ function debuginfo(config)
 end
 
 function configure(config)
-  assoc(config, :debuginfo, debuginfo(config))
+  hashmap(:debuginfo, debuginfo(config))
 end
 
 function debugmsgr(system, config)

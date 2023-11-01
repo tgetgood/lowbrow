@@ -11,7 +11,9 @@ end
 function instance(_, config)
   ic = get(config, :instance)
   validationlayers = get(ic, :validation)
-  extensions = get(ic, :extensions)
+  extensions::Vector = get(ic, :extensions)
+
+  @info extensions
 
   @assert containsall(
     extensions,

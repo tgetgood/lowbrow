@@ -52,7 +52,7 @@ end
 gather(x) = x
 
 function load(config)
-  filename = ds.getin(config, [:model, :file])
+  filename = ds.getin(config, [:model_file])
   objs = typesort(eachline(filename))
 
   vs = tofloat(get(objs, "v"))
