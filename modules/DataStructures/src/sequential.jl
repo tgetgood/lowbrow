@@ -3,6 +3,7 @@ abstract type Sequential end
 """ Returns `true` iff the collection `x` contains no elements. """
 emptyp(x::Sequential) = count(x) == 0
 emptyp(x) = length(x) == 0
+emptyp(x::Nothing) = true
 
 abstract type EarlyTermination end
 

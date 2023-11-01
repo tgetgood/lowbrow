@@ -462,6 +462,26 @@ merge() = emptymap
 # about.
 merge(xs::Map...) = reduce(merge, xs)
 
+function mergewith(f, m1, m2)
+  if count(m1) <= count(m2)
+    init = m2
+    xs = m1
+  else
+    init = m1
+    xs = m2
+  end
+
+  function rf(acc, e)
+    if containsp(acc, key(e))
+      update(acc, key(e), f, val(e))
+    else
+      conj(acc, e)
+    end
+  end
+
+  reduce(rf, init, xs)
+end
+
 function dissoc(m::PersistentHashMap, k)
   throw("not implemented")
 end

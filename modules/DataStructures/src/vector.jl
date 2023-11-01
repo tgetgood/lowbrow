@@ -516,6 +516,10 @@ function Base.convert(::Type{Base.Vector{T}}, xs::Vector) where T
   dumpwalk(v, xs)
 end
 
+function Base.convert(::Type{Base.Vector}, xs::Vector)
+  convert(Base.Vector{Any}, xs)
+end
+
 function dumpwalk(x::Base.Vector, v::VectorNode)
   reduce(dumpwalk, x, v.elements)
 end
