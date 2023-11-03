@@ -13,8 +13,6 @@ function instance(_, config)
   validationlayers = get(ic, :validation)
   extensions::Vector = get(ic, :extensions)
 
-  @info extensions
-
   @assert containsall(
     extensions,
     map(
@@ -153,6 +151,7 @@ function checkdevice(system, config)
   return getin(system, [:queues, :graphics]) !== nothing &&
          getin(system, [:queues, :presentation]) !== nothing &&
          getin(system, [:queues, :transfer]) !== nothing &&
+         getin(system, [:queues, :compute]) !== nothing &&
          all(
            map(x -> getproperty(features, x),
              ds.getin(config, [:device, :features]))

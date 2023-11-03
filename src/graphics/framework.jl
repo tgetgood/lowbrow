@@ -7,36 +7,6 @@ import uniform
 import resources as rd
 import vertex
 
-abstract type DescriptorSetBinding end
-
-struct UniformBuffer <: DescriptorSetBinding
-  config
-end
-
-struct Texture <: DescriptorSetBinding
-  config
-end
-
-buffertypes = ds.hashmap(
-  :texture, Texture,
-  :uniform, UniformBuffer,
-  :ssbo, Any
-)
-
-function binding(system, config, binding)
-  # REVIEW: Probably ought to use type tags instead of binding
-  # functions. Functions --- compiled functions anyway --- aren't data in the
-  # sense I need for the bigger picture.
-   get(binding, :allocate)(system, config, binding)
-end
-
-function model(system, config)
-  merge(
-    config,
-    ds.getin(config, [:model, :loader])(config)
-  )
-end
-
 function indexbuffer(system, config)
   if ds.containsp(config, :indicies)
     vertex.indexbuffer(system, get(config, :indicies))
@@ -74,7 +44,9 @@ function descriptors(system, config)
   end
 end
 
-function descriptorinfos(binding, data, i)
+function descriptorinfos(binding, i)
+  data = get(binding, :buffer)
+
   if data isa Vector
     data = data[i]
   end
@@ -102,7 +74,7 @@ end
 
 function binddescriptors(system, config)
   dev = get(system, :device)
-  buffers = get(config, :vbuffers, [])
+  bindings = get(config, :bindings)
   dsets = get(config, :descriptorsets, [])
 
   for i = 1:length(dsets)
@@ -110,17 +82,16 @@ function binddescriptors(system, config)
       dev,
       ds.into(
         [],
-        ds.mapindexed((j, b) -> begin
-          binding = get(config, :bindings)[j]
+        ds.mapindexed((j, binding) -> begin
           vk.WriteDescriptorSet(
             dsets[i],
             j - 1,
             0,
             get(binding, :usage),
-            descriptorinfos(binding, ds.val(b), i)...
+            descriptorinfos(binding, i)...
           )
         end),
-        buffers
+        bindings
       ),
       []
     )
@@ -128,17 +99,10 @@ function binddescriptors(system, config)
 end
 
 function buffers(system, config)
-  ds.assoc(merge(
-      config,
-      vertex.vertexbuffer(system, get(config, :verticies)),
-      indexbuffer(system, config)
-    ),
-    :vbuffers,
-    ds.into(
-      ds.emptymap,
-      map(e -> (get(e, :name), binding(system, config, e))),
-      get(config, :bindings)
-    )
+  merge(
+    config,
+    vertex.vertexbuffer(system, get(config, :verticies)),
+    indexbuffer(system, config)
   )
 end
 

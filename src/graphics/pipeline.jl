@@ -112,8 +112,6 @@ function pipelinelayout(system, config)
   dl = dl === nothing ? [] : [dl]
   dev = get(system, :device)
 
-  @info dl
-
   vk.unwrap(vk.create_pipeline_layout(dev, dl, []))
 end
 
@@ -124,16 +122,17 @@ function creategraphicspipeline(system, config)
   ])
 
   input_assembly_state = vk.PipelineInputAssemblyStateCreateInfo(
+    # vk.PRIMITIVE_TOPOLOGY_POINT_LIST,
     vk.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
     false
   )
 
   # FIXME: It's possible for :window_size and :extent to get out of sync, which
   # crashes the program.
-  win = get(system, :window_size)
+  ext = get(system, :extent)
 
-  viewports = [vk.Viewport(0, 0, win.width, win.height, 0, 1)]
-  scissors = [vk.Rect2D(vk.Offset2D(0, 0), get(system, :extent))]
+  viewports = [vk.Viewport(0, 0, ext.width, ext.height, 0, 1)]
+  scissors = [vk.Rect2D(vk.Offset2D(0, 0), ext)]
 
   viewport_state = vk.PipelineViewportStateCreateInfo(
     ;

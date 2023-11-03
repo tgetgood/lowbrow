@@ -3,6 +3,8 @@ import uniform
 import model
 import textures
 import resources as rd
+import framework as fw
+import graphics
 
 import Vulkan as vk
 
@@ -27,8 +29,7 @@ function configureprojection(config)
 end
 
 function timerotate(u)
-
-  t = time()
+  t = time() / 2
   c = cos(t)
   s = sin(t)
 
@@ -58,8 +59,9 @@ x = pi/3
 Static description of the program to be run. Pure data. Shouldn't invoke
 anything.
 """
-config = ds.hashmap(
+prog = ds.hashmap(
   :model_file, *(@__DIR__, "/../../assets/viking_room.obj"),
+  :texture_file, *(@__DIR__, "/../../assets/viking_room.png"),
   :shaders, ds.hashmap(
     :vertex, "viking.vert",
     :fragment, "viking.frag"
@@ -83,43 +85,44 @@ config = ds.hashmap(
       0 0 1 0
       0 0 0 1
     ]
-  ),
-  :bindings, [
-    ds.hashmap(
-      :type, :uniform,
-      :name, :projection,
-      :loader, ubo,
-      # magically applies `f` to current binding and updates
-      :update, timerotate,
-      :allocate, uniform.allocatebuffers,
-      :eltype, MVP,
-      :size, 1,
-      :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      :stage, vk.SHADER_STAGE_VERTEX_BIT
-    ),
-    ds.hashmap(
-      :type, :texture,
-      :name, :texture,
-      :usage, vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      :stage, vk.SHADER_STAGE_FRAGMENT_BIT,
-      :allocate, textures.textureimage,
-      :texture_file, *(@__DIR__, "/../../assets/viking_room.png"),
-    )
-  ]
+  )
 )
 
 function main()
-  state = graphics.configure(load(config))
+  config = graphics.configure(load(prog))
 
-  system, state = graphics.instantiate(state)
+  system = graphics.staticinit(config)
 
-  ubobuff = ds.getin(state, [:vbuffers, :projection])
+  texture = textures.textureimage(system, get(config, :texture_file))
 
-  graphics.renderloop(system, state) do i, renderstate
+  ubos = uniform.allocatebuffers(system, MVP, get(config, :concurrent_frames))
+
+  bindings = [
+    ds.hashmap(
+      :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      :stage, vk.SHADER_STAGE_VERTEX_BIT,
+      :buffer, ubos
+    ),
+    ds.hashmap(
+      :usage, vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      :stage, vk.SHADER_STAGE_FRAGMENT_BIT,
+      :buffer, texture
+    )
+  ]
+
+  config = ds.assoc(config, :bindings, bindings)
+
+  system, config = graphics.instantiate(system, config)
+
+  config = fw.buffers(system, config)
+
+  graphics.renderloop(system, config) do i, renderstate
 
     # TODO: Some sort of framestate abstraction so that we don't have to
     # manually juggle this index.
-    uniform.setubo!(ubobuff[i], timerotate(get(state, :ubo)))
+    uniform.setubo!(ubos[i], timerotate(get(config, :ubo)))
+
+    return renderstate
   end
 end
 

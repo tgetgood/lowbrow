@@ -1,6 +1,6 @@
 module textures
 
-import FileIO: load
+import FileIO as fio
 import hardware as hw
 import DataStructures as ds
 import Vulkan as vk
@@ -88,10 +88,10 @@ function generatemipmaps(vkim, system)
   end
 end
 
-function textureimage(system, config, opt)
+function textureimage(system, filename)
   dev = get(system, :device)
 
-  image = load(get(opt, :texture_file))
+  image = fio.load(filename)
 
   pixels = reduce(*, size(image))
 
@@ -167,9 +167,11 @@ function textureimage(system, config, opt)
 
   view = hw.imageview(
     system,
-      ds.hashmap(:format, hw.findformat(system, config).format),
-      vkim,
-    )
+    # FIXME: Format should not be hardcoded, and should be stored in the image
+    # map since it's a property of the image.
+    ds.hashmap(:format, vk.FORMAT_B8G8R8A8_SRGB),
+    vkim,
+  )
 
   return ds.hashmap(
     :texture, vkim,

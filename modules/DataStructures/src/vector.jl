@@ -478,7 +478,6 @@ function showrecur(io::IO, depth, v::Vector)
 end
 
 function show(io::IO, mime::MIME"text/plain", s::Vector)
-  @info "v"
   showrecur(io, 1, s)
 end
 

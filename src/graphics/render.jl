@@ -94,6 +94,8 @@ function recorder(cmd, framebuffer, config)
 
   vert = ds.get(config, :vertexbuffer)
 
+  vb = get(vert, :buffer)
+
   vk.cmd_bind_vertex_buffers(
     cmdbuf,
     [get(vert, :buffer)],
@@ -106,7 +108,7 @@ function recorder(cmd, framebuffer, config)
 
     vk.cmd_draw_indexed(cmdbuf, get(ind, :verticies), 1, 0, 0, 0)
   else
-    vk.cmd_draw(cmdbuf, get(vert, :size), 1, 0, 0)
+    vk.cmd_draw(cmdbuf, get(vert, :verticies), 1, 0, 0)
   end
 
   vk.cmd_end_render_pass(cmdbuf)

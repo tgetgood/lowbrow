@@ -1,7 +1,12 @@
 import hardware as hw
+import resources as rd
+import framework as fw
+import uniform
+import commands
+import graphics
+
 import DataStructures as ds
 import DataStructures: hashmap, into, emptyvector
-import commands
 
 import Vulkan as vk
 
@@ -24,8 +29,8 @@ function velocity(p)
   (25f-5/n) .* (x, y)
 end
 
-function init(count, width, height)
-  v::Vector{Particle} = ds.into(
+function init(count, width, height)::Vector{Particle}
+  ds.into(
     ds.emptyvector,
     ds.partition(5)
     ∘
@@ -38,8 +43,8 @@ function init(count, width, height)
   )
 end
 
-function buffers(system, config)
-  n = ds.getin(config, [:particles, :count])
+function particle_buffers(system, config)
+  n = get(config, :particles)
   ext = get(system, :extent)
   particles = init(n, ext.width, ext.height)
 
@@ -50,46 +55,92 @@ function buffers(system, config)
               vk.BUFFER_USAGE_TRANSFER_DST_BIT |
               vk.BUFFER_USAGE_STORAGE_BUFFER_BIT,
       :size,  sizeof(Particle) * n,
+      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
       :queues, [:transfer, :graphics, :compute]
     )))
     ∘
-    map(x -> ds.assoc(x,
-      :layout_type, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-      :eltype, Particle
-
-    )),
+    map(x -> ds.assoc(x, :verticies, n))
+    ,
     1:get(config, :concurrent_frames)
     )
 
   commands.todevicelocal(system, particles, ssbos...)
 
-  # TODO: Use a push constant here.
-  ubo = hw.buffer(system, ds.hashmap(
-    :size, sizeof(Float64),
-    :usage, vk.BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-    :queues, [:compute],
-    :memoryflags, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT |
-                  vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
-  ))
-
-  memptr = Ptr{Float64}(vk.unwrap(vk.map_memory(
-          get(system, :device), get(ubo, :memory), 0, get(ubo, :size)
-  )))
-
-  ubometa = ds.assoc(ubo,
-    :eltype, Float64,
-    :layout_type, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-    :memptr, memptr
-  )
-
-  hashmap(:particle_buffers, into(ds.vec(ubometa), ssbos))
+  ssbos
 end
 
-config = hashmap(
+prog = hashmap(
   :particles, 4096,
   :shaders, hashmap(
     :vertex, "particles.vert",
     :fragment, "particles.frag",
-    :compute, "particles.comp"
+    # :compute, "particles.comp"
   ),
 )
+
+function main()
+  config = graphics.configure(prog)
+
+  system = graphics.staticinit(config)
+
+  frames = get(config, :concurrent_frames)
+
+  ### rendering
+
+  config = ds.assoc(
+    config,
+    :vertex_input_state,
+    rd.vertex_input_state(Particle)
+  )
+
+  ### Init graphics pipeline
+
+  system, config = graphics.instantiate(system, config)
+
+  ### Bound buffers
+
+  deltas = uniform.allocatebuffers(system, Float32, frames)
+
+  ssbos = particle_buffers(system, config)
+
+  ### compute
+
+  compute_layout = [
+    ds.hashmap(
+      :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      :stage, vk.SHADER_STAGE_COMPUTE_BIT
+    ),
+    ds.hashmap(
+      :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      :stage, vk.SHADER_STAGE_COMPUTE_BIT
+    ),
+    ds.hashmap(
+      :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      :stage, vk.SHADER_STAGE_COMPUTE_BIT
+    )
+  ]
+
+  compute_bindings = ds.map(i -> [
+      deltas[i], ssbos[(i % frames) + 1], ssbos[((i + 1) % frames) + 1]
+    ],
+    1:frames
+  )
+
+  ### run
+
+  t1 = time()
+
+  graphics.renderloop(system, config) do i, renderstate
+    # TODO: Some sort of framestate abstraction so that we don't have to
+    # manually juggle this index.
+    t2 = time()
+    uniform.setubo!(deltas[i], Float32(t2-t1))
+    t1 = t2
+
+    vb = ssbos[(i % frames) + 1]
+
+    return ds.assoc(renderstate, :vertexbuffer, vb)
+  end
+end
+
+repl_teardown = main()

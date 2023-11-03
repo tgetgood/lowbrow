@@ -5,15 +5,11 @@ import Vulkan as vk
 import DataStructures as ds
 import hardware as hw
 
-function allocatebuffers(system, config, binding)
-  T = get(binding, :eltype)
-  n = get(binding, :size)
-  frames = get(config, :concurrent_frames, 1)
-
+function allocatebuffers(system, T, n)
   ds.into(
     [],
     map(_ -> hw.buffer(system, ds.hashmap(
-      :size, n * sizeof(T),
+      :size, sizeof(T),
       :usage, vk.BUFFER_USAGE_UNIFORM_BUFFER_BIT,
       :queues, [:graphics],
       :memoryflags, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT |
@@ -25,7 +21,7 @@ function allocatebuffers(system, config, binding)
         get(system, :device), get(x, :memory), 0, get(x, :size)
       )))
     )),
-    1:frames
+    1:n
   )
 end
 

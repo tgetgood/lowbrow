@@ -24,7 +24,7 @@ defaults = hashmap(
   :device, hashmap(
     :features, [:sampler_anisotropy],
     # FIXME: logically these are sets. How does vk handle repeats?
-    :extensions, ["VK_KHR_swapchain", "VK_KHR_shader_float16_int8"]
+    :extensions, ["VK_KHR_swapchain"]
   ),
   :window, hashmap(:width, 1600, :height, 1200),
   :swapchain, hashmap(
@@ -125,14 +125,12 @@ function dynamicinit(system, config)
 end
 
 # TODO: This is where the config negotiation will happen
-function instantiate(config)
-  system = staticinit(config)
-
+function instantiate(system, config)
   config = fw.descriptors(system, config)
 
   system = dynamicinit(system, config)
 
-  config = fw.buffers(system, config)
+  # config = fw.buffers(system, config)
 
   fw.binddescriptors(system, config)
 
@@ -142,7 +140,9 @@ end
 tear_down = Ref{Function}(() -> nothing)
 
 function renderloop(framefn, system, config)
-  tear_down[]()
+  if tear_down[] isa Function
+    tear_down[]()
+  end
 
   sigkill = Channel()
 
@@ -172,7 +172,7 @@ function renderloop(framefn, system, config)
 
         if !window.minimised(get(system, :window))
 
-          framefn(i, renderstate)
+          renderstate = framefn(i, renderstate)
           res = draw.draw(system, buffers[i], renderstate)
 
           if res == vk.ERROR_OUT_OF_DATE_KHR ||
@@ -201,7 +201,7 @@ function renderloop(framefn, system, config)
   end
 
   @info "returning control"
-  tear_down[] = function repl_teardown()
+  tear_down[] = function()
     if istaskstarted(handle) && !istaskdone(handle)
       put!(sigkill, true)
     end

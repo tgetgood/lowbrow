@@ -3,6 +3,7 @@
 import graphics
 
 import resources as rd
+import framework as fw
 import vertex
 
 import DataStructures as ds
@@ -24,7 +25,7 @@ function load(config)
   config = ds.assoc(config, :vertex_input_state, rd.vertex_input_state(Vertex))
 end
 
-config = ds.hashmap(
+prog = ds.hashmap(
   :name, "Quad",
   :shaders, ds.hashmap(
     :vertex, "quad.vert",
@@ -44,11 +45,14 @@ config = ds.hashmap(
 )
 
 function main()
-  state = graphics.configure(load(config))
+  state = graphics.configure(load(prog))
 
-  system, state = graphics.instantiate(state)
+  system, state = graphics.instantiate(graphics.staticinit(state), state)
+
+  state = fw.buffers(system, state)
 
   graphics.renderloop(system, state) do i, renderstate
+    renderstate
   end
 end
 
