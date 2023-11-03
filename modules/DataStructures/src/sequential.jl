@@ -5,6 +5,8 @@ emptyp(x::Sequential) = count(x) == 0
 emptyp(x) = length(x) == 0
 emptyp(x::Nothing) = true
 
+length(v::Sequential) = count(v)
+
 abstract type EarlyTermination end
 
 struct Reduced{T} <: EarlyTermination

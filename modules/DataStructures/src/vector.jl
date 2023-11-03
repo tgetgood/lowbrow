@@ -107,8 +107,6 @@ count(v::VectorLeaf) = length(v.elements)
 count(v::VectorNode) = v.count
 count(v::EmptyVector) = 0
 
-length(v::Vector) = count(v)
-
 conj(v::Nothing, x) = vectorleaf([x])
 conj(v::EmptyVector, x) = vectorleaf([x])
 conj(c::EmptyVector, x::NoEmission) = c
