@@ -7,20 +7,10 @@ import uniform
 import resources as rd
 import vertex
 
-function indexbuffer(system, config)
-  if ds.containsp(config, :indicies)
-    vertex.indexbuffer(system, get(config, :indicies))
-  else
-    ds.emptymap
-  end
-end
+function descriptors(dev, frames, bindings)
 
-function descriptors(system, config)
-  dev = get(system, :device)
-  frames = get(config, :concurrent_frames, 1)
-
-  if ds.containsp(config, :bindings) && length(get(config, :bindings)) > 0
-    layoutci = rd.descriptorsetlayout(get(config, :bindings, []))
+  if length(bindings) > 0
+    layoutci = rd.descriptorsetlayout(bindings)
     poolci = rd.descriptorpool(layoutci, frames)
 
     layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
@@ -35,7 +25,8 @@ function descriptors(system, config)
       )
     ))
 
-    ds.assoc(config,
+    ds.hashmap(
+      :layoutcreateinfo, layoutci,
       :descriptorsetlayout, layout,
       :descriptorsets, sets
     )
@@ -44,24 +35,20 @@ function descriptors(system, config)
   end
 end
 
-function descriptorinfos(binding, i)
-  data = get(binding, :buffer)
-
-  if data isa Vector
-    data = data[i]
-  end
-
-  if ds.containsp(data, :buffer)
+function descriptorinfos(binding)
+  if ds.containsp(binding, :buffer)
     (
       [],
-      [vk.DescriptorBufferInfo(0, get(data, :size), buffer=get(data, :buffer))],
+      [vk.DescriptorBufferInfo(
+        0, get(binding, :size), buffer=get(binding, :buffer)
+      )],
       []
     )
-  elseif ds.containsp(data, :texture)
+  elseif ds.containsp(binding, :texture)
     (
       [vk.DescriptorImageInfo(
-        get(data, :sampler),
-        get(data, :textureimageview),
+        get(binding, :sampler),
+        get(binding, :textureimageview),
         vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
       )],
       [],
@@ -72,29 +59,38 @@ function descriptorinfos(binding, i)
   end
 end
 
-function binddescriptors(system, config)
-  dev = get(system, :device)
-  bindings = get(config, :bindings)
-  dsets = get(config, :descriptorsets, [])
+function binddescriptors(dev, descriptors, bindings)
+  dsets = get(descriptors, :descriptorsets)
+  usages = map(x -> x.descriptor_type, get(descriptors, :layoutcreateinfo).bindings)
 
-  for i = 1:length(dsets)
-    vk.update_descriptor_sets(
-      dev,
-      ds.into(
-        [],
-        ds.mapindexed((j, binding) -> begin
-          vk.WriteDescriptorSet(
-            dsets[i],
-            j - 1,
-            0,
-            get(binding, :usage),
-            descriptorinfos(binding, i)...
-          )
-        end),
-        bindings
-      ),
-      []
-    )
+  writes = ds.into(
+    [],
+    ds.mapindexed((i, dset) -> ds.into(
+      [],
+      ds.mapindexed((j, usage) -> begin
+        vk.WriteDescriptorSet(
+          dset,
+          j - 1,
+          0,
+          usage,
+          descriptorinfos(bindings[i][j])...
+        )
+      end),
+      usages
+    )),
+    dsets
+  )
+
+  for write in writes
+    vk.update_descriptor_sets(dev, write, [])
+  end
+end
+
+function indexbuffer(system, config)
+  if ds.containsp(config, :indicies)
+    vertex.indexbuffer(system, get(config, :indicies))
+  else
+    ds.emptymap
   end
 end
 

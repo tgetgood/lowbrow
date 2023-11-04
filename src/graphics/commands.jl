@@ -7,7 +7,26 @@ import hardware as hw
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
 
-function cmdseq(body, system, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
+"""
+`signal` must be a timeline semaphore.
+"""
+function cmdseq(body, system, qf;
+                level=vk.COMMAND_BUFFER_LEVEL_PRIMARY, signal=nothing)
+
+  if signal === nothing
+    signal = vk.unwrap(vk.create_semaphore(
+      get(system, :device),
+      vk.SemaphoreCreateInfo(
+        next=vk.SemaphoreTypeCreateInfo(
+          vk.SEMAPHORE_TYPE_TIMELINE,
+          0
+        )
+      )
+    ))
+  end
+
+  @info signal
+
   pool = hw.getpool(system, qf)
   queue = hw.getqueue(system, qf)
 
@@ -46,7 +65,6 @@ function copybuffertoimage(cmd, system, src, dst, size, qf=:transfer)
     )]
   )
 end
-
 
 function mipblit(cmd, config)
   gd(x, k) = get(x, k, [0,1])

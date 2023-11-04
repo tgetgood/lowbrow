@@ -1,5 +1,7 @@
 module hardware
 
+import window
+
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
@@ -198,7 +200,7 @@ function findextent(system, config)
     get(system, :surface)
   ))
 
-  win = get(system, :window_size)
+  win = window.size(get(system, :window))
 
   vk.Extent2D(
     clamp(win.width, sc.min_image_extent.width, sc.max_image_extent.width),
@@ -279,7 +281,12 @@ function createdevice(system, config)
     getin(config, [:device, :validation], []),
     getin(config, [:device, :extensions], []);
     enabled_features=
-    vk.PhysicalDeviceFeatures(ds.getin(config, [:device, :features])...)
+    vk.PhysicalDeviceFeatures(ds.getin(config, [:device, :features])...),
+    # FIXME: Confirm that these features are available before enabling.
+    # How do I do that?
+    # Not urgent since vulkan 1.2+ requires :timeline_semaphore.
+    next=
+    vk.PhysicalDeviceVulkan12Features(ds.getin(config, [:device, :vk12features])...)
   )
 
   assoc(system, :device, vk.unwrap(vk.create_device(pdev, dci)))

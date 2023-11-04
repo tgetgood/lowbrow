@@ -1,6 +1,7 @@
 import hardware as hw
 import resources as rd
 import framework as fw
+import pipeline as gp
 import uniform
 import commands
 import graphics
@@ -26,7 +27,7 @@ function velocity(p)
 
   n = sqrt(x^2+y^2)
 
-  (25f-5/n) .* (x, y)
+  (25f-3/n) .* (x, y)
 end
 
 function init(count, width, height)::Vector{Particle}
@@ -70,27 +71,31 @@ function particle_buffers(system, config)
 end
 
 prog = hashmap(
-  :particles, 4096,
+  :particles, 2^14,
+  :compute, ds.hashmap(
+    :shaders, ds.hashmap(
+      :compute, "particles.comp"
+    )
+  ),
   :shaders, hashmap(
     :vertex, "particles.vert",
     :fragment, "particles.frag",
-    # :compute, "particles.comp"
   ),
 )
 
 function main()
   config = graphics.configure(prog)
+  frames = get(config, :concurrent_frames)
 
   system = graphics.staticinit(config)
-
-  frames = get(config, :concurrent_frames)
+  dev = get(system, :device)
 
   ### rendering
 
   config = ds.assoc(
     config,
     :vertex_input_state,
-    rd.vertex_input_state(Particle)
+    rd.vertex_input_state(Particle, [:position, :colour])
   )
 
   ### Init graphics pipeline
@@ -105,26 +110,46 @@ function main()
 
   ### compute
 
-  compute_layout = [
-    ds.hashmap(
-      :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      :stage, vk.SHADER_STAGE_COMPUTE_BIT
-    ),
-    ds.hashmap(
-      :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-      :stage, vk.SHADER_STAGE_COMPUTE_BIT
-    ),
-    ds.hashmap(
-      :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-      :stage, vk.SHADER_STAGE_COMPUTE_BIT
-    )
-  ]
+  dsets = fw.descriptors(
+    dev,
+    frames,
+    [
+      ds.hashmap(
+        :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        :stage, vk.SHADER_STAGE_COMPUTE_BIT
+      ),
+      ds.hashmap(
+        :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        :stage, vk.SHADER_STAGE_COMPUTE_BIT
+      ),
+      ds.hashmap(
+        :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        :stage, vk.SHADER_STAGE_COMPUTE_BIT
+      )
+    ]
+  )
 
   compute_bindings = ds.map(i -> [
       deltas[i], ssbos[(i % frames) + 1], ssbos[((i + 1) % frames) + 1]
     ],
     1:frames
   )
+
+  @info fw.binddescriptors(dev, dsets, compute_bindings)
+
+  playout = vk.unwrap(vk.create_pipeline_layout(
+    dev, [get(dsets, :descriptorsetlayout)], []
+  ))
+
+  cp = vk.unwrap(vk.create_compute_pipelines(
+    dev,
+    [vk.ComputePipelineCreateInfo(
+      # FIXME: Shaders have different assumptions here.
+      gp.shaders(system, get(config, :compute))[1],
+      playout,
+      0
+    )]
+  ))[1][1]
 
   ### run
 
@@ -136,6 +161,21 @@ function main()
     t2 = time()
     uniform.setubo!(deltas[i], Float32(t2-t1))
     t1 = t2
+
+    commands.cmdseq(system, :compute) do cmd
+      vk.cmd_bind_pipeline(cmd, vk.PIPELINE_BIND_POINT_COMPUTE, cp)
+
+      vk.cmd_bind_descriptor_sets(
+        cmd,
+        vk.PIPELINE_BIND_POINT_COMPUTE,
+        playout,
+        0,
+        [get(dsets, :descriptorsets)[(i%frames)+1]],
+        [],
+      )
+
+      vk.cmd_dispatch(cmd, Int(floor(get(config, :particles) / 256)), 1, 1)
+    end
 
     vb = ssbos[(i % frames) + 1]
 

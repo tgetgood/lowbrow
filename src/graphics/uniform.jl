@@ -19,7 +19,8 @@ function allocatebuffers(system, T, n)
     map(x -> ds.assoc(x,
       :memptr, Ptr{T}(vk.unwrap(vk.map_memory(
         get(system, :device), get(x, :memory), 0, get(x, :size)
-      )))
+      ))),
+      :size, sizeof(T)
     )),
     1:n
   )

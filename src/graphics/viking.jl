@@ -90,12 +90,14 @@ prog = ds.hashmap(
 
 function main()
   config = graphics.configure(load(prog))
+  frames = get(config, :concurrent_frames)
 
   system = graphics.staticinit(config)
+  dev = get(system, :device)
 
   texture = textures.textureimage(system, get(config, :texture_file))
 
-  ubos = uniform.allocatebuffers(system, MVP, get(config, :concurrent_frames))
+  ubos = uniform.allocatebuffers(system, MVP, frames)
 
   bindings = [
     ds.hashmap(
@@ -110,9 +112,16 @@ function main()
     )
   ]
 
-  config = ds.assoc(config, :bindings, bindings)
+  dsets = fw.descriptors(dev, frames, bindings)
+
+  config = merge(
+    config,
+    ds.selectkeys(dsets, [:descriptorsetlayout, :descriptorsets])
+  )
 
   system, config = graphics.instantiate(system, config)
+
+  fw.binddescriptors(dev, dsets, [[ubos[1], texture], [ubos[2], texture]])
 
   config = fw.buffers(system, config)
 

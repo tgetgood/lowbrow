@@ -23,8 +23,9 @@ defaults = hashmap(
   :debuglevel, vk.DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
   :device, hashmap(
     :features, [:sampler_anisotropy],
+    :vk12features, [:timeline_semaphore],
     # FIXME: logically these are sets. How does vk handle repeats?
-    :extensions, ["VK_KHR_swapchain"]
+    :extensions, ["VK_KHR_swapchain", "VK_KHR_timeline_semaphore"]
   ),
   :window, hashmap(:width, 1600, :height, 1200),
   :swapchain, hashmap(
@@ -126,13 +127,11 @@ end
 
 # TODO: This is where the config negotiation will happen
 function instantiate(system, config)
-  config = fw.descriptors(system, config)
 
   system = dynamicinit(system, config)
 
   # config = fw.buffers(system, config)
 
-  fw.binddescriptors(system, config)
 
   return system, config
 end
@@ -160,6 +159,7 @@ function renderloop(framefn, system, config)
       i = 0
       frames = get(config, :concurrent_frames, 1)
       t = time()
+      framecounter = 0
       while !window.closep(get(system, :window)) && !isready(sigkill)
         i = (i % frames) + 1
 
@@ -179,9 +179,20 @@ function renderloop(framefn, system, config)
              res == vk.SUBOPTIMAL_KHR ||
              get(system, :resizecb)()
 
+            @info "resized"
+
             system = ds.assoc(system, :window_size, window.size(get(system, :window)))
             system = dynamicinit(system, config)
           end
+        end
+
+        framecounter += 1
+        tp = time()
+        if tp - t > 5
+          @info "framerate: " * string(framecounter/(tp - t))
+
+          t = tp
+          framecounter = 0
         end
       end
 
