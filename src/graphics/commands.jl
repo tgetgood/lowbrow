@@ -8,24 +8,24 @@ import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
 
 """
-`signal` must be a timeline semaphore.
+Returns a timeline semaphore which will signal `1` when submitted commands are
+finished.
+
+Also starts a new task which waits and collects the command buffer. Some sort of
+pool would be a better design, but this suffices for now.
 """
 function cmdseq(body, system, qf;
-                level=vk.COMMAND_BUFFER_LEVEL_PRIMARY, signal=nothing)
+                level=vk.COMMAND_BUFFER_LEVEL_PRIMARY, wait=[])
 
-  if signal === nothing
-    signal = vk.unwrap(vk.create_semaphore(
-      get(system, :device),
-      vk.SemaphoreCreateInfo(
-        next=vk.SemaphoreTypeCreateInfo(
-          vk.SEMAPHORE_TYPE_TIMELINE,
-          0
-        )
+  signal = vk.unwrap(vk.create_semaphore(
+    get(system, :device),
+    vk.SemaphoreCreateInfo(
+      next=vk.SemaphoreTypeCreateInfo(
+        vk.SEMAPHORE_TYPE_TIMELINE,
+        0
       )
-    ))
-  end
-
-  @info signal
+    )
+  ))
 
   pool = hw.getpool(system, qf)
   queue = hw.getqueue(system, qf)
@@ -39,16 +39,20 @@ function cmdseq(body, system, qf;
 
   vk.end_command_buffer(cmd)
 
-  vk.queue_submit(queue, [vk.SubmitInfo([],[],[cmd],[])])
+  vk.queue_submit(queue, [vk.SubmitInfo(wait,[],[cmd], [signal];
+    next=vk.TimelineSemaphoreSubmitInfo(signal_semaphore_values=[UInt(1)])
+  )])
 
-  # FIXME: Waiting for the queue to be idle is wrong. My attempt to use a fence
-  # caused some exciting errors, but that's probably my fault.
-  #
-  # At least use @async so that we don't block the main render thread while this
-  # waits to clean up.
-  vk.queue_wait_idle(queue)
+  @async begin
+    vk.wait_semaphores(
+      get(system, :device),
+      vk.SemaphoreWaitInfo([signal], [UInt(1)]),
+      typemax(UInt)
+    )
+    vk.free_command_buffers(get(system, :device), pool, cmds)
+  end
 
-  vk.free_command_buffers(get(system, :device), pool, cmds)
+  return signal
 end
 
 function copybuffertoimage(cmd, system, src, dst, size, qf=:transfer)
