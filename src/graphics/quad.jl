@@ -56,4 +56,4 @@ function main()
   end
 end
 
-repl_teardown = main()
+main()

@@ -134,7 +134,7 @@ function textureimage(system, filename)
     :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
   ))
 
-  commands.cmdseq(system, :transfer) do cmd
+  sem = commands.cmdseq(system, :transfer) do cmd
     commands.transitionimage(cmd, ds.hashmap(
       :image, vkim,
       :miplevels, mips,
@@ -162,6 +162,12 @@ function textureimage(system, filename)
     ))
 
   end
+
+  vk.wait_semaphores(
+    get(system, :device),
+    vk.SemaphoreWaitInfo([sem], [UInt(1)]),
+    typemax(UInt)
+  )
 
   generatemipmaps(vkim, system)
 
