@@ -17,8 +17,8 @@ struct Particle
   colour::NTuple{4, Float32}
 end
 
-function position(r, θ, n)
-  (r*cos(θ) * n, r*sin(θ))
+function position(r, θ)
+  (r*cos(θ) , r*sin(θ))
 end
 
 function velocity(p)
@@ -30,14 +30,14 @@ function velocity(p)
   (25f-3/n) .* (x, y)
 end
 
-function init(count, width, height)::Vector{Particle}
+function init(count)::Vector{Particle}
   ds.into(
     ds.emptyvector,
     ds.partition(5)
     ∘
     map(x -> (sqrt(x[1]) * 25.0f-2, x[2] * 2pi, x[3:5]))
     ∘
-    map(x -> (position(x[1], x[2], height / width), x[3]))
+    map(x -> (position(x[1], x[2]), x[3]))
     ∘
     map(x -> Particle(x[1], velocity(x[1]), tuple(x[2]..., 1f0))),
     rand(Float32, 5, count)
@@ -46,8 +46,7 @@ end
 
 function particle_buffers(system, config)
   n = get(config, :particles)
-  ext = get(system, :extent)
-  particles = init(n, ext.width, ext.height)
+  particles = init(n)
 
   ssbos = into(
     emptyvector,
@@ -73,9 +72,7 @@ end
 prog = hashmap(
   :particles, 2^14,
   :compute, ds.hashmap(
-    :shaders, ds.hashmap(
-      :compute, "particles.comp"
-    )
+    :shader, "particles.comp"
   ),
   :shaders, hashmap(
     :vertex, "particles.vert",
@@ -135,7 +132,7 @@ function main()
     1:frames
   )
 
-  @info fw.binddescriptors(dev, dsets, compute_bindings)
+  fw.binddescriptors(dev, dsets, compute_bindings)
 
   playout = vk.unwrap(vk.create_pipeline_layout(
     dev, [get(dsets, :descriptorsetlayout)], []
@@ -145,7 +142,7 @@ function main()
     dev,
     [vk.ComputePipelineCreateInfo(
       # FIXME: Shaders have different assumptions here.
-      gp.shaders(system, get(config, :compute))[1],
+      gp.shader(dev, ds.getin(config, [:compute, :shader]), :compute),
       playout,
       0
     )]
@@ -177,10 +174,10 @@ function main()
       vk.cmd_dispatch(cmd, Int(floor(get(config, :particles) / 256)), 1, 1)
     end
 
-    vb = ssbos[(i % frames) + 1]
+    vb = ssbos[((i+1) % frames) + 1]
 
     return ds.assoc(renderstate, :vertexbuffer, vb)
   end
 end
 
-repl_teardown = main()
+main()

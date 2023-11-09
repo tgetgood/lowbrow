@@ -11,14 +11,14 @@ function glslc(src, out)
   run(`glslc $(@__DIR__)/../shaders/$src -o $out`)
 end
 
-function compileshader(system, fname)
+function compileshader(device, fname)
   (tmp, io) = mktemp()
   close(io)
   glslc(fname, tmp)
   bin = read(tmp)
   size = length(bin)
   code = reinterpret(UInt32, bin)
-  vk.unwrap(vk.create_shader_module(get(system, :device), size, code))
+  vk.unwrap(vk.create_shader_module(device, size, code))
 end
 
 const shadertypes = hashmap(
@@ -27,16 +27,20 @@ const shadertypes = hashmap(
   :compute, vk.SHADER_STAGE_COMPUTE_BIT
 )
 
-function shaders(system, config)
-  # FIXME: This only allows one shader of a given type per pipeline. That's
-  # probably wrong.
+function shader(device, fname, stage, entry="main")
+  vk.PipelineShaderStageCreateInfo(
+    get(shadertypes, stage),
+    compileshader(device, fname),
+    entry
+  )
+end
+
+function shaders(device, config)
+  # REVIEW: This assumes only one shader of a given type per pipeline. Is that
+  # correct?
   into(
     [],
-    map(e -> vk.PipelineShaderStageCreateInfo(
-      get(shadertypes, ds.key(e)),
-      compileshader(system, ds.val(e)),
-      "main" # TODO: This should be overridable
-    )),
+    map(e -> shader(device, ds.val(e), ds.key(e))),
     get(config, :shaders))
 end
 
@@ -116,14 +120,17 @@ function pipelinelayout(system, config)
 end
 
 function creategraphicspipeline(system, config)
+  device = get(system, :device)
+
   dynamic_state = vk.PipelineDynamicStateCreateInfo([
     vk.DYNAMIC_STATE_SCISSOR,
     vk.DYNAMIC_STATE_VIEWPORT
   ])
 
   input_assembly_state = vk.PipelineInputAssemblyStateCreateInfo(
-    # vk.PRIMITIVE_TOPOLOGY_POINT_LIST,
-    vk.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+    vk.PRIMITIVE_TOPOLOGY_POINT_LIST,
+    # vk.PRIMITIVE_TOPOLOGY_LINE_LIST,
+    # vk.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
     false
   )
 
@@ -195,9 +202,9 @@ function creategraphicspipeline(system, config)
   layout = pipelinelayout(system, config)
 
   ps = vk.unwrap(vk.create_graphics_pipelines(
-    get(system, :device),
+    device,
     [vk.GraphicsPipelineCreateInfo(
-      shaders(system, config),
+      shaders(device, config),
       vk.PipelineRasterizationStateCreateInfo(
         false,
         false,
