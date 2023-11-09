@@ -17,7 +17,6 @@ mergeconfig(x, y) = y
 mergeconfig(x::ds.Map, y::ds.Map) = ds.mergewith(mergeconfig, x, y)
 mergeconfig(x::VS, y::VS) = ds.into(y, x)
 
-
 defaults = hashmap(
   :dev_tools, true,
   :debuglevel, vk.DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
@@ -48,7 +47,11 @@ devtooling = ds.hashmap(
   )
 )
 
+const tear_down = Ref{Function}(() -> nothing)
+
 function configure(prog)
+  tear_down[]()
+
   devcfg = ds.transduce(
     map(x -> ds.selectkeys(x, [:dev_tools, :debuglevel])),
     merge,
@@ -136,20 +139,16 @@ function instantiate(system, config)
   return system, config
 end
 
-tear_down = Ref{Function}(() -> nothing)
-
 function renderloop(framefn, system, config)
-  if tear_down[] isa Function
-    tear_down[]()
-  end
-
   sigkill = Channel()
 
-  # The number of some types of Vulkan objects that can be created is
-  # limited. Make sure finalisers run to clean up between iterations.
-  GC.gc()
+  tear_down[] = function()
+    tear_down[] = () -> nothing
+    @info "tearing down running process."
+    put!(sigkill, true)
+    @info "teardown finished."
+  end
 
-  configcache = config
   renderstate = fw.assemblerender(system, config)
 
   handle = Threads.@spawn begin
@@ -160,15 +159,21 @@ function renderloop(framefn, system, config)
       frames = get(config, :concurrent_frames, 1)
       t = time()
       framecounter = 0
-      while !window.closep(get(system, :window)) && !isready(sigkill)
+      while !isready(sigkill)
+
+        if window.closep(get(system, :window))
+          @async put!(sigkill, true)
+          break
+        end
+
         i = (i % frames) + 1
 
         window.poll()
 
-        if config !== configcache
-          renderstate = vertex.assemblerender(system, config)
-          configcache = config
-        end
+        # if config !== configcache
+        #   renderstate = vertex.assemblerender(system, config)
+        #   configcache = config
+        # end
 
         if !window.minimised(get(system, :window))
 
@@ -188,7 +193,7 @@ function renderloop(framefn, system, config)
 
         framecounter += 1
         tp = time()
-        if tp - t > 5
+        if tp - t > 10
           @info "framerate: " * string(framecounter/(tp - t))
 
           t = tp
@@ -196,25 +201,28 @@ function renderloop(framefn, system, config)
         end
       end
 
+      @info isready(sigkill)
       @info "finished main loop; cleaning up"
+
       vk.device_wait_idle(get(system, :device))
       window.shutdown()
 
-      if isready(sigkill)
-        take!(sigkill)
-      end
+      config = nothing
+      system = nothing
+      renderstate = nothing
+
+      take!(sigkill)
+
+      tear_down[] = () -> nothing
+
+      # The number of some types of Vulkan objects that can be created is
+      # limited. Make sure finalisers run to clean up between iterations.
+      GC.gc()
 
       @info "done"
     catch e
       showerror(stderr, e)
       show(stderr, "text/plain", stacktrace(catch_backtrace()))
-    end
-  end
-
-  @info "returning control"
-  tear_down[] = function()
-    if istaskstarted(handle) && !istaskdone(handle)
-      put!(sigkill, true)
     end
   end
 end
