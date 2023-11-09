@@ -163,6 +163,13 @@ function textureimage(system, filename)
 
   end
 
+  # REVIEW: Ideally we'd send `sem` as a wait to the mipmap `queue_submit`.
+  #
+  # The problem is that the semaphore gets freed by Julia's GC, so we'd have to
+  # hold on to the `sem` handle somehow for an unknown length of time. The
+  # easiest way I can think to do that is use a task and another tick of the
+  # timeline. But if I'm blocking a thread anyway, why bother for something that
+  # happens only at load time?
   vk.wait_semaphores(
     get(system, :device),
     vk.SemaphoreWaitInfo([sem], [UInt(1)]),
