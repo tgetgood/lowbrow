@@ -100,13 +100,6 @@ function staticinit(config)
     # available.
 
     hw.createcommandpools,
-    # hw.createdescriptorpools,
-    # gp.shaders,
-    # model.load,
-    draw.commandbuffers,
-    # uniform.allocatebuffers,
-    # textures.textureimage,
-    # textures.allocatesets,
   ]
 
   ds.reduce((s, f) -> begin @info f; merge(s, f(s, config)) end, emptymap, steps)
@@ -117,6 +110,7 @@ function dynamicinit(system, config)
   vk.device_wait_idle(get(system, :device))
 
   steps = [
+    draw.commandbuffers,
     hw.createswapchain,
     hw.createimageviews,
     # TODO: There's so much config in the renderpass, it shouldn't be hardcoded.
