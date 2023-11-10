@@ -163,7 +163,6 @@ function draw(system, cmd, renderstate)
 
     if vk.iserror(preres)
       return vk.unwrap_error(preres).code
-    else
     end
   end
 end

@@ -258,11 +258,11 @@ function pdevice(system, config)
   end
 end
 
-function getqueue(system, queue, index=0)
+function getqueue(system, queue, nth=1)
   vk.get_device_queue(
     get(system, :device),
     getin(system, [:queues, queue]),
-    index
+    nth-1
   )
 end
 

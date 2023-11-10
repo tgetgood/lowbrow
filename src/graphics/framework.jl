@@ -1,3 +1,7 @@
+"""
+Helpers that work in a frameworky fashion. I don't want a framework, but I
+really hate boilerplate.
+"""
 module framework
 
 import Vulkan as vk
@@ -102,6 +106,48 @@ function buffers(system, config)
   )
 end
 
+function acquire_present(drawfn, system, swapchain, locks)
+  dev = get(system, :device)
+  timeout = typemax(Int64)
+  (imagesem, rendersem, fence) = locks
+
+  vk.wait_for_fences(dev, [fence], true, timeout)
+
+  imres = vk.acquire_next_image_khr(
+    dev,
+    swapchain,
+    timeout,
+    semaphore = imagesem
+  )
+
+  if vk.iserror(imres)
+    err = vk.unwrap_error(imres)
+    return err.code
+  else
+    image = vk.unwrap(imres)[1] + 1 # 0-indexed -> 1-indexed
+
+    #  Don't record over unsubmitted buffer
+    vk.reset_fences(dev, [fence])
+
+    drawfn(image)
+
+    # end fenced region
+
+    preres = vk.queue_present_khr(
+      hw.getqueue(system, :presentation),
+      vk.PresentInfoKHR(
+        [rendersem],
+        [swapchain],
+        [image]
+      )
+    )
+
+    if vk.iserror(preres)
+      return vk.unwrap_error(preres).code
+    end
+  end
+end
+
 function assemblerender(system, config)
   merge(
     ds.selectkeys(system, [
@@ -119,17 +165,6 @@ function assemblerender(system, config)
       :bindings
     ])
   )
-end
-
-function frameupdater(system, config)
-  function(i, renderstate)
-    for (buff, bind) in zip(ds.vals(get(config, :vbuffers)), get(config, :bindings))
-      if ds.containsp(bind, :update)
-        v = get(bind, :update)(get(config, get(bind, :initial_value)))
-        uniform.setubo!(buff[i], v)
-      end
-    end
-  end
 end
 
 end

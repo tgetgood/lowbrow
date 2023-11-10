@@ -148,35 +148,74 @@ function main()
     )]
   ))[1][1]
 
+  system = ds.assoc(system, :compute, ds.hashmap(
+    :pipeline, cp,
+    :dsets, dsets
+  ))
+
+  ### record compute commands once since they never change.
+
+  cqueue = hw.getqueue(system, :compute)
+
+  ccmds = hw.commandbuffers(system, frames, :compute)
+
+  for i in 1:frames
+    ccmd = ccmds[i]
+    vk.begin_command_buffer(ccmd, vk.CommandBufferBeginInfo())
+
+    vk.cmd_bind_pipeline(ccmd, vk.PIPELINE_BIND_POINT_COMPUTE, cp)
+
+    vk.cmd_bind_descriptor_sets(
+      ccmd,
+      vk.PIPELINE_BIND_POINT_COMPUTE,
+      playout,
+      0,
+      [get(dsets, :descriptorsets)[i]],
+      [],
+    )
+
+    vk.cmd_dispatch(ccmd, Int(floor(get(config, :particles) / 256)), 1, 1)
+
+    vk.end_command_buffer(ccmd)
+  end
+
+  csemcounters::Vector{UInt} = map(x->UInt(0), 1:frames)
+
+  csems = map(x -> vk.unwrap(vk.create_semaphore(
+      get(system, :device),
+      vk.SemaphoreCreateInfo(
+        next=vk.SemaphoreTypeCreateInfo(vk.SEMAPHORE_TYPE_TIMELINE, x)
+      )
+    )), csemcounters)
+
   ### run
 
   t1 = time()
 
   graphics.renderloop(system, config) do i, renderstate
-    # TODO: Some sort of framestate abstraction so that we don't have to
-    # manually juggle this index.
     t2 = time()
     uniform.setubo!(deltas[i], Float32(t2-t1))
     t1 = t2
 
-    commands.cmdseq(system, :compute) do cmd
-      vk.cmd_bind_pipeline(cmd, vk.PIPELINE_BIND_POINT_COMPUTE, cp)
+    csem = csems[i]
 
-      vk.cmd_bind_descriptor_sets(
-        cmd,
-        vk.PIPELINE_BIND_POINT_COMPUTE,
-        playout,
-        0,
-        [get(dsets, :descriptorsets)[(i%frames)+1]],
-        [],
+    # wait on cpu, signal on gpu. Not the most efficient, but with multiple
+    # frames in flight it should be just fine.
+    vk.wait_semaphores(
+      get(system, :device),
+      vk.SemaphoreWaitInfo([csem], [csemcounters[i]]),
+      typemax(UInt)
+    )
+
+    vk.queue_submit(cqueue, [vk.SubmitInfo([],[],[ccmds[i]], [csem];
+      next=vk.TimelineSemaphoreSubmitInfo(
+        signal_semaphore_values=[csemcounters[i]+1]
       )
+    )])
 
-      vk.cmd_dispatch(cmd, Int(floor(get(config, :particles) / 256)), 1, 1)
-    end
+    csemcounters[i] += 1
 
-    vb = ssbos[((i+1) % frames) + 1]
-
-    return ds.assoc(renderstate, :vertexbuffer, vb)
+    return ds.assoc(renderstate, :vertexbuffer, ssbos[i])
   end
 end
 
