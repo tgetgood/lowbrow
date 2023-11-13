@@ -16,7 +16,7 @@ include("./vector.jl")
 include("./transientvector.jl")
 include("./list.jl")
 include("./map.jl")
-# include("./set.jl")
+include("./set.jl")
 include("./queue.jl")
 
 include("./juliatypes.jl")
@@ -33,6 +33,9 @@ export list, tolist
 
 # Maps
 export emptymap, assoc, update, dissoc, containsp, hashmap, vals, associn, updatein, getin
+
+# Sets
+export emptyset, disj, set
 
 # Queues
 export Queue, queue, emptyqueue, closedp, emptystream, put!, Stream, stream

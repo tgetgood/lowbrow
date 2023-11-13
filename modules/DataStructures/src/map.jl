@@ -102,7 +102,7 @@ count(m::PersistentHashNode) = m.count
 count(m::MapEntry) = 1
 count(m::EmptyMap) = 0
 count(m::PersistentArrayMap) = div(length(m.kvs), 2) # inline kvs
-count(m::PersistentHashMap) = m.root.count
+count(m::PersistentHashMap) = m.root.count # REVIEW: Too much indirection?
 
 emptyp(m::Map) = count(m) == 0
 
@@ -344,6 +344,7 @@ function dissoc(m::PersistentArrayMap, k)
 end
 
 function seq(m::PersistentArrayMap)
+  # FIXME: We ought to return an iterable, not a realised vector.
   map(i -> MapEntry(m.kvs[i], m.kvs[i+1]), 1:2:length(m.kvs))
 end
 
@@ -483,6 +484,9 @@ function mergewith(f, m1, m2)
 end
 
 function dissoc(m::PersistentHashMap, k)
+  # REVIEW: It's telling that I haven't actually hit this error in the months
+  # I've been using this library. Is it just my style of programming?
+  # Monotonicity has a lot of benefits. And there's always `selectkeys`.
   throw("not implemented")
 end
 
@@ -495,6 +499,7 @@ function seq(m::PersistentHashMap)
 end
 
 function selectkey(m::Map, k)
+  emptymarker = gensym()
   v = get(m, k, emptymarker)
   if v === emptymarker
     nil
@@ -503,10 +508,7 @@ function selectkey(m::Map, k)
   end
 end
 
-# N.B.: This assumes that you're selecting a relatively small number of keys. If
-# you're selecting a lot of keys from a huge map, this will not do so well.
-#
-# REVIEW: will that ever be a problem?
+# TODO: Override `into` for EmptyMap as we did for vectors.
 function selectkeys(m::Map, ks)
   into(emptymap, map(x -> selectkey(m, x)) ∘ remove(x -> x === nil), ks)
 end
