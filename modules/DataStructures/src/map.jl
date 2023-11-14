@@ -191,21 +191,42 @@ function showrecur(io::IO, depth, m::EmptyMap)
   print(io, "{}")
 end
 
+function aligncol(io::IO, depth, es)
+  len = max(map(length ∘ string ∘ key, es)...) + 2
+  for i in 1:length(es)
+    if i > 1
+      indent(io, depth-1)
+      print(io, " ")
+    end
+
+    k = key(es[i])
+    if isa(k, Sequential)
+      showrecur(io, depth, k)
+    else
+      s = string(k)
+      print(io, s)
+      print(io, repeat(" ", len - length(s)))
+    end
+    showrecur(io, depth, val(es[i]))
+
+    if i != length(es)
+      print(io, "\n")
+    end
+  end
+end
+
 function showrecur(io::IO, depth, m::Map)
-  print(io, string(count(m)) * "-element PersistentMap: {\n")
-  indent(io, depth)
+  print(io, "{")
 
   s = seq(m)
   if count(m) > 33
-    showseq(io, depth, take(16, s))
+    aligncol(io, depth, take(16, s))
     print(io, "\n ...\n")
     indent(io, depth)
-    showseq(io, depth, drop(count(m) - 16, s))
+    aligncol(io, depth, drop(count(m) - 16, s))
   else
-    showseq(io, depth, s)
+    aligncol(io, depth, s)
   end
-  print(io, "\n")
-  indent(io, depth-1)
   print(io, "}")
 end
 
