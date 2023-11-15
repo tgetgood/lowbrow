@@ -1,13 +1,70 @@
 module hardware
 
 import window
+import GLFW
+
+import Base: get
 
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
 
+abstract type VKSystem end
+
+struct VKRender <: VKSystem
+  instance::vk.Instance
+  physical_device::vk.PhysicalDevice
+  device::vk.Device
+  window::GLFW.Window
+  surface::vk.SurfaceKHR
+  queues::ds.Map
+  commandpools::ds.Map
+end
+
+##### REVIEW: Seems I'll want these eventually, but they're just reminders at
+##### present.
+struct VKHeadlessRender <: VKSystem
+end
+
+struct VKComputeOnly <: VKSystem
+end
+
+function get(x::VKSystem, k::Symbol, default)
+  if hasproperty(x, k)
+    getproperty(x, k)
+  else
+    default
+  end
+end
+
+get(x::VKSystem, k::Symbol) = get(x, k, nothing)
+
 function containsall(needles, hay)::Bool
   return [nothing] == indexin([nothing], indexin(needles, hay))
+end
+
+"""
+Returns a hashmap isomorphic to s. It's probably better to override fns for
+vk.HighLevelStruct to treat them like maps, rather than actually cast
+everything.
+"""
+function srecord(s::T) where T
+  into(emptymap, map(k -> (k, getproperty(s, k))), fieldnames(T))
+end
+
+function probeapi()
+  hashmap(
+    :version, vk.unwrap(vk.enumerate_instance_version()),
+    :extensions, vk.unwrap(vk.enumerate_instance_extension_properties()),
+    :layers, vk.unwrap(vk.enumerate_instance_layer_properties())
+  )
+end
+
+function probedevices(instance, query)
+end
+
+function probe(requirements)
+  vk.unwrap(vk.enumerate_instance_extension_properties())
 end
 
 function instance(_, config)

@@ -70,13 +70,25 @@ function particle_buffers(system, config)
 end
 
 prog = hashmap(
+  :name, "VK tutorial particle sim.",
+  :version, v"0.1",
+  :vulkan, ds.hashmap(
+    :version, v"1.3"
+  ),
+  # :device, ds.hashmap(
+  #   :features, ds.hashmap(
+  #     v"1.0", ds.set(:sampler_anisotropy),
+  #     v"1.2", ds.set(:timeline_semaphore)
+  #   ),
+  #   :extensions, ds.set("VK_KHR_swapchain", "VK_KHR_timeline_semaphore")
+  # ),
   :particles, 2^14,
   :compute, ds.hashmap(
-    :shader, "particles.comp"
+    :shader, *(@__DIR__, "/../shaders/particles.comp")
   ),
   :shaders, hashmap(
-    :vertex, "particles.vert",
-    :fragment, "particles.frag",
+    :vertex, *(@__DIR__, "/../shaders/particles.vert"),
+    :fragment, *(@__DIR__, "/../shaders/particles.frag"),
   ),
 )
 
@@ -106,6 +118,31 @@ function main()
   ssbos = particle_buffers(system, config)
 
   ### compute
+
+  cpconfig = ds.hashmap(
+    :descriptorsets, [ds.hashmap(
+      :count, frames,
+      :layout, [
+        ds.hashmap(
+          :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+          :stage, vk.SHADER_STAGE_COMPUTE_BIT
+        ),
+        ds.hashmap(
+          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          :stage, vk.SHADER_STAGE_COMPUTE_BIT
+        ),
+        ds.hashmap(
+          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          :stage, vk.SHADER_STAGE_COMPUTE_BIT
+        )
+      ]
+    )],
+    :shader, ds.hashmap(
+      :type, :compute,
+      :file, *(@__DIR__, "/../shaders/particles.comp"),
+      :cache, true
+    )
+  )
 
   dsets = fw.descriptors(
     dev,

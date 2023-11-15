@@ -8,7 +8,7 @@ import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, mapindexed
 
 function glslc(src, out)
-  run(`glslc $(@__DIR__)/../shaders/$src -o $out`)
+  run(`glslc $src -o $out`)
 end
 
 function compileshader(device, fname)
@@ -24,7 +24,10 @@ end
 const shadertypes = hashmap(
   :vertex, vk.SHADER_STAGE_VERTEX_BIT,
   :fragment, vk.SHADER_STAGE_FRAGMENT_BIT,
-  :compute, vk.SHADER_STAGE_COMPUTE_BIT
+  :compute, vk.SHADER_STAGE_COMPUTE_BIT,
+  :geometry, vk.SHADER_STAGE_GEOMETRY_BIT,
+  :tessellationcontrol, vk.SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+  :tessellationeval, vk.SHADER_STAGE_TESSELLATION_EVALUATION_BIT
 )
 
 function shader(device, fname, stage, entry="main")
@@ -43,6 +46,23 @@ function shaders(device, config)
     map(e -> shader(device, ds.val(e), ds.key(e))),
     get(config, :shaders))
 end
+
+##### Compute Pipelines
+
+function computepipeline(system, config)
+  dev = get(system, :device)
+
+  descriptorsetlayouts = into(
+    emptyvector,
+    map(x -> get(x, :layout))
+    ∘
+    map(rd.descriptorsetlayout),
+    get(config, :descriptorsets)
+  )
+
+end
+
+##### Render Pipelines
 
 function renderpass(system, config)
   hashmap(

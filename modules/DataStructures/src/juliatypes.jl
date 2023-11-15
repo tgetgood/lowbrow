@@ -28,7 +28,6 @@ ireduce(f, init, coll::AbstractRange) = Base.reduce(f, coll; init)
 ireduce(f, init, coll::Array) = Base.reduce(f, coll; init)
 ireduce(f, init, coll::Tuple) = Base.reduce(f, coll; init)
 
-
 Base.convert(::Type{Vector}, xs::Tuple) = vec(xs)
 Base.convert(::Type{Vector}, xs::Base.Vector) = vec(xs)
 Base.convert(::Type{Vector}, xs::UnitRange) = vec(xs)

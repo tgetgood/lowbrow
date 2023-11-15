@@ -26,7 +26,7 @@ count(s::PersistentArraySet) = length(s.elements)
 
 containsp(s::Set, x) = getindexed(s, x) !== :notfound
 
-set(xs) = into(emptyset, xs)
+set(xs...) = into(emptyset, xs)
 
 function arrayset(elements)
   if length(elements) === 0
