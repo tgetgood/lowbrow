@@ -49,17 +49,26 @@ end
 
 ##### Compute Pipelines
 
+# TODO: Map this over multiple configs for multiple pipelines (minimise vk calls).
 function computepipeline(system, config)
   dev = get(system, :device)
 
-  descriptorsetlayouts = into(
-    emptyvector,
-    map(x -> get(x, :layout))
-    ∘
-    map(rd.descriptorsetlayout),
-    get(config, :descriptorsets)
-  )
+  layoutci = rd.descriptorsetlayout(ds.getin(config, [:descriptorset, :layout]))
 
+  layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
+
+  pipelinelayout = vk.unwrap(vk.create_pipeline_layout(dev, [layout], []))
+
+  shaderconfig = get(config, :shader)
+  computeshader = shader(dev, get(shaderconfig, :file), get(shaderconfig, :stage))
+
+  ds.hashmap(
+    :layout, playout,
+    :pipeline, vk.unwrap(vk.create_compute_pipelines(
+      dev,
+      [vk.ComputePipelineCreateInfo(computeshader, pipelinelayout, 0)]
+    ))[1][1]
+  )
 end
 
 ##### Render Pipelines

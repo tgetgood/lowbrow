@@ -120,7 +120,7 @@ function main()
   ### compute
 
   cpconfig = ds.hashmap(
-    :descriptorsets, [ds.hashmap(
+    :descriptorset, ds.hashmap(
       :count, frames,
       :layout, [
         ds.hashmap(
@@ -136,10 +136,11 @@ function main()
           :stage, vk.SHADER_STAGE_COMPUTE_BIT
         )
       ]
-    )],
+    ),
     :shader, ds.hashmap(
-      :type, :compute,
+      :stage, :compute,
       :file, *(@__DIR__, "/../shaders/particles.comp"),
+      # FIXME: Currently no caching is implemented.
       :cache, true
     )
   )

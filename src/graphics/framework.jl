@@ -12,7 +12,6 @@ import resources as rd
 import vertex
 
 function descriptors(dev, frames, bindings)
-
   if length(bindings) > 0
     layoutci = rd.descriptorsetlayout(bindings)
     poolci = rd.descriptorpool(layoutci, frames)
