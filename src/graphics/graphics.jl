@@ -26,15 +26,15 @@ defaults = hashmap(
     # FIXME: logically these are sets. How does vk handle repeats?
     :extensions, ["VK_KHR_swapchain", "VK_KHR_timeline_semaphore"]
   ),
-  :window, hashmap(:width, 1600, :height, 1200),
+  :window, hashmap(:width, 1600, :height, 1000),
   :swapchain, hashmap(
     # TODO: Fallback formats and init time selection.
     :format, vk.FORMAT_B8G8R8A8_SRGB,
     :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
     :presentmode, vk.PRESENT_MODE_FIFO_KHR,
-    :images, 2
+    :images, 3
   ),
-  :concurrent_frames, 2
+  :concurrent_frames, 3
 )
 
 devtooling = ds.hashmap(

@@ -461,17 +461,17 @@ end
 function buffer(system, config)
   dev = get(system, :device)
 
-  queues = into([], map(x -> getin(system, [:queues, x]), get(config, :queues)))
+  queues = into(ds.emptyset, map(x -> getin(system, [:queues, x]), get(config, :queues)))
 
   mode = get(config, :sharingmode,
-    length(queues) == 1 ? vk.SHARING_MODE_EXCLUSIVE : vk.SHARING_MODE_CONCURRENT
+    ds.count(queues) == 1 ? vk.SHARING_MODE_EXCLUSIVE : vk.SHARING_MODE_CONCURRENT
   )
 
   bci = vk.BufferCreateInfo(
     get(config, :size),
     get(config, :usage),
     mode,
-    queues
+    into([], queues)
   )
 
   buffer = vk.unwrap(vk.create_buffer(dev, bci))

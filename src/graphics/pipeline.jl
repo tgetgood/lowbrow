@@ -280,19 +280,4 @@ function createframebuffers(system, config)
   )
 end
 
-function computelayout(buffers)
-end
-
-function computepipeline(system, config)
-  layout = computelayout(get(system, :particle_buffers))
-  pipeline = vk.unwrap(vk.create_compute_pipelines(
-    get(system, :device),
-    [vk.ComputePipelineCreateInfo(
-      ds.getin(system, [:shaders, :compute]),
-      vk.PipelineLayoutCreateInfo(layout, [])
-    )]
-  ))
-  hashmap(:compute, hashmap(:pipeline, pipeline, :layout, layout))
-end
-
 end #module
