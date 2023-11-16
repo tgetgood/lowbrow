@@ -120,9 +120,9 @@ function main()
   ### compute
 
   cpconfig = ds.hashmap(
-    :descriptorset, ds.hashmap(
+    :descriptorsets, ds.hashmap(
       :count, frames,
-      :layout, [
+      :bindings, [
         ds.hashmap(
           :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
           :stage, vk.SHADER_STAGE_COMPUTE_BIT
@@ -145,23 +145,8 @@ function main()
     )
   )
 
-  dsets = fw.descriptors(
-    dev,
-    frames,
-    [
-      ds.hashmap(
-        :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        :stage, vk.SHADER_STAGE_COMPUTE_BIT
-      ),
-      ds.hashmap(
-        :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-        :stage, vk.SHADER_STAGE_COMPUTE_BIT
-      ),
-      ds.hashmap(
-        :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-        :stage, vk.SHADER_STAGE_COMPUTE_BIT
-      )
-    ]
+  cpconfig = ds.update(
+    cpconfig, :descriptorsets, x -> merge(x, fw.descriptors(dev, x))
   )
 
   compute_bindings = ds.map(i -> [
@@ -170,26 +155,16 @@ function main()
     1:frames
   )
 
-  fw.binddescriptors(dev, dsets, compute_bindings)
+  fw.binddescriptors(dev, get(cpconfig, :descriptorsets), compute_bindings)
 
-  playout = vk.unwrap(vk.create_pipeline_layout(
-    dev, [get(dsets, :descriptorsetlayout)], []
-  ))
+  cpconfig = ds.assoc(cpconfig, :pipeline, gp.computepipeline(dev, cpconfig))
 
-  cp = vk.unwrap(vk.create_compute_pipelines(
-    dev,
-    [vk.ComputePipelineCreateInfo(
-      # FIXME: Shaders have different assumptions here.
-      gp.shader(dev, ds.getin(config, [:compute, :shader]), :compute),
-      playout,
-      0
-    )]
-  ))[1][1]
+  config = ds.assoc(config, :computeparticles, cpconfig)
 
-  system = ds.assoc(system, :compute, ds.hashmap(
-    :pipeline, cp,
-    :dsets, dsets
-  ))
+  # system = ds.assoc(system, :compute, ds.hashmap(
+  #   :pipeline, cp,
+  #   :dsets, ds.getin
+  # ))
 
   ### record compute commands once since they never change.
 
@@ -201,14 +176,14 @@ function main()
     ccmd = ccmds[i]
     vk.begin_command_buffer(ccmd, vk.CommandBufferBeginInfo())
 
-    vk.cmd_bind_pipeline(ccmd, vk.PIPELINE_BIND_POINT_COMPUTE, cp)
+    vk.cmd_bind_pipeline(ccmd, vk.PIPELINE_BIND_POINT_COMPUTE, ds.getin(cpconfig, [:pipeline, :pipeline]))
 
     vk.cmd_bind_descriptor_sets(
       ccmd,
       vk.PIPELINE_BIND_POINT_COMPUTE,
-      playout,
+      ds.getin(cpconfig, [:pipeline, :layout]),
       0,
-      [get(dsets, :descriptorsets)[i]],
+      [ds.getin(cpconfig, [:descriptorsets, :sets])[i]],
       [],
     )
 

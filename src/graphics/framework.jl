@@ -11,7 +11,10 @@ import uniform
 import resources as rd
 import vertex
 
-function descriptors(dev, frames, bindings)
+function descriptors(dev, dsetspec)
+  bindings = get(dsetspec, :bindings)
+  frames = get(dsetspec, :count)
+
   if length(bindings) > 0
     layoutci = rd.descriptorsetlayout(bindings)
     poolci = rd.descriptorpool(layoutci, frames)
@@ -29,12 +32,11 @@ function descriptors(dev, frames, bindings)
     ))
 
     ds.hashmap(
-      :layoutcreateinfo, layoutci,
-      :descriptorsetlayout, layout,
-      :descriptorsets, sets
+      :layout, layout,
+      :sets, sets
     )
   else
-    config
+    ds.emptymap
   end
 end
 
@@ -62,9 +64,9 @@ function descriptorinfos(binding)
   end
 end
 
-function binddescriptors(dev, descriptors, bindings)
-  dsets = get(descriptors, :descriptorsets)
-  usages = map(x -> x.descriptor_type, get(descriptors, :layoutcreateinfo).bindings)
+function binddescriptors(dev, config, bindings)
+  dsets = get(config, :sets)
+  usages = map(x -> get(x, :usage), get(config, :bindings))
 
   writes = ds.into(
     [],
