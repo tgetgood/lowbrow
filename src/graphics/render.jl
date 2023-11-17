@@ -33,7 +33,7 @@ function commandbuffers(system, config)
   )
 end
 
-function recorder(cmd, framebuffer, config)
+function recorder(cmd, i, framebuffers, config)
   # REVIEW: This can probably be sped up a lot by moving all of the lookups out
   # of runtime.
   #
@@ -58,7 +58,7 @@ function recorder(cmd, framebuffer, config)
     cmdbuf,
     vk.RenderPassBeginInfo(
       render_pass,
-      framebuffer,
+      framebuffers[i],
       scissors[1],
       [
         vk.ClearValue(vk.ClearColorValue((0f0, 0f0, 0f0, 1f0))),
@@ -78,18 +78,17 @@ function recorder(cmd, framebuffer, config)
 
   vk.cmd_set_scissor(cmdbuf, scissors)
 
-  if ds.containsp(config, :descriptorsets)
-    descriptorsets = get(config, :descriptorsets)
-    if length(descriptorsets) > 0
-      vk.cmd_bind_descriptor_sets(
-        cmdbuf,
-        vk.PIPELINE_BIND_POINT_GRAPHICS,
-        get(config, :pipelinelayout),
-        0,
-        [descriptorsets[1]],
-        []
-      )
-    end
+  descriptorsets = ds.getin(config, [:descriptorsets, :sets], [])
+
+  if length(descriptorsets) > 0
+    vk.cmd_bind_descriptor_sets(
+      cmdbuf,
+      vk.PIPELINE_BIND_POINT_GRAPHICS,
+      get(config, :pipelinelayout),
+      0,
+      [descriptorsets[i]],
+      []
+    )
   end
 
   vert = ds.get(config, :vertexbuffer)
@@ -139,7 +138,7 @@ function draw(system, cmd, renderstate)
     #  Don't record over unsubmitted buffer
     vk.reset_fences(dev, [fence])
 
-    recorder(cmd, get(system, :framebuffers)[image + 1], renderstate)
+    recorder(cmd, image + 1, get(system, :framebuffers), renderstate)
 
     submission = vk.SubmitInfo(
       [imagesem],

@@ -27,9 +27,14 @@ end
 
 prog = ds.hashmap(
   :name, "Quad",
-  :shaders, ds.hashmap(
-    :vertex, "quad.vert",
-    :fragment, "quad.frag"
+  :render, ds.hashmap(
+    :shaders, ds.hashmap(
+      :vertex, *(@__DIR__, "/../shaders/quad.vert"),
+      :fragment, *(@__DIR__, "/../shaders/quad.frag")
+    ),
+    :inputassembly, ds.hashmap(
+      :topology, :triangles
+    )
   ),
   :model, ds.hashmap(
     :loader, load,

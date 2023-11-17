@@ -44,7 +44,8 @@ function shaders(device, config)
   into(
     [],
     map(e -> shader(device, ds.val(e), ds.key(e))),
-    get(config, :shaders))
+    config
+  )
 end
 
 ##### Compute Pipelines
@@ -137,12 +138,19 @@ function renderpass(system, config)
 end
 
 function pipelinelayout(system, config)
-  dl = get(config, :descriptorsetlayout, nothing)
+  dl = ds.getin(config, [:render, :descriptorsets, :layout], nothing)
   dl = dl === nothing ? [] : [dl]
   dev = get(system, :device)
 
   vk.unwrap(vk.create_pipeline_layout(dev, dl, []))
 end
+
+const topomap = ds.hashmap(
+  :points, vk.PRIMITIVE_TOPOLOGY_POINT_LIST,
+  :lines, vk.PRIMITIVE_TOPOLOGY_LINE_LIST,
+  :linearspline, vk.PRIMITIVE_TOPOLOGY_LINE_STRIP,
+  :triangles, vk.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+)
 
 function creategraphicspipeline(system, config)
   device = get(system, :device)
@@ -152,11 +160,10 @@ function creategraphicspipeline(system, config)
     vk.DYNAMIC_STATE_VIEWPORT
   ])
 
+  ias = ds.getin(config, [:render, :inputassembly])
   input_assembly_state = vk.PipelineInputAssemblyStateCreateInfo(
-    vk.PRIMITIVE_TOPOLOGY_POINT_LIST,
-    # vk.PRIMITIVE_TOPOLOGY_LINE_LIST,
-    # vk.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-    false
+    get(topomap, get(ias, :topology)),
+    get(ias, :restart, false)
   )
 
   # FIXME: It's possible for :window_size and :extent to get out of sync, which
@@ -166,10 +173,7 @@ function creategraphicspipeline(system, config)
   viewports = [vk.Viewport(0, 0, ext.width, ext.height, 0, 1)]
   scissors = [vk.Rect2D(vk.Offset2D(0, 0), ext)]
 
-  viewport_state = vk.PipelineViewportStateCreateInfo(
-    ;
-    viewports, scissors
-  )
+  viewport_state = vk.PipelineViewportStateCreateInfo(; viewports, scissors)
 
   multisample_state = vk.PipelineMultisampleStateCreateInfo(
     getin(system, [:colour, :samples]),
@@ -229,7 +233,7 @@ function creategraphicspipeline(system, config)
   ps = vk.unwrap(vk.create_graphics_pipelines(
     device,
     [vk.GraphicsPipelineCreateInfo(
-      shaders(device, config),
+      shaders(device, ds.getin(config, [:render, :shaders])),
       vk.PipelineRasterizationStateCreateInfo(
         false,
         false,

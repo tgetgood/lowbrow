@@ -69,27 +69,58 @@ function particle_buffers(system, config)
   ssbos
 end
 
+frames = 3
+
 prog = hashmap(
   :name, "VK tutorial particle sim.",
   :version, v"0.1",
-  :vulkan, ds.hashmap(
+  :vulkan_req, ds.hashmap(
     :version, v"1.3"
   ),
-  # :device, ds.hashmap(
-  #   :features, ds.hashmap(
-  #     v"1.0", ds.set(:sampler_anisotropy),
-  #     v"1.2", ds.set(:timeline_semaphore)
-  #   ),
-  #   :extensions, ds.set("VK_KHR_swapchain", "VK_KHR_timeline_semaphore")
-  # ),
+  :device_req, ds.hashmap(
+    :features, ds.hashmap(
+      v"1.0", ds.set(:sampler_anisotropy),
+      v"1.2", ds.set(:timeline_semaphore)
+    ),
+    :extensions, ds.set("VK_KHR_swapchain", "VK_KHR_timeline_semaphore")
+  ),
+  :concurrent_frames, frames,
   :particles, 2^14,
   :compute, ds.hashmap(
-    :shader, *(@__DIR__, "/../shaders/particles.comp")
+    :descriptorsets, ds.hashmap(
+      :count, frames,
+      :bindings, [
+        ds.hashmap(
+          :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+          :stage, vk.SHADER_STAGE_COMPUTE_BIT
+        ),
+        ds.hashmap(
+          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          :stage, vk.SHADER_STAGE_COMPUTE_BIT
+        ),
+        ds.hashmap(
+          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          :stage, vk.SHADER_STAGE_COMPUTE_BIT
+        )
+      ]
+    ),
+    :shader, ds.hashmap(
+      :stage, :compute,
+      :file, *(@__DIR__, "/../shaders/particles.comp"),
+      # FIXME: Currently no caching is implemented.
+      :cache, true
+    )
   ),
-  :shaders, hashmap(
-    :vertex, *(@__DIR__, "/../shaders/particles.vert"),
-    :fragment, *(@__DIR__, "/../shaders/particles.frag"),
-  ),
+  :render, ds.hashmap(
+    :inputassembly, ds.hashmap(
+      :topology, :points,
+      :restart, false
+    ),
+    :shaders, hashmap(
+      :vertex, *(@__DIR__, "/../shaders/particles.vert"),
+      :fragment, *(@__DIR__, "/../shaders/particles.frag"),
+    )
+  )
 )
 
 function main()
@@ -119,31 +150,7 @@ function main()
 
   ### compute
 
-  cpconfig = ds.hashmap(
-    :descriptorsets, ds.hashmap(
-      :count, frames,
-      :bindings, [
-        ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-          :stage, vk.SHADER_STAGE_COMPUTE_BIT
-        ),
-        ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-          :stage, vk.SHADER_STAGE_COMPUTE_BIT
-        ),
-        ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-          :stage, vk.SHADER_STAGE_COMPUTE_BIT
-        )
-      ]
-    ),
-    :shader, ds.hashmap(
-      :stage, :compute,
-      :file, *(@__DIR__, "/../shaders/particles.comp"),
-      # FIXME: Currently no caching is implemented.
-      :cache, true
-    )
-  )
+  cpconfig = get(config, :compute)
 
   cpconfig = ds.update(
     cpconfig, :descriptorsets, x -> merge(x, fw.descriptors(dev, x))
@@ -161,11 +168,6 @@ function main()
 
   config = ds.assoc(config, :computeparticles, cpconfig)
 
-  # system = ds.assoc(system, :compute, ds.hashmap(
-  #   :pipeline, cp,
-  #   :dsets, ds.getin
-  # ))
-
   ### record compute commands once since they never change.
 
   cqueue = hw.getqueue(system, :compute)
@@ -176,7 +178,11 @@ function main()
     ccmd = ccmds[i]
     vk.begin_command_buffer(ccmd, vk.CommandBufferBeginInfo())
 
-    vk.cmd_bind_pipeline(ccmd, vk.PIPELINE_BIND_POINT_COMPUTE, ds.getin(cpconfig, [:pipeline, :pipeline]))
+    vk.cmd_bind_pipeline(
+      ccmd,
+      vk.PIPELINE_BIND_POINT_COMPUTE,
+      ds.getin(cpconfig, [:pipeline, :pipeline])
+    )
 
     vk.cmd_bind_descriptor_sets(
       ccmd,

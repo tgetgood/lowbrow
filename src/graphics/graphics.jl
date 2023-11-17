@@ -127,9 +127,6 @@ function instantiate(system, config)
 
   system = dynamicinit(system, config)
 
-  # config = fw.buffers(system, config)
-
-
   return system, config
 end
 
@@ -164,11 +161,6 @@ function renderloop(framefn, system, config)
 
         window.poll()
 
-        # if config !== configcache
-        #   renderstate = vertex.assemblerender(system, config)
-        #   configcache = config
-        # end
-
         if !window.minimised(get(system, :window))
 
           renderstate = framefn(i, renderstate)
@@ -188,7 +180,7 @@ function renderloop(framefn, system, config)
         framecounter += 1
         tp = time()
         if tp - t > 10
-          @info "framerate: " * string(framecounter/(tp - t))
+          @info "fps: " * string(framecounter/(tp - t))
 
           t = tp
           framecounter = 0

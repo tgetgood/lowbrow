@@ -54,6 +54,7 @@ end
 ##### Main definition
 
 x = pi/3
+frames = 3
 
 """
 Static description of the program to be run. Pure data. Shouldn't invoke
@@ -62,9 +63,28 @@ anything.
 prog = ds.hashmap(
   :model_file, *(@__DIR__, "/../../assets/viking_room.obj"),
   :texture_file, *(@__DIR__, "/../../assets/viking_room.png"),
-  :shaders, ds.hashmap(
-    :vertex, "viking.vert",
-    :fragment, "viking.frag"
+  :concurrent_frames, frames,
+  :render, ds.hashmap(
+    :shaders, ds.hashmap(
+      :vertex, *(@__DIR__, "/../shaders/viking.vert"),
+      :fragment, *(@__DIR__, "/../shaders/viking.frag")
+    ),
+    :inputassembly, ds.hashmap(
+      :topology, :triangles
+    ),
+    :descriptorsets, ds.hashmap(
+      :count, frames,
+      :bindings, [
+        ds.hashmap(
+          :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+          :stage, vk.SHADER_STAGE_VERTEX_BIT,
+        ),
+        ds.hashmap(
+          :usage, vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+          :stage, vk.SHADER_STAGE_FRAGMENT_BIT,
+        )
+      ]
+    )
   ),
   :ubo, ds.hashmap(
     :model, [
@@ -89,7 +109,7 @@ prog = ds.hashmap(
 )
 
 function main()
-  config = graphics.configure(load(prog))
+  config = graphics.configure(load(prog)); nothing
   frames = get(config, :concurrent_frames)
 
   system = graphics.staticinit(config)
@@ -99,31 +119,23 @@ function main()
 
   ubos = uniform.allocatebuffers(system, MVP, frames)
 
-  bindings = [
-    ds.hashmap(
-      :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      :stage, vk.SHADER_STAGE_VERTEX_BIT,
-      :buffer, ubos
-    ),
-    ds.hashmap(
-      :usage, vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      :stage, vk.SHADER_STAGE_FRAGMENT_BIT,
-      :buffer, texture
-    )
-  ]
+  dsets = fw.descriptors(dev, ds.getin(config, [:render, :descriptorsets]))
 
-  dsets = fw.descriptors(dev, frames, bindings)
+  bindings = [ubos, texture]
 
-  config = merge(
-    config,
-    ds.selectkeys(dsets, [:descriptorsetlayout, :descriptorsets])
-  )
+  config = ds.updatein(config, [:render, :descriptorsets], merge, dsets)
 
   system, config = graphics.instantiate(system, config)
 
-  fw.binddescriptors(dev, dsets, [[ubos[1], texture], [ubos[2], texture]])
+  fw.binddescriptors(
+    dev,
+    ds.getin(config, [:render, :descriptorsets]),
+    ds.into([], map(i -> [ubos[i], texture]), 1:frames)
+  )
 
   config = fw.buffers(system, config)
+
+  config = merge(config, get(config, :render))
 
   graphics.renderloop(system, config) do i, renderstate
 
