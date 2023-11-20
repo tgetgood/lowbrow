@@ -26,7 +26,7 @@ defaults = hashmap(
     # FIXME: logically these are sets. How does vk handle repeats?
     :extensions, ["VK_KHR_swapchain", "VK_KHR_timeline_semaphore"]
   ),
-  :window, hashmap(:width, 1600, :height, 1000),
+  :window, hashmap(:width, 1440, :height, 1440),
   :swapchain, hashmap(
     # TODO: Fallback formats and init time selection.
     :format, vk.FORMAT_B8G8R8A8_SRGB,

@@ -3,6 +3,7 @@ import hardware as hw
 import resources as rd
 import framework as fw
 import pipeline as gp
+import render as draw
 
 import DataStructures as ds
 import Vulkan as vk
@@ -47,15 +48,25 @@ prog = ds.hashmap(
 )
 
 # function main()
-  state = graphics.configure(load(prog))
 
-  system, state = graphics.instantiate(graphics.staticinit(state), state)
+config = graphics.configure(load(prog))
 
-  state = fw.buffers(system, state)
+system, config = graphics.instantiate(graphics.staticinit(config), config)
 
-  graphics.renderloop(system, state) do i, renderstate
-    renderstate
-  end
+config = fw.buffers(system, config)
+
+buffers = get(system, :commandbuffers)
+
+renderstate = fw.assemblerender(system, config)
+
+draw.draw(system, buffers[1], renderstate)
+
+  # graphics.renderloop(system, state) do i, renderstate
+  #   renderstate
+  # end
 # end
 
 #main()
+ # r = 1.0-(c>>16)/255;
+ # g = 1.0-((c&((1<<16) - 1))>>8)/255;
+ # b = 1.0-(c&255)/255;
