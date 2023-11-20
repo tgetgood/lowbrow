@@ -113,7 +113,7 @@ prog = hashmap(
   ),
   :render, ds.hashmap(
     :inputassembly, ds.hashmap(
-      :topology, :points,
+      :topology, :lines,
       :restart, false
     ),
     :shaders, hashmap(

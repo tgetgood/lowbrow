@@ -172,7 +172,10 @@ function renderloop(framefn, system, config)
 
             @info "resized"
 
-            system = ds.assoc(system, :window_size, window.size(get(system, :window)))
+            system = ds.assoc(system, :window_size,
+                              window.size(get(system, :window))
+            )
+
             system = dynamicinit(system, config)
           end
         end
@@ -180,7 +183,7 @@ function renderloop(framefn, system, config)
         framecounter += 1
         tp = time()
         if tp - t > 10
-          @info "fps: " * string(framecounter/(tp - t))
+          @info string(round(framecounter/(tp - t))) * " fps"
 
           t = tp
           framecounter = 0
