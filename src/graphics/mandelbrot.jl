@@ -55,18 +55,9 @@ function main()
 
   config = fw.buffers(system, config)
 
-  # buffers = get(system, :commandbuffers)
-
-  # renderstate = fw.assemblerender(system, config)
-
-  # draw.draw(system, buffers[1], renderstate)
-
   graphics.renderloop(system, config) do i, renderstate
     renderstate
   end
 end
 
 main()
- # r = 1.0-(c>>16)/255;
- # g = 1.0-((c&((1<<16) - 1))>>8)/255;
- # b = 1.0-(c&255)/255;

@@ -174,6 +174,20 @@ function todevicelocal(system, data, buffers...)
       )
     end
   end
+
+  # TODO: Test if this solves the use after free on dedicated hardware.
+  # Can't replicate on laptop (embedded gpu).
+
+  # @async begin
+  #   vk.wait_semaphores(
+  #     get(system, :device),
+  #     vk.SemaphoreWaitInfo([sem], [UInt(1)]),
+  #     typemax(UInt)
+  #   )
+
+  #   staging
+  # end
+
 end
 
 end # module
