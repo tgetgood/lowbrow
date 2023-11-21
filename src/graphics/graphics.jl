@@ -26,7 +26,7 @@ defaults = hashmap(
     # FIXME: logically these are sets. How does vk handle repeats?
     :extensions, ["VK_KHR_swapchain", "VK_KHR_timeline_semaphore"]
   ),
-  :window, hashmap(:width, 1440, :height, 1440),
+  :window, hashmap(:width, 1200, :height, 1200),
   :swapchain, hashmap(
     # TODO: Fallback formats and init time selection.
     :format, vk.FORMAT_B8G8R8A8_SRGB,
@@ -181,17 +181,12 @@ function renderloop(framefn, system, config)
         end
 
         framecounter += 1
-        tp = time()
-        if tp - t > 10
-          @info string(round(framecounter/(tp - t))) * " fps"
-
-          t = tp
-          framecounter = 0
-        end
       end
 
       @info isready(sigkill)
       @info "finished main loop; cleaning up"
+
+      @info "Average fps: " * string(round(framecounter / (time() - t)))
 
       vk.device_wait_idle(get(system, :device))
       window.shutdown()
