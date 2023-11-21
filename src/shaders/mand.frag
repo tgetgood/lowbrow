@@ -10,8 +10,8 @@ int exceeds(const float mr, const float mi) {
   float z_real = 0.0;
   float z_im = 0.0;
 
-  for (int i = 0; i < (1<<22); i++) {
-    if (z_real > 2 || z_real < -2 || z_im > 2 || z_im < -2) {
+  for (int i = 0; i < (1<<12); i++) {
+    if (z_real > 10 || z_real < -10 || z_im > 10 || z_im < -10) {
       return i;
     }
     float zr = z_real;
@@ -20,7 +20,7 @@ int exceeds(const float mr, const float mi) {
     z_real = zr*zr - zi*zi - mr;
     z_im = 2*zr*zi - mi;
   }
-  return (1<<24)-1;
+  return (1<<12)-1;
 }
 
 void main() {
@@ -32,9 +32,9 @@ void main() {
 
   int c = exceeds(mu_real, mu_im);
   
-  float r = 1.0-float(c>>16)/255.0;
-  float g = 1.0-float((c&((1<<16) - 1))>>8)/255.0;
-  float b = 1.0-float(c&255)/255.0;
+  float r = float(c>>8)/15.0;
+  float g = float((c&((1<<8) - 1))>>4)/15.0;
+  float b = float(c&15)/15.0;
 
   outColour = vec4(r, g, b, 1.0);
 }

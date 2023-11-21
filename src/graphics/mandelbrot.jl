@@ -47,26 +47,26 @@ prog = ds.hashmap(
   :indicies, [0, 3, 2, 2, 1, 0,]
 )
 
-# function main()
+function main()
 
-config = graphics.configure(load(prog))
+  config = graphics.configure(load(prog))
 
-system, config = graphics.instantiate(graphics.staticinit(config), config)
+  system, config = graphics.instantiate(graphics.staticinit(config), config)
 
-config = fw.buffers(system, config)
+  config = fw.buffers(system, config)
 
-buffers = get(system, :commandbuffers)
+  # buffers = get(system, :commandbuffers)
 
-renderstate = fw.assemblerender(system, config)
+  # renderstate = fw.assemblerender(system, config)
 
-draw.draw(system, buffers[1], renderstate)
+  # draw.draw(system, buffers[1], renderstate)
 
-  # graphics.renderloop(system, state) do i, renderstate
-  #   renderstate
-  # end
-# end
+  graphics.renderloop(system, config) do i, renderstate
+    renderstate
+  end
+end
 
-#main()
+main()
  # r = 1.0-(c>>16)/255;
  # g = 1.0-((c&((1<<16) - 1))>>8)/255;
  # b = 1.0-(c&255)/255;

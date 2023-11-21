@@ -24,6 +24,8 @@ function vertexbuffer(system, data)
     )
   )
 
+  @info buffer
+
   commands.todevicelocal(system, data, buffer)
 
   ds.hashmap(:vertexbuffer, ds.assoc(buffer,
