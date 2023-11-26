@@ -6,6 +6,8 @@ struct EmptySet <: Set end
 
 emptyset = EmptySet()
 
+seq(s::EmptySet) = emptyvector
+
 function conj(s::EmptySet, x)
   PersistentArraySet([x])
 end
@@ -136,4 +138,8 @@ struct PersistentSortedSet
   root
   by::Function
   lt::Function
+end
+
+function string(s::Set)
+  "#{" * transduce(map(string) ∘ interpose(", "), *, "", seq(s)) * "}"
 end

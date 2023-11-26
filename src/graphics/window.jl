@@ -4,6 +4,8 @@ import Vulkan as vk
 import GLFW.GLFW as glfw
 import DataStructures as ds
 
+import eventsystem as events
+
 function size(window)
   glfw.GetFramebufferSize(window)
 end
@@ -32,6 +34,12 @@ function poll()
   glfw.PollEvents()
 end
 
+function handleerror(e)
+  showerror(stderr, e)
+  print(stderr, "\n")
+  show(stderr, "text/plain", stacktrace(catch_backtrace()))
+end
+
 function resizecb(ch)
   function inner(win, _, _)
     try
@@ -39,8 +47,59 @@ function resizecb(ch)
         @async put!(ch, true)
       end
     catch e
-      @error e
+      handleerror(e)
     end
+  end
+end
+
+const buttons = ds.hashmap(
+  glfw.MOUSE_BUTTON_LEFT, :left,
+  glfw.MOUSE_BUTTON_RIGHT, :right,
+  glfw.MOUSE_BUTTON_MIDDLE, :middle
+)
+
+const actions = ds.hashmap(
+  glfw.PRESS, :down,
+  glfw.RELEASE, :up,
+  glfw.REPEAT, :repeat
+)
+
+const modmap = ds.hashmap(
+  glfw.MOD_ALT, :alt,
+  glfw.MOD_SHIFT, :shift,
+  glfw.MOD_CONTROL, :ctrl,
+  glfw.MOD_SUPER, :super
+)
+
+function mousebuttoncb(_, button, action, mods)
+  try
+    events.mouseclickupdate(ds.hashmap(
+      :button, get(buttons, button, Int(button)),
+      :action, get(actions, action),
+      :modifiers, ds.into(
+        ds.emptyset,
+        filter(x -> (mods & ds.key(x)) > 0) ∘ map(ds.val),
+        modmap
+      )
+    ))
+  catch e
+    handleerror(e)
+  end
+end
+
+function mouseposcb(_, x, y)
+  try
+    events.mousepositionupdate(x, y)
+  catch e
+    handleerror(e)
+  end
+end
+
+function scrollcb(_, x, y)
+  try
+    events.mousescrollupdate(x, y)
+  catch e
+    handleerror(e)
   end
 end
 
@@ -58,6 +117,10 @@ function createwindow(system, config)
 
   glfw.SetFramebufferSizeCallback(window, resizecb(ch))
 
+  glfw.SetMouseButtonCallback(window, mousebuttoncb)
+  glfw.SetCursorPosCallback(window, mouseposcb)
+  glfw.SetScrollCallback(window, scrollcb)
+
   ds.hashmap(:window, window, :resizecb, resized(ch), :window_size, (;width, height))
 end
 
@@ -68,7 +131,13 @@ function createsurface(system, config)
     get(system, :window)
   )
 
-  # REVIEW: Undocumented. Feels brittle. Possibly incorrect.
+  # REVIEW: GLFW creates a valid VK_KHR_Surface and returns a raw C pointer to it.
+  # The jl vulkan wrapper I'm using needs a managed object, so I need to create
+  # that myself.
+  #
+  # The problem is: to what do I set the initial refcount?
+  #
+  # I'll need to dig a lot deeper into the library to know what's what.
   surface = vk.SurfaceKHR(
     surface,
     instance,
