@@ -150,6 +150,13 @@ end
 function configure()
   # FIXME: This is an odd place to do side effects, but I don't see anywhere
   # better to do this. Explicit window.init() is not a good alternative.
+  #
+  # REVIEW: What if the window is a system thing like stdout (stdwin?). I'm
+  # trying to get away from syscalls and globals, so that's the wrong direction.
+  #
+  # I do like the idea of treating the window as something "out
+  # there". Conceptually you just send off frames to have rendered. That way
+  # something running inside a compositor doesn't even need to know it.
   glfw.Init()
 
   ds.associn(
