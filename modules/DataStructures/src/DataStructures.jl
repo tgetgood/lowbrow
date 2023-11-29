@@ -18,6 +18,7 @@ include("./list.jl")
 include("./map.jl")
 include("./set.jl")
 include("./queue.jl")
+include("./async.jl")
 
 include("./juliatypes.jl")
 

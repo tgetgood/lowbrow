@@ -5,6 +5,8 @@ import graphics
 import resources as rd
 import framework as fw
 import vertex
+import mouse
+import eventsystem as es
 
 import DataStructures as ds
 import Vulkan as vk
@@ -60,5 +62,9 @@ function main()
     renderstate
   end
 end
+
+dragch = Channel(32)
+
+drags = @async ds.transduce(mouse.drag() ∘ ds.tap(dragch), ds.lastarg, 0, es.click, es.move)
 
 main()

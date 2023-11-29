@@ -4,14 +4,16 @@ mutable struct EventStream
   listeners::Vector
 end
 
-const click = EventStream([])
-const move = EventStream([])
+const click = Channel(64)
+const move = Channel(typemax(Int))
 const scroll = EventStream([])
 
 function mousepositionupdate(x::Float64, y::Float64)
+  put!(move, (x, y))
 end
 
 function mouseclickupdate(event)
+  put!(click, event)
 end
 
 function mousescrollupdate(x::Float64, y::Float64)

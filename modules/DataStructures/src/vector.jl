@@ -415,21 +415,17 @@ function rightmost(v, depth)
   end
 end
 
-# REVIEW: RRB tries make this unnecessary. But rrb tries with lots of catenation
-# have high constants, so this might still be faster.
+# REVIEW: RRB tries would let us use the above plus `cat` for general
+# into(_::Vector,... and would be a lot more efficient that updateing the `to`
+# vector for every new value.
 #
-# Mostly I'm curious if it will work or not.
-
-# function intononemptyvec(xform, to, from)
-#   c = count(from)
-#   d = from.depth
-#   xf = xform
-#   while c !== 0
-#     (c, r) = divrem(c, nodelength)
-#     t = rightmost
-#   end
-
-# end
+# We could also do something like `intoemptyvec` where we group elements by how
+# many are needed to fill out tail nodes at various levels in the target. This
+# would also minimise useless allocations.
+#
+# But I think I have some other use cases for O(1) catenation that doesn't
+# impinge on iteration speed. We'll see if those actually become a pain point
+# though, I think, before implementing yet another data structure.
 
 reverse(v::EmptyVector) = v
 

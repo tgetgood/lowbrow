@@ -707,3 +707,51 @@
    262144:   0.260248 seconds (7.25 M allocations: 252.915 MiB, 9.14% gc time)
    524288:   0.516125 seconds (14.49 M allocations: 504.806 MiB, 8.50% gc time)
    1048576:   1.030130 seconds (28.98 M allocations: 1008.589 MiB, 8.89% gc time)
+* Ideas / devlog
+** IO and events
+   Something I really want to work out is having all IO being either input or
+   output streams. That is completely decouple programs from their IO so that it
+   can be stubbed, sandboxed, etc..
+
+   Extending transducers to channels is a natural way to do that to some extent,
+   but there are some corner cases I need to worry about.
+
+   Events will come in ludicrous quantities. They can't be buffered for any
+   length of time.
+
+   Any stream to stream process needs the result stream to be eagerly consumed
+   otherwise we're going to have spacetime leakage.
+
+   However a reduction over these streams makes for a natural reactive value.
+
+   I can force that by not defining an "empty stream" which you can pass to
+   =into= as a first argument. Thus you'll be able to call transduce on streams,
+   but you'll ~need~ to define a reducing function.
+
+   That might be enough.
+
+   Stream combinators is also a bit of a mess. Streams don't have a natural
+   stride like sequences so you don't necessarily want to wait for a new value
+   from each input stream before moving on.
+
+   In fact, you can't in general because one stream might produce terrabytes of
+   data before another emits a single event.
+
+   We can leave it up to the developer to write their own function to combine
+   streams. If they want to buffer the fast ones they can, but it's application
+   logic.
+
+   I don't want to get trapped in Hoare's purgatory of a dozen interleaving
+   operators.
+
+   So we say how streams are combined is entirely up to the developer, maybe
+   there will be useful patterns to write helpers for, but in the end the
+   transduction takes a single stream to a reactive value.
+
+   If you're sure the channel will close you can dump it into a collection, but
+   if it doesn't close, that will park and never return.
+
+   I think I need some way to name intermediate streams since I want to combine
+   them in complex ways.
+
+   If channels apply back pressure, maybe it's okay to dump into channels.
