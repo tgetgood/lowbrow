@@ -1,6 +1,6 @@
 module DataStructures
 
-import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex, eltype, show, last, empty, repeat, split
+import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex, eltype, show, last, empty, repeat, split, take!, put!, close
 
 # N.B.: Base.rest is broken for ranges and zip iterators. It returns the
 # collection itself. Don't import it.
@@ -19,7 +19,6 @@ include("./map.jl")
 include("./set.jl")
 include("./queue.jl")
 include("./async.jl")
-
 include("./juliatypes.jl")
 
 # Sequential
@@ -50,6 +49,8 @@ export Keyword, Map, Vector, MapEntry, List
 # Transients
 export transient!, persist!, conj!
 
+# Async
+export Atom, deref, swap!, pub, subscribe, tap
 
 ## Julia conventions vs my tendency to use clojure names...
 values(m::Map) = vals(m)

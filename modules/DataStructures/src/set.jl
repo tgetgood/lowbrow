@@ -6,6 +6,12 @@ struct EmptySet <: Set end
 
 emptyset = EmptySet()
 
+empty(s::Set) = emptyset
+count(s::EmptySet) = 0
+
+emptyp(s::EmptySet) = true
+emptyp(s::Set) = false
+
 seq(s::EmptySet) = emptyvector
 
 function conj(s::EmptySet, x)

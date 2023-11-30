@@ -1,6 +1,48 @@
 # TODO: mock up clojure's atom and use that to avoid locks in the pub/sub queues
 # below..
 
+mutable struct Atom{T}
+  @atomic value::T
+end
+
+function deref(a::Atom)
+  getfield(a, :value, :monotonic)
+end
+
+"""
+Doesn't necessarily set the atom. Check the return value.
+"""
+function trycas!(a::Atom{T}, current::T, next::T) where T
+  replacefield!(a, :value, current, next, :monotonic)
+end
+
+"""
+Atomically set `a`'s value to f(deref(a), args...).
+
+Spins if `a` is changed while `f` is being computed (cas semantics).
+
+N.B.: this could get ugly if lots of threads are changing `a` simultaneously,
+but if contention is low and `f` is fast, it can be very efficient.
+
+Also note that `f` will, in general, be invoked multiple times, so it should be
+pure.
+"""
+function swap!(a::Atom, f, args...)
+  i = 0
+  # REVIEW: is 2^16 too many tries before failing?
+  # TODO: backoff
+  while i < 2^16
+    i += 1
+    current = deref(a)
+    next = f(current, args...)
+    res = trycas!(a, current, next)
+    if res.success
+      return next
+    end
+  end
+  throw("Too much contention in atom, aborting to avoid deadlock.")
+end
+
 ##### Julia Channels
 #
 ## N.B.: These are not threadsafe in the sense that if you reduce on a channel
@@ -27,6 +69,18 @@
 
 # So it looks like each subscriber needs a dropping policy.
 
+function ireduce(f, init, ch::Channel)
+  try
+    ireduce(f, f(init, take!(ch)), ch)
+  catch e
+    if e isa InvalidStateException && ch.state === :closed
+      init
+    else
+      throw(e)
+    end
+  end
+end
+
 function ireduce(f, init, chs::Channel...)
   try
     vs = [take!(ch) for ch in chs]
@@ -40,72 +94,85 @@ function ireduce(f, init, chs::Channel...)
   end
 end
 
-##### Computed Values
-#
-# Essentially cells in a spreadsheet, but implemented via transduction
-
-# REVIEW: Do I actually want/need these?
-
-mutable struct ReactiveValue
-  @atomic value::Ref{Any}
-  @atomic listeners::Ref{Vector}
-end
-
-function rv()
-  ReactiveValue(Ref(undef))
-end
-
-function set!(r::ReactiveValue, v)
-  swapfield!(r, :x, v, :monotonic)
-  r
-end
-
-function deref(r::ReactiveValue)
-  getfield(r, :x, :monotonic)
-end
-
 ##### Streams pub/sub, and integrations with transduction.
 
 abstract type SubStream <: Stream end
 
-struct TailSubStream
-  buffer::Base.Vector
+struct TailSubStream <: SubStream
+  ch::Channel
 end
 
-mutable struct PubStream <: Stream
-  @atomic state::Symbol
-  @atomic subscriptions::ds.Set
-  const lock::ReentrantLock
+function take!(s::TailSubStream)
+  take!(s.ch)
 end
 
-function subscribe(s::PubStream)
-  try
-    lock(s.lock)
-    if s.state === :open
-      s.subscriptions = ds.conj(s.subscriptions,
+function put!(s::TailSubStream, x)
+  lock(s.ch) do
+    if s.ch.n_avail_items === s.ch.sz_max
+      take!(s.ch)
     end
-  finally
-    unlock(s.lock)
+
+    put!(s.ch, x)
   end
 end
 
+function close(s::TailSubStream)
+  close(s.ch)
+end
+
+function sub(; buffer = 32, drop=:oldest)
+  if drop === :oldest
+    TailSubStream(Channel(buffer))
+  else
+    throw("not implemented")
+  end
+end
+
+struct PubStream <: Stream
+  state::Atom
+end
+
+closedp(s::Channel) = s.state === :closed
+closedp(s::SubStream) = s.ch.state === :closed
+closedp(s::PubStream) = get(deref(s.state), :state) === :closed
+
+function pub()
+  PubStream(Atom(hashmap(:state, :open, :subscribers, emptyset)))
+end
+
+function put!(s::PubStream, x)
+  v = deref(s.state)
+  cleanup = false
+  if get(v, :state) === :open
+    reduce((_, c) -> begin
+        if closedp(c)
+           cleanup = true
+        else
+          put!(c, x)
+        end
+      end,
+      none, get(v, :subscribers)
+    )
+
+    if cleanup
+      swap!(s.state, update, :subscribers, subs -> remove(closedp, subs))
+    end
+    return nothing
+  else
+    throw(InvalidStateException("channel is closed.", get(v, :state)))
+  end
+end
+
+function subscribe(p::PubStream; buffer = 32, drop = :oldest)
+  s = sub(;buffer, drop)
+  swap!(p.state, update, :subscribers, conj, s)
+  return s
 end
 
 function close(s::PubStream)
-  try
-    lock(s.lock)
-    s.state = :closed
-    map(close, s.subscriptions)
-  finally
-    unlock(s.lock)
-  end
+  v = swap!(s.state, assoc, :state, :closed)
+  map(close, get(v, :subscribers))
 end
-
-
-# struct Stream
-#   buffer::Vector
-#   tail::Channel
-# end
 
 function tap(ch)
   function(emit)
@@ -120,15 +187,46 @@ function tap(ch)
       close(ch)
       return v
     end
-    function inner(result, next...)
-      v = emit(result, next...)
+    function inner(result, next)
+      v = emit(result, next)
       put!(ch, v)
       return v
     end
   end
 end
 
-function stream(xform, inputs...; n=32, overflow=:drop_old)
-  ch = Channel(n)
+ChannelLike = Union{Channel, PubStream, SubStream}
 
+# Helpers to treat all these channellikes the same.
+listener(ch::Channel) = ch
+listener(s::SubStream) = s.ch
+listener(p::PubStream) = subscribe(p)
+
+function stream(xform, streams::PubStream...)
+  output = pub()
+
+  inputs = map(subscribe, streams)
+
+  t = Threads.@spawn transduce(xform ∘ tap(output), lastarg, none, inputs...)
+
+  # How does one implement `bind` for custom channel like types?
+  # bind(output, t)
+
+  return output
+end
+
+function ireduce(f, init, s::PubStream)
+  ireduce(f, init, subscribe(s))
+end
+
+function ireduce(f, init, ss::PubStream...)
+  ireduce(f, init, map(x -> subscribe(x).ch, ss)...)
+end
+
+function ireduce(f, init, s::SubStream)
+  ireduce(f, init, s.ch)
+end
+
+function ireduce(f, init, s::SubStream...)
+  ireduce(f, init, map(x -> x.ch)...)
 end
