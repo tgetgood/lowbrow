@@ -20,6 +20,10 @@ function getstream(name)
   get(ds.deref(streams), name)
 end
 
+function getstreams(names...)
+  ds.into(ds.emptymap, map(k -> (k, get(ds.deref(streams), k))), names)
+end
+
 function mousepositionupdate(x::Float64, y::Float64)
   send!(:position, (x, y))
 end

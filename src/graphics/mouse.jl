@@ -12,7 +12,9 @@ function drag()
     function inner(result)
       emit(result)
     end
-    function inner(result, click, pos)
+    function inner(result, next)
+      click = get(next, :click)
+      pos = get(next, :position)
       if get(click, :button) === :left
         if get(click, :action) === :down
           if started

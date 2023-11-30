@@ -237,3 +237,95 @@ end
 function ireduce(f, init, s::SubStream...)
   ireduce(f, init, map(x -> x.ch, s)...)
 end
+
+##### Stream Operators
+
+"""
+Returns a pub stream which listens to all `ps` and emits every message it gets
+in the order received. Note, there is no way to tell which message came from
+which stream when combined this way.
+"""
+function interleave(ps::PubStream...)
+  ls = map(subscribe, ps)
+  out = pub()
+
+  function abort()
+    close(out)
+    map(close, ls)
+  end
+
+  for l in ls
+    @async begin
+      try
+        while true
+          if closedp(l) || closedp(out)
+            abort()
+            break
+          else
+            put!(out, take!(l))
+          end
+        end
+      catch e
+        handleerror(e)
+      end
+    end
+  end
+
+  return out
+end
+
+"""
+Given a map from names to streams return a pub stream which recieves every
+message from all named streams tagged with the name of the origin
+stream. Messages are in the order received by a gaggle of async waiters, so it
+had better not be important.
+"""
+#FIXME: That's a mouthful
+function interleave(streams::Map)
+  ls = mapvals(subscribe, streams)
+  out = pub()
+
+  function abort()
+    close(out)
+    map(val ∘ close, ls)
+  end
+
+  for l in ls
+    @async begin
+      try
+        while true
+          if closedp(val(l)) || closedp(out)
+            abort()
+            break
+          else
+            put!(out, hashmap(key(l), take!(val(l))))
+          end
+        end
+      catch e
+        handleerror(e)
+      end
+    end
+  end
+
+  return out
+end
+
+"""
+Given a stream of named messages, emit a map containing the last from each each
+time a new message is received.
+"""
+function combinelast(init)
+  state = init
+  function(emit)
+    function inner()
+      emit()
+    end
+    function inner(result)
+      emit(result)
+    end
+    function inner(result, next)
+      state = merge(state, next)
+      emit(result, state)
+    end
+  end
+end
