@@ -227,7 +227,7 @@ end
 
 ## FIXME: Sooo much boilerplate. I need to write macros for building xforms.
 function mapkeys(f)
-  function emit()
+  function(emit)
     function inner()
       emit()
     end
@@ -241,7 +241,7 @@ function mapkeys(f)
 end
 
 function mapvals(f)
-  function emit()
+  function(emit)
     function inner()
       emit()
     end

@@ -144,3 +144,11 @@ end
   @test merge(d, b) == merge(b, d)
 
 end
+
+@testset "map helpers" begin
+  m = hashmap("A", 1, "B", 2)
+
+  @test mapvals(x -> x + 1, m) == hashmap("A", 2, "B", 3)
+
+  @test mapkeys(k -> k*"s", m) == hashmap("As", 1, "Bs", 2)
+end

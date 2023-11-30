@@ -34,7 +34,7 @@ export emptyvector, nth, vec, vector
 export list, tolist
 
 # Maps
-export emptymap, assoc, update, dissoc, containsp, hashmap, vals, associn, updatein, getin
+export emptymap, assoc, update, dissoc, containsp, hashmap, vals, associn, updatein, getin, mapkeys, mapvals
 
 # Sets
 export emptyset, disj, set
