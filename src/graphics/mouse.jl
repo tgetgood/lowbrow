@@ -18,7 +18,7 @@ function drag()
           if started
             p = lastpos
             lastpos = pos
-            emit(result, ds.hashmap(:delta, p .- pos))
+            emit(result, ds.hashmap(:delta, pos .- p))
           else
             lastpos = pos
             started = true
@@ -28,7 +28,7 @@ function drag()
             started = false
             p = lastpos
             lastpos = pos
-            emit(result, ds.hashmap(:delta, p .- pos))
+            emit(result, ds.hashmap(:delta, pos .- p))
           else
           end
         end

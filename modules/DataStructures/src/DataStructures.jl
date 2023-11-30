@@ -10,6 +10,8 @@ hashbits = 5
 nodelength = 2^hashbits
 nil = nothing
 
+include("./util.jl")
+
 include("./sexps.jl")
 include("./sequential.jl")
 include("./vector.jl")
@@ -51,6 +53,9 @@ export transient!, persist!, conj!
 
 # Async
 export Atom, deref, swap!, pub, subscribe, tap
+
+# other
+export handleerror
 
 ## Julia conventions vs my tendency to use clojure names...
 values(m::Map) = vals(m)

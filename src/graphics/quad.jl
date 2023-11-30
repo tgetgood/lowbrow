@@ -63,8 +63,12 @@ function main()
   end
 end
 
-dragch = Channel(32)
+es.init()
 
-drags = @async ds.transduce(mouse.drag() ∘ ds.tap(dragch), ds.lastarg, 0, es.click, es.move)
+l = ds.subscribe(es.getstream(:click))
+
+dragspub = ds.stream(mouse.drag(), es.getstream(:click), es.getstream(:position))
+
+drags = ds.subscribe(dragspub)
 
 main()

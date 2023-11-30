@@ -47,7 +47,7 @@ function handleabort(default, r::EarlyTermination)
 end
 
 function handleabort(_, r)
-  throw(r)
+  throw(errorchain(r))
 end
 
 defaultreturn(default, _::NoEmission) = default
@@ -514,7 +514,7 @@ function seqcompose(xforms...)
   g = active[1](active[2])
   acc = active[3]
 
-  handler(_, _, r) = throw(r)
+  handler(_, _, r) = throw(errorchain(r))
   function handler(emit, result, r::EarlyTermination)
     v = g(r.value)
     ret = maybe(emit, result, v)

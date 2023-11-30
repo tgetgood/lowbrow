@@ -205,9 +205,7 @@ function renderloop(framefn, system, config)
 
       @info "done"
     catch e
-      showerror(stderr, e)
-      print(stderr, "\n")
-      show(stderr, "text/plain", stacktrace(catch_backtrace()))
+      ds.handleerror(e)
     end
   end
 end

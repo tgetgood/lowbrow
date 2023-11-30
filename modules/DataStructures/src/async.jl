@@ -1,8 +1,5 @@
-# TODO: mock up clojure's atom and use that to avoid locks in the pub/sub queues
-# below..
-
-mutable struct Atom{T}
-  @atomic value::T
+mutable struct Atom
+  @atomic value
 end
 
 function deref(a::Atom)
@@ -12,7 +9,7 @@ end
 """
 Doesn't necessarily set the atom. Check the return value.
 """
-function trycas!(a::Atom{T}, current::T, next::T) where T
+function trycas!(a::Atom, current, next)
   replacefield!(a, :value, current, next, :monotonic)
 end
 
@@ -29,7 +26,7 @@ pure.
 """
 function swap!(a::Atom, f, args...)
   i = 0
-  # REVIEW: is 2^16 too many tries before failing?
+  # REVIEW: is 2^16 too many tries before failing? Probably.
   # TODO: backoff
   while i < 2^16
     i += 1
@@ -41,6 +38,10 @@ function swap!(a::Atom, f, args...)
     end
   end
   throw("Too much contention in atom, aborting to avoid deadlock.")
+end
+
+function reset!(a::Atom, value)
+  setfield!(a, :value, value, :monotonic)
 end
 
 ##### Julia Channels
@@ -76,7 +77,7 @@ function ireduce(f, init, ch::Channel)
     if e isa InvalidStateException && ch.state === :closed
       init
     else
-      throw(e)
+      throw(errorchain(e))
     end
   end
 end
@@ -151,7 +152,7 @@ function put!(s::PubStream, x)
           put!(c, x)
         end
       end,
-      none, get(v, :subscribers)
+      0, get(v, :subscribers)
     )
 
     if cleanup
@@ -187,8 +188,8 @@ function tap(ch)
       close(ch)
       return v
     end
-    function inner(result, next)
-      v = emit(result, next)
+    function inner(result, next...)
+      v = emit(result, next...)
       put!(ch, v)
       return v
     end
@@ -207,7 +208,13 @@ function stream(xform, streams::PubStream...)
 
   inputs = map(subscribe, streams)
 
-  t = Threads.@spawn transduce(xform ∘ tap(output), lastarg, none, inputs...)
+  t = Threads.@spawn begin
+    try
+      transduce(xform ∘ tap(output), lastarg, 0, inputs...)
+    catch e
+      handleerror(e)
+    end
+  end
 
   # How does one implement `bind` for custom channel like types?
   # bind(output, t)
@@ -228,5 +235,5 @@ function ireduce(f, init, s::SubStream)
 end
 
 function ireduce(f, init, s::SubStream...)
-  ireduce(f, init, map(x -> x.ch)...)
+  ireduce(f, init, map(x -> x.ch, s)...)
 end

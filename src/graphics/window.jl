@@ -34,12 +34,6 @@ function poll()
   glfw.PollEvents()
 end
 
-function handleerror(e)
-  showerror(stderr, e)
-  print(stderr, "\n")
-  show(stderr, "text/plain", stacktrace(catch_backtrace()))
-end
-
 function resizecb(ch)
   function inner(win, _, _)
     try
@@ -47,7 +41,7 @@ function resizecb(ch)
         @async put!(ch, true)
       end
     catch e
-      handleerror(e)
+      ds.handleerror(e)
     end
   end
 end
@@ -83,7 +77,7 @@ function mousebuttoncb(_, button, action, mods)
       )
     ))
   catch e
-    handleerror(e)
+    ds.handleerror(e)
   end
 end
 
@@ -91,7 +85,7 @@ function mouseposcb(_, x, y)
   try
     events.mousepositionupdate(x, y)
   catch e
-    handleerror(e)
+    ds.handleerror(e)
   end
 end
 
@@ -99,7 +93,7 @@ function scrollcb(_, x, y)
   try
     events.mousescrollupdate(x, y)
   catch e
-    handleerror(e)
+    ds.handleerror(e)
   end
 end
 
