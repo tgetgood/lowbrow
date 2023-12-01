@@ -77,7 +77,7 @@ function ireduce(f, init, ch::Channel)
     if e isa InvalidStateException && ch.state === :closed
       init
     else
-      throw(errorchain(e))
+      rethrow(e)
     end
   end
 end

@@ -330,7 +330,7 @@ function leafpartition(; init=[])
           t[i] = next
           acc[] = t
         else
-          throw(errorchain(e))
+          rethrow(e)
         end
       end
       if nodelength === i
