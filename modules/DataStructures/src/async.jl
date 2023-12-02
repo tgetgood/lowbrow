@@ -73,11 +73,9 @@ end
 
 # Julia sucks a recursion, so loopify everything
 function ireduce(f, init, ch::Channel)
-  @warn init, f
   v = init
   try
     while true # REVIEW:
-      @warn v
       v = f(v, take!(ch))
     end
   catch e
@@ -223,8 +221,7 @@ end
 function into(to::WriteStream, xform, from...)
   Threads.@spawn begin
     try
-      @info to
-      transduce(xform, send!, to, from...)
+      transduce(xform ∘ tap(to), lastarg, 0, from...)
     catch e
       handleerror(e)
     end
@@ -249,7 +246,6 @@ function ireduce(f, init, ss::PubStream...)
 end
 
 function ireduce(f, init, s::SubStream)
-  @info init
   ireduce(f, init, s.ch)
 end
 
