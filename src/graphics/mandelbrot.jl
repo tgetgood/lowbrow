@@ -72,45 +72,43 @@ drag = ds.stream(
   ds.interleave(es.getstreams(:click, :position))
 )
 
-# zoom = ds.stream(
-#   mouse.zoom() ∘ map(x -> ds.update(x, :scroll, y -> y isa Tuple ? y[2] : y)),
-#   ds.interleave(es.getstreams(:position, :scroll))
-# )
+zoom = ds.stream(
+  mouse.zoom() ∘ map(x -> ds.update(x, :scroll, y -> y isa Tuple ? y[2] : y)),
+  ds.interleave(es.getstreams(:position, :scroll))
+)
 
-# function normalisezoom(z)
-#   exp(-z/100)
-# end
+function normalisezoom(z)
+  exp(-z/100)
+end
 
-# function recentrezoom(Δzoom, offset, zoomcentre)
-#   znorm = normalisezoom(Δzoom)
+function recentrezoom(Δzoom, offset, zoomcentre)
+  znorm = normalisezoom(Δzoom)
 
-#   znorm .* offset .+ (1 - znorm) .* zoomcentre
-# end
+  (znorm .* offset) .+ ((1 - znorm) .* zoomcentre)
+end
 
-# function viewframe(frame, ev)
-#   if ds.containsp(ev, :drag)
-#     ds.update(frame, :offset, .+, get(ev, :drag))
-#   elseif ds.containsp(ev, :scroll)
-#     zoom = get(frame, :zoom)
-#     offset = get(frame, :offset)
+function viewframe(frame, ev)
+  if ds.containsp(ev, :drag)
+    ds.update(frame, :offset, .+, get(ev, :drag))
+  elseif ds.containsp(ev, :scroll)
+    zoom = get(frame, :zoom)
+    offset = get(frame, :offset)
 
-#     Δzoom = ds.getin(ev, [:scroll, :scroll])
-#     zoomcentre = get(ev, [:scroll, :position])
+    Δzoom = ds.getin(ev, [:scroll, :scroll])
+    zoomcentre = ds.getin(ev, [:scroll, :position])
 
-#     ds.hashmap(
-#       :zoom, zoom + Δzoom,
-#       :offset, recentrezoom(Δzoom, offset, zoomcentre)
-#     )
-#   else
-#     @assert false "unreachable"
-#   end
-# end
+    ds.hashmap(
+      :zoom, zoom + Δzoom,
+      :offset, recentrezoom(Δzoom, offset, zoomcentre)
+    )
+  else
+    @assert false "unreachable"
+  end
+end
 
-# frame = ds.stream(
-#   ds.scan(viewframe, ds.hashmap(:zoom, 0, :offset, (0,0))),
-#   ds.interleave(ds.hashmap(:scroll, zoom, :drag, drag))
-# )
+frame = ds.stream(
+  ds.scan(viewframe, ds.hashmap(:zoom, 0, :offset, (0,0))),
+  ds.interleave(ds.hashmap(:scroll, zoom, :drag, drag))
+)
 
-# l = ds.subscribe(frame)
-
-# take!(l)
+to_render = ds.subscribe(frame; buffer=1)
