@@ -4,6 +4,8 @@ import resources as rd
 import framework as fw
 import pipeline as gp
 import render as draw
+import eventsystem as es
+import mouse
 
 import DataStructures as ds
 import Vulkan as vk
@@ -60,4 +62,55 @@ function main()
   end
 end
 
+
+es.init()
+
 main()
+
+drag = ds.stream(
+  ds.combinelast(ds.emptymap) ∘ mouse.drag(),
+  ds.interleave(es.getstreams(:click, :position))
+)
+
+# zoom = ds.stream(
+#   mouse.zoom() ∘ map(x -> ds.update(x, :scroll, y -> y isa Tuple ? y[2] : y)),
+#   ds.interleave(es.getstreams(:position, :scroll))
+# )
+
+# function normalisezoom(z)
+#   exp(-z/100)
+# end
+
+# function recentrezoom(Δzoom, offset, zoomcentre)
+#   znorm = normalisezoom(Δzoom)
+
+#   znorm .* offset .+ (1 - znorm) .* zoomcentre
+# end
+
+# function viewframe(frame, ev)
+#   if ds.containsp(ev, :drag)
+#     ds.update(frame, :offset, .+, get(ev, :drag))
+#   elseif ds.containsp(ev, :scroll)
+#     zoom = get(frame, :zoom)
+#     offset = get(frame, :offset)
+
+#     Δzoom = ds.getin(ev, [:scroll, :scroll])
+#     zoomcentre = get(ev, [:scroll, :position])
+
+#     ds.hashmap(
+#       :zoom, zoom + Δzoom,
+#       :offset, recentrezoom(Δzoom, offset, zoomcentre)
+#     )
+#   else
+#     @assert false "unreachable"
+#   end
+# end
+
+# frame = ds.stream(
+#   ds.scan(viewframe, ds.hashmap(:zoom, 0, :offset, (0,0))),
+#   ds.interleave(ds.hashmap(:scroll, zoom, :drag, drag))
+# )
+
+# l = ds.subscribe(frame)
+
+# take!(l)

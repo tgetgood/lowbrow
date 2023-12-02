@@ -18,6 +18,18 @@
   end
 
   @test reduce(+, 0, c2, c3) == 1
+
+  c3 = Channel()
+  c4 = Channel()
+
+  @async into(c4, map(x -> x + 2), c3)
+
+  @async for i in 1:10
+    put!(c3, i)
+  end
+
+  @test take!(c4) == 3
+  @test take!(c4) == 4
 end
 
 @testset "atoms" begin

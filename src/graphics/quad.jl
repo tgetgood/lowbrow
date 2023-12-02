@@ -63,17 +63,4 @@ function main()
   end
 end
 
-es.init()
-
-dragspub = ds.stream(
-  ds.combinelast(ds.emptymap) ∘ mouse.drag(),
-  ds.interleave(es.getstreams(:click, :position))
-)
-
-drags = ds.subscribe(dragspub)
-
 main()
-
-@async while true
-  @info take!(drags)
-end

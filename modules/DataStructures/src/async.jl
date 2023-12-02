@@ -1,5 +1,5 @@
 mutable struct Atom
-  @atomic value
+  @atomic value::Any
 end
 
 function deref(a::Atom)
@@ -70,12 +70,19 @@ end
 
 # So it looks like each subscriber needs a dropping policy.
 
+
+# Julia sucks a recursion, so loopify everything
 function ireduce(f, init, ch::Channel)
+  @warn init, f
+  v = init
   try
-    ireduce(f, f(init, take!(ch)), ch)
+    while true # REVIEW:
+      @warn v
+      v = f(v, take!(ch))
+    end
   catch e
     if e isa InvalidStateException && ch.state === :closed
-      init
+      return v
     else
       rethrow(e)
     end
@@ -83,12 +90,15 @@ function ireduce(f, init, ch::Channel)
 end
 
 function ireduce(f, init, chs::Channel...)
+  v = init
   try
-    vs = [take!(ch) for ch in chs]
-    ireduce(f, f(init, vs...), chs...)
+    while true
+      xs = [take!(ch) for ch in chs]
+      v = f(v, xs...)
+    end
   catch e
     if e isa InvalidStateException && !every(x -> x.state === :open, chs)
-      init
+      return v
     else
       throw(e)
     end
@@ -100,7 +110,7 @@ end
 abstract type SubStream <: Stream end
 
 struct TailSubStream <: SubStream
-  ch::Channel
+  ch::Channel{Any}
 end
 
 function take!(s::TailSubStream)
@@ -203,23 +213,31 @@ listener(ch::Channel) = ch
 listener(s::SubStream) = s.ch
 listener(p::PubStream) = subscribe(p)
 
-function stream(xform, streams::PubStream...)
-  output = pub()
+WriteStream = Union{Channel, PubStream}
 
-  inputs = map(subscribe, streams)
+function send!(ch::WriteStream, val)
+  put!(ch, val)
+  return ch
+end
 
-  t = Threads.@spawn begin
+function into(to::WriteStream, xform, from...)
+  Threads.@spawn begin
     try
-      transduce(xform ∘ tap(output), lastarg, 0, inputs...)
+      @info to
+      transduce(xform, send!, to, from...)
     catch e
       handleerror(e)
     end
   end
+  return to
+end
 
-  # How does one implement `bind` for custom channel like types?
-  # bind(output, t)
+function into(to::WriteStream, xform, from::PubStream...)
+  into(to, xform, map(subscribe, from)...)
+end
 
-  return output
+function stream(xform, streams::PubStream...)
+  into(pub(), xform, streams...)
 end
 
 function ireduce(f, init, s::PubStream)
@@ -231,6 +249,7 @@ function ireduce(f, init, ss::PubStream...)
 end
 
 function ireduce(f, init, s::SubStream)
+  @info init
   ireduce(f, init, s.ch)
 end
 
@@ -239,6 +258,38 @@ function ireduce(f, init, s::SubStream...)
 end
 
 ##### Stream Operators
+
+"""
+Squggol's `scan` operator. I.e. emits each step of a reduction.
+"""
+function scan(f, init)
+  state = init
+  function(emit)
+    function inner()
+      emit()
+    end
+    function inner(x)
+      emit(x)
+    end
+    function inner(result, next)
+      state = f(state, next)
+      emit(result, state)
+    end
+  end
+end
+
+# Notably, you can implement `reduce` as
+#
+# function reduce(f, init, coll)
+#   transduce(scan(f, init), lastarg, nil, coll)
+# end
+#
+# One of those degenerate transductions that keep coming up.
+#
+# This one in particular is really just a reactive value that updates each time
+# a new element of `coll` is processed. There is no reduction step, to speak
+# of. Just a sequence of values. Except there is, we've just "pulled it back"
+# into the transduction.
 
 """
 Returns a pub stream which listens to all `ps` and emits every message it gets
@@ -275,7 +326,7 @@ function interleave(ps::PubStream...)
 end
 
 """
-Given a map from names to streams return a pub stream which recieves every
+Given a map from names to streams return a pub stream which receives every
 message from all named streams tagged with the name of the origin
 stream. Messages are in the order received by a gaggle of async waiters, so it
 had better not be important.
@@ -311,9 +362,10 @@ function interleave(streams::Map)
 end
 
 """
-Given a stream of named messages, emit a map containing the last from each each
-time a new message is received.
+Given a stream of named messages, emit a map containing the last from each
+whenever a new message is received.
 """
+# combinelast(init) = scan(merge, init)
 function combinelast(init)
   state = init
   function(emit)

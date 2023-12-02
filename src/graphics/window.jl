@@ -81,9 +81,10 @@ function mousebuttoncb(_, button, action, mods)
   end
 end
 
-function mouseposcb(_, x, y)
+function mouseposcb(w, x, y)
   try
-    events.mousepositionupdate(x, y)
+    s = size(w)
+    events.mousepositionupdate((x/s.width, y/s.height) .* 2 .- 1)
   catch e
     ds.handleerror(e)
   end
