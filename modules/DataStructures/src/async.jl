@@ -221,7 +221,7 @@ end
 function into(to::WriteStream, xform, from...)
   Threads.@spawn begin
     try
-      transduce(xform ∘ tap(to), lastarg, 0, from...)
+      transduce(xform, send!, to, from...)
     catch e
       handleerror(e)
     end
@@ -361,19 +361,4 @@ end
 Given a stream of named messages, emit a map containing the last from each
 whenever a new message is received.
 """
-# combinelast(init) = scan(merge, init)
-function combinelast(init)
-  state = init
-  function(emit)
-    function inner()
-      emit()
-    end
-    function inner(result)
-      emit(result)
-    end
-    function inner(result, next)
-      state = merge(state, next)
-      emit(result, state)
-    end
-  end
-end
+combinelast(init) = scan(merge, init)

@@ -20,7 +20,7 @@ function drag()
           if started
             p = lastpos
             lastpos = pos
-            emit(result, pos .- p)
+            return emit(result, pos .- p)
           else
             lastpos = pos
             started = true
@@ -30,11 +30,11 @@ function drag()
             started = false
             p = lastpos
             lastpos = pos
-            emit(result, pos .- p)
-          else
+            return emit(result, pos .- p)
           end
         end
       end
+      return result
     end
   end
 end
@@ -51,6 +51,7 @@ function zoom()
     function inner(result, next)
       if ds.containsp(next, :position)
         position = get(next, :position)
+        result
       elseif ds.containsp(next, :scroll)
         emit(result, ds.assoc(next, :position, position))
       else

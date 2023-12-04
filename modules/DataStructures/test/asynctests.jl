@@ -85,6 +85,13 @@ end
 
   @test take!(l2) == 81
 
+  # (transduce xform send! to from)
+  # should always equal
+  # (transduce (comp xform tap!(to)) lastarg nil from)
+  #
+  # In the sense that the `to` channels should always receive the same values.
+
+
 end
 
 @testset "stream transduction" begin
