@@ -7,4 +7,6 @@ function pushonce(path)
   end
 end
 
-map(pushonce, ["src", "modules", "src/graphics"])
+for i in ["src", "modules", "src/graphics"]
+  pushonce(i)
+end

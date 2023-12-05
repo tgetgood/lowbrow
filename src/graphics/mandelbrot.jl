@@ -107,7 +107,7 @@ function viewframe(frame, ev)
 end
 
 frame = ds.stream(
-  ds.scan(viewframe, ds.hashmap(:zoom, 0, :offset, (0,0))),
+  ds.scan(viewframe, ds.hashmap(:zoom, 0, :offset, (0.5,0.5))),
   ds.interleave(ds.hashmap(:scroll, zoom, :drag, drag))
 )
 
