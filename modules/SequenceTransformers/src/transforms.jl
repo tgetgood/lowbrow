@@ -4,7 +4,15 @@ struct MapXf{F} <: PureXf
   f::F
 end
 
-next(xf::MapXf) = (emit, _, _) -> x -> emit(xf.f(x))
+function next(xf::MapXf)
+  function(emit, _, _)
+    function(x)
+      emit(xf.f(x))
+      return nothing
+    end
+  end
+end
+
 map(f) = MapXf(f)
 map(f, xs) = map(f)(xs)
 
@@ -16,7 +24,16 @@ end
 
 
 # TODO: Handle errors from `p`
-next(xf::FilterXf) = (emit, _, _) -> x -> xf.p(x) ? emit(x) :
+function next(xf::FilterXf)
+  function(emit, _, _)
+    function(x)
+      if xf.p(x)
+        emit(x)
+      end
+      return nothing
+    end
+  end
+end
 
 filter(p) = FilterXf(p)
 # If I define this only once, Base.filter is used instead.

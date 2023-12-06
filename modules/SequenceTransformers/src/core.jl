@@ -10,7 +10,9 @@ struct PureCompositeXf <: PureXf
   inner::T where T <: PureXf
 end
 
-∘(f::PureXf, g::PureXf) = PureCompositeXf(f, g)
+function ∘(f::S, g::T) where S <: PureXf where T <: PureXf
+  PureCompositeXf(f, g)
+end
 
 struct NoEmission end
 
@@ -45,6 +47,19 @@ end
 
 simpleiter(x, y) = iterate(x, y)
 simpleiter(x, _::NoEmission) = iterate(x)
+
+eltype(iter::PureXfIterator) = Int
+
+function collect(xf::PureXf, iter)
+  out = []
+  y = iterate(iter)
+  collector = next(xf)(x -> push!(out, x), nothing, nothing)
+  while y !== nothing
+    collector(y[1])
+    y = iterate(iter, y[2])
+  end
+  return out
+end
 
 function iterate(iter::PureXfIterator, inputstate=none)
   state = inputstate

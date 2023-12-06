@@ -1,7 +1,6 @@
 module SequenceTransformers
 
-filter(x) = x
-import Base: length, iterate
+import Base: length, iterate, ∘
 
 # include("../../../repl.jl")
 
