@@ -1,0 +1,18 @@
+#+TITLE: Bundle of Experiments
+
+The name comes from the fact that I was going to play with writing a toy
+browser. It has since gone in several very different directions.
+
+./modules/DataStructures contains a rewrite of the persistent datastructures
+— HAMTs and Hickey's vectors, mostly — from xprl, along with a transducers api
+intended for use both with those and julia channels; the end goal being to have
+a library to write functional UIs without the downsides of FRP (probably with
+its own downsides). This ought to me moved to its own repo.
+
+./src/graphics contains a jumble of high level Vulkan wrappers and
+demos/examples to test them out. ./src/graphics/viking.jl &
+src/graphics/particles.jl run examples from vulkan-tutorial.com, whereas
+src/graphics/mandlebrot.jl runs an example of an interactive demo (using GLFW).
+
+src/browser is < 1% of a working browser. It can fetch HTML and dump it to a
+terminal. That's about it.
