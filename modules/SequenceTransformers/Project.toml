@@ -1,8 +1,0 @@
-name = "SequenceTransformers"
-uuid = "2c8c66a3-8712-4554-ace0-7bd901cc92b8"
-authors = ["Thomas Getgood <thomas@macroexpanse.com>"]
-version = "0.1.0"
-
-[deps]
-Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
