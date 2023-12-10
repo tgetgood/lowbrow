@@ -97,8 +97,8 @@ function textureimage(system, filename)
 
   mips = Int(1 + floor(log2(min(size(image)...))))
 
-  rgb::Vector{UInt8} = ds.into(
-    ds.emptyvector,
+  rgb = ds.into!(
+    UInt8[],
     map(bgr)
     ∘
     ds.inject(ds.repeat(ds.vector(0xff)))
