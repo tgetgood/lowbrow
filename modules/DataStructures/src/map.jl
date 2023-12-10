@@ -564,3 +564,9 @@ function iterate(m::PersistentHashMap, state)
     first(state), rest(state)
   end
 end
+
+depth(m::PersistentArrayMap) = 1
+depth(m::PersistentHashMap) = depth(m.root)
+depth(n::PersistentHashNode) = 1 + max(map(depth, n.ht)...)
+# REVIEW: Do leaves count as a level? I guess it depends on what you're doing.
+depth(n::MapNode) = 0

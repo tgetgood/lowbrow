@@ -18,8 +18,9 @@ import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, Emp
 # symbol is a global mutable variable. The "can't modify without explicit
 # import" property helps but is a bit of a kludge.
 
-# include("vectortests.jl")
-# include("maptests.jl")
-# include("xformtests.jl")
-# include("settests.jl")
+include("vectortests.jl")
+include("maptests.jl")
+include("xformtests.jl")
+include("settests.jl")
 include("asynctests.jl")
+include("typeinferencetests.jl")

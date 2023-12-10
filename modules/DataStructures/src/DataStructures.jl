@@ -57,6 +57,9 @@ export Atom, deref, swap!, pub, subscribe, tap
 # other
 export handleerror
 
+# Mutable Julia collections
+export into!
+
 ## Julia conventions vs my tendency to use clojure names...
 values(m::Map) = vals(m)
 
