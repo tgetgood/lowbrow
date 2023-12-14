@@ -49,33 +49,7 @@ prog = ds.hashmap(
   :indicies, [0, 3, 2, 2, 1, 0,]
 )
 
-function main()
-
-  config = graphics.configure(load(prog))
-
-  system, config = graphics.instantiate(graphics.staticinit(config), config)
-
-  config = fw.buffers(system, config)
-
-  graphics.renderloop(system, config) do i, renderstate
-    renderstate
-  end
-end
-
-
-es.init()
-
-main()
-
-drag = ds.stream(
-  ds.combinelast(ds.emptymap) ∘ mouse.drag(),
-  ds.interleave(es.getstreams(:click, :position))
-)
-
-zoom = ds.stream(
-  mouse.zoom() ∘ map(x -> ds.update(x, :scroll, y -> y isa Tuple ? y[2] : y)),
-  ds.interleave(es.getstreams(:position, :scroll))
-)
+### Mouse event handlers
 
 function normalisezoom(z)
   exp(-z/100)
@@ -106,9 +80,97 @@ function viewframe(frame, ev)
   end
 end
 
-frame = ds.stream(
-  ds.scan(viewframe, ds.hashmap(:zoom, 0, :offset, (0.5,0.5))),
-  ds.interleave(ds.hashmap(:scroll, zoom, :drag, drag))
-)
+struct MemoChannel{T}
+  cache::Ref{T}
+  ch::Channel{T}
+end
 
-to_render = ds.subscribe(frame; buffer=1)
+function take!(ch::MemoChannel)
+  try
+    lock(ch.ch)
+    if isready(ch.ch)
+      ch.cache[] = take!(ch.ch)
+    end
+      return ch.cache[]
+  finally
+    unlock(ch.ch)
+  end
+end
+
+function takelast(init, ch)
+  MemoChannel(Ref(init), ch)
+end
+
+
+function main()
+
+  ## UI setup
+
+  es.init()
+
+  drag = ds.stream(
+    ds.combinelast(ds.emptymap) ∘ mouse.drag(),
+    ds.interleave(es.getstreams(:click, :position))
+  )
+
+  zoom = ds.stream(
+    mouse.zoom() ∘ map(x -> ds.update(x, :scroll, y -> y isa Tuple ? y[2] : y)),
+    ds.interleave(es.getstreams(:position, :scroll))
+  )
+
+  viewport = ds.stream(
+    ds.scan(viewframe, ds.hashmap(:zoom, 0, :offset, (0.5, 0.5))),
+    ds.interleave(ds.hashmap(:scroll, zoom, :drag, drag))
+  )
+
+  viewstate = takelast(
+    ds.hashmap(:zoom, 0, :offset, (0, 0)),
+    ds.subscribe(viewport; buffer=1)
+  )
+
+  coords = take!(viewstate)
+  new = true
+
+  ## VK wrapper setup
+
+  config = graphics.configure(load(prog))
+
+  system, config = graphics.instantiate(graphics.staticinit(config), config)
+
+  config = fw.buffers(system, config)
+
+  framecount = get(config, :concurrent_frames)
+
+  ## Compute
+
+  images = ds.into(
+    ds.emptyvector,
+    map(_ -> hw.createimage(system, ds.hashmap(
+      :format, vk.FORMAT_R64G64B64_SFLOAT,
+      :queres, [:compute, :graphics],
+      :sharingmode, vk.SHARING_MODE_CONCURRENT,
+      :size, 1200*1200*8*3, #FIXME!!!
+      :usage, vk.IMAGE_USAGE_STORAGE_BIT | vk.IMAGE_USAGE_SAMPLED_BIT,
+      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+
+    ))),
+    1:framecount
+  )
+
+  ## Render loop
+  graphics.renderloop(system, config) do i, renderstate
+    if new
+      # reset image buffer and iteration counter (zero out)
+    end
+
+    temp = take!(viewstate)
+    new = temp !== coords
+    coords = temp
+
+    return renderstate
+  end
+
+end
+
+
+# main()
