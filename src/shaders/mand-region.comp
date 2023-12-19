@@ -1,0 +1,36 @@
+#version 450
+
+struct Pixel {
+  bool done;
+  int count;
+  dvec2 mu;
+  dvec2 z;
+};
+
+layout(std140, binding = 0) writeonly restrict buffer PixelSSBOOut {
+   Pixel pixels[ ];
+};
+
+layout(push_constant) uniform constants {
+  uvec2 window;
+  dvec2 offset;
+  double zoom;
+} pcs;
+     
+// REVIEW: Why 2D? Does it make any difference in this case? 
+layout (local_size_x = 3, local_size_y = 32, local_size_z = 1) in;
+
+void main() {
+  
+  uint i = gl_GlobalInvocationID.x;
+  uint j = gl_GlobalInvocationID.y;
+  uint n = j * pcs.window[0] + i;
+  uint N = pcs.window[0] + pcs.window[1];
+
+  if (n < N) {
+    dvec2 coords = dvec2(double(i/pcs.window[0]), double(j/pcs.window[1]));
+    dvec2 mu = pcs.offset + (pcs.zoom * coords);
+
+    pixels[n] = Pixel(false, 0, mu, dvec2(0.0, 0.0));
+  }
+}

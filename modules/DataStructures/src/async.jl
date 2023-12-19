@@ -111,9 +111,13 @@ struct TailSubStream <: SubStream
   ch::Channel{Any}
 end
 
-function take!(s::TailSubStream)
-  take!(s.ch)
-end
+lock(x::TailSubStream) = lock(x.ch)
+unlock(x::TailSubStream) = unlock(x.ch)
+isready(x::TailSubStream) = isready(x.ch)
+
+close(s::TailSubStream) = close(s.ch)
+
+take!(s::TailSubStream) = take!(s.ch)
 
 function put!(s::TailSubStream, x)
   lock(s.ch) do
@@ -123,10 +127,6 @@ function put!(s::TailSubStream, x)
 
     put!(s.ch, x)
   end
-end
-
-function close(s::TailSubStream)
-  close(s.ch)
 end
 
 function sub(; buffer = 32, drop=:oldest)

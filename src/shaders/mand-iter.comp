@@ -1,0 +1,57 @@
+#version 450
+
+struct Pixel {
+  bool done;
+  int count;
+  dvec2 mu;
+  dvec2 z;
+};
+
+layout(push_constant) uniform constants {
+  uvec2 window;
+  int itercount;
+} pcs;
+     
+layout(std140, binding = 0) readonly restrict buffer PixelSSBOIn {
+   Pixel pixelsIn[ ];
+};
+
+layout(std140, binding = 1) writeonly restrict buffer PixelSSBOOut {
+   Pixel pixelsOut[ ];
+};
+
+layout (local_size_x = 3, local_size_y = 32, local_size_z = 1) in;
+
+// Escape boundary (squared)
+const double threshold = 4.0;
+
+void main() {
+  
+  uint i = gl_GlobalInvocationID.x;
+  uint j = gl_GlobalInvocationID.y;
+  uint n = j * pcs.window[0] + i;
+  uint N = pcs.window[0] + pcs.window[1];
+
+  if (n < N) {
+    Pixel p = pixelsIn[n];
+    bool done = p.done;
+
+    if (!done) {
+      int count = p.count;
+      dvec2 z = p.z;
+      const dvec2 mu = p.mu;
+
+      for (int c = 0; c < pcs.itercount; c++) {
+        double zrs = z[0]*z[0];
+        double zis = z[1]*z[1];
+        // This done check lags one step behind the computation.
+        done = zrs + zis < threshold;
+        if (done) break;
+        z = dvec2(zrs - zis - mu[0], 2.0*z[0]*z[1] - mu[1]);
+        count++;
+      }
+
+      pixelsOut[n] = Pixel(done, count, mu, z);
+    }
+  }
+} 

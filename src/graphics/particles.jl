@@ -113,7 +113,7 @@ prog = hashmap(
   ),
   :render, ds.hashmap(
     :inputassembly, ds.hashmap(
-      :topology, :lines,
+      :topology, :points,
       :restart, false
     ),
     :shaders, hashmap(
@@ -160,7 +160,7 @@ function main()
       deltas[i], ssbos[(i % frames) + 1], ssbos[((i + 1) % frames) + 1]
     ],
     1:frames
-  )
+  # )
 
   fw.binddescriptors(dev, get(cpconfig, :descriptorsets), compute_bindings)
 

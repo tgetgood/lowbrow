@@ -1,6 +1,8 @@
 import graphics
+import window
 import hardware as hw
 import resources as rd
+import commands
 import framework as fw
 import pipeline as gp
 import render as draw
@@ -24,8 +26,18 @@ function load(config)
   config = ds.assoc(config, :vertex_input_state, rd.vertex_input_state(Vertex))
 end
 
+struct Pixel
+  done::Bool
+  count::Int
+  mu::NTuple{2, Float64}
+  z::NTuple{2, Float64}
+end
+
 prog = ds.hashmap(
   :name, "The Separator",
+  :device, ds.hashmap(
+    :features, [:shader_float_64]
+  ),
   :render, ds.hashmap(
     :texture_file, *(@__DIR__, "/../../assets/texture.jpg"),
     :shaders, ds.hashmap(
@@ -35,6 +47,25 @@ prog = ds.hashmap(
     :inputassembly, ds.hashmap(
       :topology, :triangles
     )
+  ),
+  :compute, ds.hashmap(
+    :bufferinit, ds.hashmap(
+      :shader, ds.hashmap(
+        :stage, :compute,
+        :file, *(@__DIR__, "/../shaders/mand-region.comp")
+      ),
+      :pushconstants, [ds.hashmap(:stage, :compute, :size, 40)],
+      :descriptorsets, ds.hashmap(
+        :count, 1,
+        :bindings, [
+          ds.hashmap(
+            :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            :stage, vk.SHADER_STAGE_COMPUTE_BIT
+          )
+        ]
+      )
+    ),
+
   ),
   :model, ds.hashmap(
     :loader, load,
@@ -80,27 +111,40 @@ function viewframe(frame, ev)
   end
 end
 
-struct MemoChannel{T}
-  cache::Ref{T}
-  ch::Channel{T}
+struct MemoChannel
+  cache::Ref{Any}
+  ch
 end
 
+import Base.take!
 function take!(ch::MemoChannel)
   try
     lock(ch.ch)
     if isready(ch.ch)
       ch.cache[] = take!(ch.ch)
     end
-      return ch.cache[]
+    return ch.cache[]
   finally
     unlock(ch.ch)
   end
 end
 
 function takelast(init, ch)
-  MemoChannel(Ref(init), ch)
+  MemoChannel(init, ch)
 end
 
+function pixel_buffers(system, frames, winsize)
+  ds.into(
+    ds.emptyvector,
+    map(_ -> hw.buffer(system, ds.hashmap(
+      :usage, vk.BUFFER_USAGE_STORAGE_BUFFER_BIT,
+      :size, sizeof(Pixel) * winsize.width * winsize.height,
+      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+      :queues, [:compute]
+    ))),
+    1:frames
+  )
+end
 
 function main()
 
@@ -137,40 +181,96 @@ function main()
 
   system, config = graphics.instantiate(graphics.staticinit(config), config)
 
+  dev = get(system, :device)
+
   config = fw.buffers(system, config)
 
-  framecount = get(config, :concurrent_frames)
+  frames = get(config, :concurrent_frames)
+
+  w = get(system, :window)
+  winsize = window.size(w)
 
   ## Compute
 
-  images = ds.into(
-    ds.emptyvector,
-    map(_ -> hw.createimage(system, ds.hashmap(
-      :format, vk.FORMAT_R64G64B64_SFLOAT,
-      :queres, [:compute, :graphics],
-      :sharingmode, vk.SHARING_MODE_CONCURRENT,
-      :size, 1200*1200*8*3, #FIXME!!!
-      :usage, vk.IMAGE_USAGE_STORAGE_BIT | vk.IMAGE_USAGE_SAMPLED_BIT,
-      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+  initconfig = ds.getin(config, [:compute, :bufferinit])
 
-    ))),
-    1:framecount
+  initconfig = ds.update(
+    initconfig, :descriptorsets, x -> merge(x, fw.descriptors(dev, x))
   )
 
+  initconfig = ds.assoc(
+    initconfig, :pipeline, gp.computepipeline(dev, initconfig)
+  )
+
+  pbuffs = []
+
   ## Render loop
+  framecounter = 0
+
   graphics.renderloop(system, config) do i, renderstate
+    framecounter += 1
     if new
-      # reset image buffer and iteration counter (zero out)
+      @info "new"
+      pbuffs = pixel_buffers(system, frames, winsize)
+      fw.binddescriptors(dev, get(initconfig, :descriptorsets), [pbuffs])
+
+      pipeline = ds.getin(initconfig, [:pipeline, :pipeline])
+      layout = ds.getin(initconfig, [:pipeline, :layout])
+
+      pcvs = [(
+        winsize.width, winsize.height, get(coords, :offset), get(coords, :zoom)
+      )]
+
+      # Prevent GC.
+      initconfig = ds.assoc(initconfig, :pushconstantvalues, pcvs)
+
+      initsem = commands.cmdseq(system, :compute) do cmd
+        vk.cmd_bind_pipeline(cmd, vk.PIPELINE_BIND_POINT_COMPUTE, pipeline)
+        vk.cmd_push_constants(
+          cmd,
+          layout,
+          vk.SHADER_STAGE_COMPUTE_BIT,
+          0,
+          sizeof(pcvs),
+          Ptr{Nothing}(pointer(pcvs))
+        )
+        vk.cmd_bind_descriptor_sets(
+          cmd,
+          vk.PIPELINE_BIND_POINT_COMPUTE,
+          layout,
+          0,
+          ds.getin(initconfig, [:descriptorsets, :sets]),
+          []
+        )
+
+        vk.cmd_dispatch(
+          cmd,
+          Int(ceil(winsize.width/32)), Int(ceil(winsize.height/32)), 1
+        )
+      end
+
+      initsems = [initsem]
+      new = false
+    else
+      initsems = []
     end
 
-    temp = take!(viewstate)
-    new = temp !== coords
-    coords = temp
+
+
+    # Check for updated inputs.
+    #
+    # This is way too pedantic, there has to be a cleaner way to talk about such
+    # a common pattern.
+    ctemp = take!(viewstate)
+    new = ctemp !== coords
+    coords = ctemp
+    wtemp = window.size(w)
+    new = new || wtemp != winsize
+    winsize = wtemp
 
     return renderstate
   end
 
 end
 
-
-# main()
+main()

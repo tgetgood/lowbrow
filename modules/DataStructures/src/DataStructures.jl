@@ -1,6 +1,6 @@
 module DataStructures
 
-import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex, eltype, show, last, empty, repeat, split, take!, put!, close
+import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex, eltype, show, last, empty, repeat, split, take!, put!, close, lock, unlock, isready
 
 # N.B.: Base.rest is broken for ranges and zip iterators. It returns the
 # collection itself. Don't import it.

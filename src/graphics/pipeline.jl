@@ -52,8 +52,16 @@ end
 
 # TODO: Map this over multiple configs for multiple pipelines (minimise vk calls).
 function computepipeline(dev, config)
+  pcrs = ds.into(
+    [],
+    map(x -> vk.PushConstantRange(
+      get(shadertypes, get(x, :stage)), get(x, :offset, 0), get(x, :size)
+    )),
+    get(config, :pushconstants, [])
+  )
+
   pipelinelayout = vk.unwrap(vk.create_pipeline_layout(
-    dev, [ds.getin(config, [:descriptorsets, :layout])], []
+    dev, [ds.getin(config, [:descriptorsets, :layout])], pcrs
   ))
 
   shaderconfig = get(config, :shader)
@@ -61,6 +69,7 @@ function computepipeline(dev, config)
 
   ds.hashmap(
     :layout, pipelinelayout,
+    :bindpoint, :compute,
     :pipeline, vk.unwrap(vk.create_compute_pipelines(
       dev,
       [vk.ComputePipelineCreateInfo(computeshader, pipelinelayout, 0)]
@@ -259,6 +268,7 @@ function creategraphicspipeline(system, config)
   ))
 
   hashmap(:pipeline, ps[1][1], :viewports, viewports, :scissors, scissors,
+          :bindpoint, :graphics,
           :pipelinelayout, layout)
 end
 
