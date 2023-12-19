@@ -79,15 +79,29 @@ function recorder(cmd, i, framebuffers, config)
   vk.cmd_set_scissor(cmdbuf, scissors)
 
   descriptorsets = ds.getin(config, [:descriptorsets, :sets], [])
+  layout = get(config, :pipelinelayout)
 
   if length(descriptorsets) > 0
     vk.cmd_bind_descriptor_sets(
       cmdbuf,
       vk.PIPELINE_BIND_POINT_GRAPHICS,
-      get(config, :pipelinelayout),
+      layout,
       0,
       [descriptorsets[i]],
       []
+    )
+  end
+
+  pcvs = get(config, :pushconstantvalues, [])
+
+  if length(pcvs) > 0
+    vk.cmd_push_constants(
+      cmdbuf,
+      layout,
+      vk.SHADER_STAGE_FRAGMENT_BIT,
+      0,
+      sizeof(pcvs),
+      Ptr{Nothing}(pointer(pcvs))
     )
   end
 

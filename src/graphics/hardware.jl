@@ -309,7 +309,7 @@ function pdevice(system, config)
   )
 
   if ds.emptyp(potential)
-    nothing
+    throw("No suitable hardware found. Cannot continue.")
   else
     first(potential)
   end
@@ -328,10 +328,10 @@ function createdevice(system, config)
   queues = get(system, :queues)
   pdev = get(system, :physicaldevice)
 
-  qs2c = ds.vals(
-    into(emptymap, map(x -> ds.MapEntry(x, x)), ds.vals(queues))
-  )
-  qcis::Base.Vector = map(x -> vk.DeviceQueueCreateInfo(x, [1.0]), qs2c)
+  # Uniqify queue family list
+  qs2c = into(ds.emptyset, ds.vals(queues))
+
+  qcis = ds.into!([], map(qf -> vk.DeviceQueueCreateInfo(qf, [1.0])), qs2c)
 
   dci = vk.DeviceCreateInfo(
     qcis,

@@ -3,8 +3,8 @@
 struct Pixel {
   bool done;
   int count;
-  dvec2 mu;
-  dvec2 z;
+  vec2 mu;
+  vec2 z;
 };
 
 layout(std140, binding = 0) writeonly restrict buffer PixelSSBOOut {
@@ -13,8 +13,8 @@ layout(std140, binding = 0) writeonly restrict buffer PixelSSBOOut {
 
 layout(push_constant) uniform constants {
   uvec2 window;
-  dvec2 offset;
-  double zoom;
+  vec2 offset;
+  float zoom;
 } pcs;
      
 // REVIEW: Why 2D? Does it make any difference in this case? 
@@ -28,9 +28,9 @@ void main() {
   uint N = pcs.window[0] + pcs.window[1];
 
   if (n < N) {
-    dvec2 coords = dvec2(double(i/pcs.window[0]), double(j/pcs.window[1]));
-    dvec2 mu = pcs.offset + (pcs.zoom * coords);
+    vec2 coords = vec2(float(i/pcs.window[0]), float(j/pcs.window[1]));
+    vec2 mu = pcs.offset + (pcs.zoom * coords);
 
-    pixels[n] = Pixel(false, 0, mu, dvec2(0.0, 0.0));
+    pixels[n] = Pixel(false, 0, mu, vec2(0.0, 0.0));
   }
 }

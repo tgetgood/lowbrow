@@ -16,3 +16,18 @@ src/graphics/mandlebrot.jl runs an example of an interactive demo (using GLFW).
 
 src/browser is < 1% of a working browser. It can fetch HTML and dump it to a
 terminal. That's about it.
+* Fail notes
+** [2023-12-19 Tue]
+   Just spent 20 minutes debugging a null pointer error through mandlebrot,
+   graphics, and hardware.
+
+   The core issue was that vk couldn't create a device because I wanted a
+   feature that wasn't available on the hardware. That did not — and does not —
+   cause any error. In fact, none of the checks in hardware.checkdevice trigger
+   any sort of error, they just return null.
+
+   The null also propagated up through pdevice and caused the npe in
+   createdevice when it tried to read out the queues.
+
+   Possible solution: have `checkdevice` take a map of tests and return a map of
+   results. Then, when a device is rejected, we have a clear reason why.

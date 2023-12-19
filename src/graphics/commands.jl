@@ -31,7 +31,7 @@ function cmdseq(body, system, qf;
   queue = hw.getqueue(system, qf)
 
   cmds = hw.commandbuffers(system, 1, qf, level)
-  cmd = cmds[1]
+  cmd = cds[1]
 
   vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
 

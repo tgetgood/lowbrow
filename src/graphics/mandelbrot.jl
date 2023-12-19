@@ -36,7 +36,7 @@ end
 prog = ds.hashmap(
   :name, "The Separator",
   :device, ds.hashmap(
-    :features, [:shader_float_64]
+    :features, [] #[:shader_float_64]
   ),
   :render, ds.hashmap(
     :texture_file, *(@__DIR__, "/../../assets/texture.jpg"),
@@ -46,6 +46,16 @@ prog = ds.hashmap(
     ),
     :inputassembly, ds.hashmap(
       :topology, :triangles
+    ),
+    :pushconstants, [ds.hashmap(:stage, :fragment, :size, 16)],
+    :descriptorsets, ds.hashmap(
+      :count, 1,
+      :bindings, [
+        ds.hashmap(
+          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          :stage, vk.SHADER_STAGE_FRAGMENT_BIT
+        )
+      ]
     )
   ),
   :compute, ds.hashmap(
@@ -54,7 +64,7 @@ prog = ds.hashmap(
         :stage, :compute,
         :file, *(@__DIR__, "/../shaders/mand-region.comp")
       ),
-      :pushconstants, [ds.hashmap(:stage, :compute, :size, 40)],
+      :pushconstants, [ds.hashmap(:stage, :compute, :size, 20)],
       :descriptorsets, ds.hashmap(
         :count, 1,
         :bindings, [
@@ -65,7 +75,25 @@ prog = ds.hashmap(
         ]
       )
     ),
-
+    :iteration, ds.hashmap(
+      :shader, ds.hashmap(
+        :stage, :compute,
+        :file, *(@__DIR__, "/../shaders/mand-iter.comp")
+      ),
+      :pushconstants, [ds.hashmap(:stage, :compute, :size, 12)],
+      :descriptorsets, ds.hashmap(
+        :bindings, [
+          ds.hashmap(
+            :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            :stage, vk.SHADER_STAGE_COMPUTE_BIT
+          ),
+          ds.hashmap(
+            :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            :stage, vk.SHADER_STAGE_COMPUTE_BIT
+          )
+        ]
+      )
+    )
   ),
   :model, ds.hashmap(
     :loader, load,
@@ -179,9 +207,15 @@ function main()
 
   config = graphics.configure(load(prog))
 
-  system, config = graphics.instantiate(graphics.staticinit(config), config)
+  system = graphics.staticinit(config)
 
   dev = get(system, :device)
+
+  dsets = fw.descriptors(dev, ds.getin(config, [:render, :descriptorsets]))
+
+  config = ds.updatein(config, [:render, :descriptorsets], merge, dsets)
+
+  system, config = graphics.instantiate(system, config)
 
   config = fw.buffers(system, config)
 
@@ -212,13 +246,17 @@ function main()
     if new
       @info "new"
       pbuffs = pixel_buffers(system, frames, winsize)
-      fw.binddescriptors(dev, get(initconfig, :descriptorsets), [pbuffs])
+      fw.binddescriptors(dev, get(initconfig, :descriptorsets), [[pbuffs[1]]])
 
       pipeline = ds.getin(initconfig, [:pipeline, :pipeline])
       layout = ds.getin(initconfig, [:pipeline, :layout])
 
+      offset = get(coords, :offset)
+
       pcvs = [(
-        winsize.width, winsize.height, get(coords, :offset), get(coords, :zoom)
+        winsize.width, winsize.height,
+        Float32(offset[1]), Float32(offset[2]),
+        Float32(get(coords, :zoom))
       )]
 
       # Prevent GC.
@@ -226,6 +264,7 @@ function main()
 
       initsem = commands.cmdseq(system, :compute) do cmd
         vk.cmd_bind_pipeline(cmd, vk.PIPELINE_BIND_POINT_COMPUTE, pipeline)
+
         vk.cmd_push_constants(
           cmd,
           layout,
@@ -234,6 +273,7 @@ function main()
           sizeof(pcvs),
           Ptr{Nothing}(pointer(pcvs))
         )
+
         vk.cmd_bind_descriptor_sets(
           cmd,
           vk.PIPELINE_BIND_POINT_COMPUTE,
@@ -250,11 +290,21 @@ function main()
       end
 
       initsems = [initsem]
+
+      vk.wait_semaphores(
+        get(system, :device),
+        vk.SemaphoreWaitInfo([initsem], [UInt(1)]),
+        typemax(UInt)
+      )
+
+      fw.binddescriptors(
+        dev, ds.getin(config, [:render, :descriptorsets]), [[pbuffs[1]]]
+      )
+
       new = false
     else
       initsems = []
     end
-
 
 
     # Check for updated inputs.
@@ -267,6 +317,11 @@ function main()
     wtemp = window.size(w)
     new = new || wtemp != winsize
     winsize = wtemp
+
+    renderstate = ds.assoc(
+      renderstate, :pushconstantvalues,
+      [(winsize.width, winsize.height, 10)]
+    )
 
     return renderstate
   end

@@ -121,8 +121,6 @@ function main()
 
   dsets = fw.descriptors(dev, ds.getin(config, [:render, :descriptorsets]))
 
-  bindings = [ubos, texture]
-
   config = ds.updatein(config, [:render, :descriptorsets], merge, dsets)
 
   system, config = graphics.instantiate(system, config)

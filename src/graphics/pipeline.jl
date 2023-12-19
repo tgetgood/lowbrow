@@ -21,7 +21,7 @@ function compileshader(device, fname)
   vk.unwrap(vk.create_shader_module(device, size, code))
 end
 
-const shadertypes = hashmap(
+const shaderstagebits = hashmap(
   :vertex, vk.SHADER_STAGE_VERTEX_BIT,
   :fragment, vk.SHADER_STAGE_FRAGMENT_BIT,
   :compute, vk.SHADER_STAGE_COMPUTE_BIT,
@@ -32,7 +32,7 @@ const shadertypes = hashmap(
 
 function shader(device, fname, stage, entry="main")
   vk.PipelineShaderStageCreateInfo(
-    get(shadertypes, stage),
+    get(shaderstagebits, stage),
     compileshader(device, fname),
     entry
   )
@@ -48,17 +48,17 @@ function shaders(device, config)
   )
 end
 
+function pushconstantrange(x)
+ vk.PushConstantRange(
+   get(shaderstagebits, get(x, :stage)), get(x, :offset, 0), get(x, :size)
+ )
+end
+
 ##### Compute Pipelines
 
 # TODO: Map this over multiple configs for multiple pipelines (minimise vk calls).
 function computepipeline(dev, config)
-  pcrs = ds.into(
-    [],
-    map(x -> vk.PushConstantRange(
-      get(shadertypes, get(x, :stage)), get(x, :offset, 0), get(x, :size)
-    )),
-    get(config, :pushconstants, [])
-  )
+  pcrs = ds.into!([], map(pushconstantrange), get(config, :pushconstants, []))
 
   pipelinelayout = vk.unwrap(vk.create_pipeline_layout(
     dev, [ds.getin(config, [:descriptorsets, :layout])], pcrs
@@ -150,8 +150,11 @@ function pipelinelayout(system, config)
   dl = ds.getin(config, [:render, :descriptorsets, :layout], nothing)
   dl = dl === nothing ? [] : [dl]
   dev = get(system, :device)
+  pcs = map(pushconstantrange, ds.getin(config, [:render, :pushconstants], []))
 
-  vk.unwrap(vk.create_pipeline_layout(dev, dl, []))
+  @info pcs
+
+  vk.unwrap(vk.create_pipeline_layout(dev, dl, pcs))
 end
 
 const topomap = ds.hashmap(
