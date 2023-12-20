@@ -75,7 +75,7 @@ prog = ds.hashmap(
         ]
       )
     ),
-    :iteration, ds.hashmap(
+    :separator, ds.hashmap(
       :shader, ds.hashmap(
         :stage, :compute,
         :file, *(@__DIR__, "/../shaders/mand-iter.comp")
@@ -228,7 +228,7 @@ function main()
   w = get(system, :window)
   winsize = window.size(w)
 
-  ## Compute
+  ## Compute init buffer
 
   initconfig = ds.getin(config, [:compute, :bufferinit])
 
@@ -239,6 +239,19 @@ function main()
   initconfig = ds.assoc(
     initconfig, :pipeline, gp.computepipeline(dev, initconfig)
   )
+
+  ## Compute separator
+  sepconfig = ds.getin(config, [:compute, :separator])
+
+  sepconfig = ds.update(
+    sepconfig, :descriptorsets, x -> merge(x, fw.descriptors(dev, x))
+  )
+
+  sepconfig = ds.assoc(sepconfig,
+    :pipeline, gp.computepipeline(dev, sepconfig),
+    :cmdbuffers, hw.commandbuffers(system, frames, :compute)
+  )
+
 
   pbuffs = []
 
@@ -252,6 +265,13 @@ function main()
       @info "new"
       pbuffs = pixel_buffers(system, frames, winsize)
       fw.binddescriptors(dev, get(initconfig, :descriptorsets), [[pbuffs[1]]])
+
+      fw.binddescriptors(dev, get(sepconfig, :descriptorsets), map(j -> [
+          pbuffs[((j-1)%frames)+1],
+          pbuffs[(j%frames)+1]
+        ],
+        1:frames
+      ))
 
       pipeline = ds.getin(initconfig, [:pipeline, :pipeline])
       layout = ds.getin(initconfig, [:pipeline, :layout])
