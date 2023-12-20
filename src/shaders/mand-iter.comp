@@ -20,7 +20,7 @@ layout(std140, binding = 1) writeonly restrict buffer PixelSSBOOut {
    Pixel pixelsOut[ ];
 };
 
-layout (local_size_x = 3, local_size_y = 32, local_size_z = 1) in;
+layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 // Escape boundary (squared)
 const float threshold = 4.0;

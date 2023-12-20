@@ -47,9 +47,9 @@ prog = ds.hashmap(
     :inputassembly, ds.hashmap(
       :topology, :triangles
     ),
+    # FIXME: push constants must be at least 16 bytes. Remember glsl padding!!
     :pushconstants, [ds.hashmap(:stage, :fragment, :size, 16)],
     :descriptorsets, ds.hashmap(
-      :count, 1,
       :bindings, [
         ds.hashmap(
           :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -80,7 +80,7 @@ prog = ds.hashmap(
         :stage, :compute,
         :file, *(@__DIR__, "/../shaders/mand-iter.comp")
       ),
-      :pushconstants, [ds.hashmap(:stage, :compute, :size, 12)],
+      :pushconstants, [ds.hashmap(:stage, :compute, :size, 16)],
       :descriptorsets, ds.hashmap(
         :bindings, [
           ds.hashmap(
@@ -207,6 +207,10 @@ function main()
 
   config = graphics.configure(load(prog))
 
+  frames = get(config, :concurrent_frames)
+
+  config = ds.associn(config, [:render, :descriptorsets, :count], frames)
+
   system = graphics.staticinit(config)
 
   dev = get(system, :device)
@@ -222,8 +226,6 @@ function main()
   # FIXME: This is a trap I'm going to fall into over and over.
   # REVIEW: I need to encapsulate pipelines as wholes. graphics and compute.
   config = merge(config, get(config, :render))
-
-  frames = get(config, :concurrent_frames)
 
   w = get(system, :window)
   winsize = window.size(w)
@@ -243,6 +245,8 @@ function main()
   ## Compute separator
   sepconfig = ds.getin(config, [:compute, :separator])
 
+  sepconfig = ds.associn(sepconfig, [:descriptorsets, :count], frames)
+
   sepconfig = ds.update(
     sepconfig, :descriptorsets, x -> merge(x, fw.descriptors(dev, x))
   )
@@ -252,15 +256,23 @@ function main()
     :cmdbuffers, hw.commandbuffers(system, frames, :compute)
   )
 
+  semcounters::Vector{UInt} = map(x -> UInt(0), 1:frames)
+  sems = map(x -> vk.unwrap(vk.create_semaphore(
+    get(system, :device),
+    vk.SemaphoreCreateInfo(
+      next=vk.SemaphoreTypeCreateInfo(vk.SEMAPHORE_TYPE_TIMELINE, x)
+    )
+  )), semcounters)
 
   pbuffs = []
 
   ## Render loop
   framecounter = 0
-  itercount = 100
+  itercount = 50
 
   graphics.renderloop(system, config) do i, renderstate
     framecounter += 1
+
     if new
       @info "new"
       pbuffs = pixel_buffers(system, frames, winsize)
@@ -272,6 +284,10 @@ function main()
         ],
         1:frames
       ))
+
+      fw.binddescriptors(
+        dev, ds.getin(config, [:render, :descriptorsets]), map(x -> [x], pbuffs)
+      )
 
       pipeline = ds.getin(initconfig, [:pipeline, :pipeline])
       layout = ds.getin(initconfig, [:pipeline, :layout])
@@ -323,14 +339,61 @@ function main()
       )
 
       new = false
-      @info renderstate
     else
       initsems = []
     end
 
-    fw.binddescriptors(
-      dev, ds.getin(config, [:render, :descriptorsets]), [pbuffs[1:1]]
+    sepbuffer = get(sepconfig, :cmdbuffers)[i]
+    pcs = [(winsize.width, winsize.height, framecounter * itercount)]
+
+    vk.wait_semaphores(
+      get(system, :device),
+      vk.SemaphoreWaitInfo([sems[i]], [semcounters[i]]),
+      typemax(UInt)
     )
+
+    layout = ds.getin(sepconfig, [:pipeline, :layout])
+    pipeline = ds.getin(sepconfig, [:pipeline, :pipeline])
+
+    vk.reset_command_buffer(sepbuffer)
+
+    vk.begin_command_buffer(sepbuffer, vk.CommandBufferBeginInfo())
+
+    vk.cmd_bind_pipeline(sepbuffer, vk.PIPELINE_BIND_POINT_COMPUTE, pipeline)
+
+    vk.cmd_push_constants(
+      sepbuffer,
+      layout,
+      vk.SHADER_STAGE_COMPUTE_BIT,
+      0,
+      sizeof(pcs),
+      Ptr{Nothing}(pointer(pcs))
+    )
+
+    vk.cmd_bind_descriptor_sets(
+      sepbuffer,
+      vk.PIPELINE_BIND_POINT_COMPUTE,
+      layout,
+      0,
+      [ds.getin(sepconfig, [:descriptorsets, :sets])[i]],
+      []
+    )
+
+    vk.cmd_dispatch(
+      sepbuffer,
+      Int(ceil(winsize.width / 32)), Int(ceil(winsize.height / 32)), 1
+    )
+
+    vk.end_command_buffer(sepbuffer)
+
+    vk.queue_submit(hw.getqueue(system, :compute),
+      [vk.SubmitInfo([], [], [sepbuffer], [sems[i]];
+        next=vk.TimelineSemaphoreSubmitInfo(
+          signal_semaphore_values=[semcounters[i] + 1]
+        )
+      )])
+
+    semcounters[i] += 1
 
     # Check for updated inputs.
     #
@@ -343,14 +406,15 @@ function main()
     new = new || wtemp != winsize
     winsize = wtemp
 
-    renderstate = ds.assoc(
-      renderstate, :pushconstantvalues,
-      [(winsize.width, winsize.height, framecounter * itercount)]
-    )
+    renderstate = ds.assoc(renderstate, :pushconstantvalues, pcs)
+
+    if framecounter % 100 == 0
+      @info pcs
+    end
 
     return renderstate
   end
 
 end
 
-# main()
+main()

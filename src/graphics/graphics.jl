@@ -136,7 +136,7 @@ function renderloop(framefn, system, config)
   tear_down[] = function()
     tear_down[] = () -> nothing
     @info "tearing down running process."
-    put!(sigkill, true)
+    @async put!(sigkill, true)
     @info "teardown finished."
   end
 
