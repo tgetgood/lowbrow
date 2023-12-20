@@ -219,6 +219,10 @@ function main()
 
   config = fw.buffers(system, config)
 
+  # FIXME: This is a trap I'm going to fall into over and over.
+  # REVIEW: I need to encapsulate pipelines as wholes. graphics and compute.
+  config = merge(config, get(config, :render))
+
   frames = get(config, :concurrent_frames)
 
   w = get(system, :window)
@@ -240,6 +244,7 @@ function main()
 
   ## Render loop
   framecounter = 0
+  itercount = 100
 
   graphics.renderloop(system, config) do i, renderstate
     framecounter += 1
@@ -297,15 +302,15 @@ function main()
         typemax(UInt)
       )
 
-      fw.binddescriptors(
-        dev, ds.getin(config, [:render, :descriptorsets]), [[pbuffs[1]]]
-      )
-
       new = false
+      @info renderstate
     else
       initsems = []
     end
 
+    fw.binddescriptors(
+      dev, ds.getin(config, [:render, :descriptorsets]), [pbuffs[1:1]]
+    )
 
     # Check for updated inputs.
     #
@@ -320,7 +325,7 @@ function main()
 
     renderstate = ds.assoc(
       renderstate, :pushconstantvalues,
-      [(winsize.width, winsize.height, 10)]
+      [(winsize.width, winsize.height, framecounter * itercount)]
     )
 
     return renderstate
@@ -328,4 +333,4 @@ function main()
 
 end
 
-main()
+# main()

@@ -13,7 +13,7 @@ layout(push_constant) uniform constants {
   uvec2 window;
   int count;
 } pcs;
-     
+
 layout(location = 0) in vec2 texCoord;
 
 layout(location = 0) out vec4 outColour;
@@ -26,9 +26,12 @@ void main() {
   // outColour = vec4(texture(sam, texCoord * 1.0).rgb, 1.0);
   // outColour = vec4(texCoord, 1.0, 1.0);
 
-  int n = int((texCoord.y * pcs.window[1] + texCoord.x) * pcs.window[0]);
+  uint i = uint((texCoord.x + 1) * pcs.window[0]/2);
+  uint j = uint((texCoord.y + 1) * pcs.window[1]/2);
+
+  uint n = i + j * pcs.window[0];
 
   int c = pixels[n].count;
-  
+
   outColour = vec4(float(c)/float(pcs.count), 0.0, 0.0, 1.0);
 }

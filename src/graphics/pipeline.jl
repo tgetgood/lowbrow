@@ -152,8 +152,6 @@ function pipelinelayout(system, config)
   dev = get(system, :device)
   pcs = map(pushconstantrange, ds.getin(config, [:render, :pushconstants], []))
 
-  @info pcs
-
   vk.unwrap(vk.create_pipeline_layout(dev, dl, pcs))
 end
 

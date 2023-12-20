@@ -31,3 +31,8 @@ terminal. That's about it.
 
    Possible solution: have `checkdevice` take a map of tests and return a map of
    results. Then, when a device is rejected, we have a clear reason why.
+** [2023-12-19 Tue 22:47]
+   Bug involving descriptorsets not being set properly comes down to a magic
+   line of code where I merge config with one of its submaps.
+
+   Why? I have no idea. I suspect this is a half finished refactor.

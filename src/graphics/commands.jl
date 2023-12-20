@@ -31,7 +31,7 @@ function cmdseq(body, system, qf;
   queue = hw.getqueue(system, qf)
 
   cmds = hw.commandbuffers(system, 1, qf, level)
-  cmd = cds[1]
+  cmd = cmds[1]
 
   vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
 
@@ -178,15 +178,15 @@ function todevicelocal(system, data, buffers...)
   # TODO: Test if this solves the use after free on dedicated hardware.
   # Can't replicate on laptop (embedded gpu).
 
-  # @async begin
-  #   vk.wait_semaphores(
-  #     get(system, :device),
-  #     vk.SemaphoreWaitInfo([sem], [UInt(1)]),
-  #     typemax(UInt)
-  #   )
+  @async begin
+    vk.wait_semaphores(
+      get(system, :device),
+      vk.SemaphoreWaitInfo([sem], [UInt(1)]),
+      typemax(UInt)
+    )
 
-  #   staging
-  # end
+    staging
+  end
 
 end
 
