@@ -275,6 +275,7 @@ function main()
 
     if new
       @info "new"
+      framecounter = 1
       pbuffs = pixel_buffers(system, frames, winsize)
       fw.binddescriptors(dev, get(initconfig, :descriptorsets), [[pbuffs[1]]])
 
@@ -297,7 +298,7 @@ function main()
       pcvs = [(
         winsize.width, winsize.height,
         Float32(offset[1]), Float32(offset[2]),
-        Float32(get(coords, :zoom))
+        normalisezoom(Float32(get(coords, :zoom)))
       )]
 
       # Prevent GC.

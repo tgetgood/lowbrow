@@ -31,7 +31,13 @@ void main() {
 
   uint n = i + j * pcs.window[0];
 
+  Pixel p = pixels[n];
+
   int c = pixels[n].count;
 
-  outColour = vec4(float(c)/float(pcs.count), 0.0, 0.0, 1.0);
+  float r = float(c>>8)/15.0;
+  float g = float((c&((1<<8)-1))>>4)/15.0;
+  float b = float(c&15)/15.0;
+
+  outColour = vec4(r,g,b, 1.0);
 }
