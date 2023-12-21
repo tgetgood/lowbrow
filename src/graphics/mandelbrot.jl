@@ -47,7 +47,9 @@ prog = ds.hashmap(
     :inputassembly, ds.hashmap(
       :topology, :triangles
     ),
-    # FIXME: push constants must be at least 16 bytes. Remember glsl padding!!
+    # FIXME: push constants must be at least 16 bytes.
+    # IS it because of glsl 16 byte alignment?
+    # But Why does 12 fail and 20 seem to work?
     :pushconstants, [ds.hashmap(:stage, :fragment, :size, 16)],
     :descriptorsets, ds.hashmap(
       :bindings, [

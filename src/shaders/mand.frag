@@ -26,8 +26,8 @@ void main() {
   // outColour = vec4(texture(sam, texCoord * 1.0).rgb, 1.0);
   // outColour = vec4(texCoord, 1.0, 1.0);
 
-  uint i = uint((texCoord.x + 1) * pcs.window[0]/2);
-  uint j = uint((texCoord.y + 1) * pcs.window[1]/2);
+  uint i = uint(texCoord.x * (pcs.window[0] - 1));
+  uint j = uint(texCoord.y * (pcs.window[1] - 1));
 
   uint n = i + j * pcs.window[0];
 
@@ -39,5 +39,6 @@ void main() {
   float g = float((c&((1<<8)-1))>>4)/15.0;
   float b = float(c&15)/15.0;
 
+  // outColour = vec4(0.0, 0.0, float(c/pcs.count), 1.0);
   outColour = vec4(r,g,b, 1.0);
 }
