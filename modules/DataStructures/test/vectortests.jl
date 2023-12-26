@@ -121,3 +121,11 @@ end
 @testset "Vector Seqs" begin
   #TODO:
 end
+
+@testset "into!" begin
+  @test into!([], []) == []
+  @test into([], map(identity), []) == []
+
+  @test into!([], []; infertype=false) == []
+  @test into([], map(identity), [], false) == []
+end
