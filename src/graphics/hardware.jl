@@ -9,6 +9,8 @@ import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
 
+import resources: bufferusagebits, memorypropertybits
+
 abstract type VKSystem end
 
 struct VKRender <: VKSystem
@@ -458,6 +460,20 @@ function findmemtype(system, config)
   mt[1]
 end
 
+function orlist(bitmap, x::Symbol)
+  get(bitmap, x)
+end
+
+bitor() = 0
+bitor(x) = x
+bitor(x, y) = x | y
+
+function orlist(bitmap, xs)
+  flags = ds.transduce(map(k -> get(bitmap, k)), bitor, xs)
+  @assert flags !== 0
+  flags
+end
+
 function buffer(system, config)
   dev = get(system, :device)
 
@@ -469,7 +485,7 @@ function buffer(system, config)
 
   bci = vk.BufferCreateInfo(
     get(config, :size),
-    get(config, :usage),
+    vk.BufferUsageFlag(orlist(bufferusagebits, get(config, :usage))),
     mode,
     into([], queues)
   )
@@ -480,7 +496,7 @@ function buffer(system, config)
 
   req = ds.hashmap(
     :typemask, memreq.memory_type_bits,
-    :flags, get(config, :memoryflags)
+    :flags, orlist(memorypropertybits, get(config, :memoryflags))
   )
 
   memtype = findmemtype(system, req)
@@ -497,10 +513,9 @@ function transferbuffer(system, size)
     system,
     ds.hashmap(
       :size, size,
-      :usage, vk.BUFFER_USAGE_TRANSFER_SRC_BIT,
+      :usage, :transfer_src,
       :queues, [:transfer],
-      :memoryflags, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT |
-                    vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
+      :memoryflags, [:host_coherent, :host_visible]
     )
   )
 end
@@ -548,7 +563,7 @@ function createimage(system, config)
     memreq.size,
     findmemtype(system, ds.hashmap(
       :typemask, memreq.memory_type_bits,
-      :flags, get(config, :memoryflags)
+      :flags, orlist(memorypropertybits, get(config, :memoryflags))
     ))[2]
   ))
 
@@ -573,7 +588,7 @@ function colourresources(system, config)
     :size, [ext.width, ext.height],
     :format, format,
     :samples, get(system, :max_msaa),
-    :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    :memoryflags, :device_local,
     :queues, [:graphics],
     :usage, vk.IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
             vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT
@@ -659,7 +674,7 @@ function depthresources(system, config)
       :size, [ex.width, ex.height],
       :usage, vk.IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
       :queues, [:graphics],
-      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+      :memoryflags, :device_local
     )
   )
 

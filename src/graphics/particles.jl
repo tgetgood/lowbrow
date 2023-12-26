@@ -51,11 +51,9 @@ function particle_buffers(system, config)
   ssbos = into(
     emptyvector,
     map(_ -> hw.buffer(system, ds.hashmap(
-      :usage, vk.BUFFER_USAGE_VERTEX_BUFFER_BIT |
-              vk.BUFFER_USAGE_TRANSFER_DST_BIT |
-              vk.BUFFER_USAGE_STORAGE_BUFFER_BIT,
+      :usage, ds.set(:vertex_buffer, :storage_buffer, :transfer_dst),
       :size,  sizeof(Particle) * n,
-      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+      :memoryflags, :device_local,
       :queues, [:transfer, :graphics, :compute]
     )))
     ∘
@@ -90,18 +88,9 @@ prog = hashmap(
     :descriptorsets, ds.hashmap(
       :count, frames,
       :bindings, [
-        ds.hashmap(
-          :usage, :uniform,
-          :stage, :compute
-        ),
-        ds.hashmap(
-          :usage, :ssbo,
-          :stage, :compute
-        ),
-        ds.hashmap(
-          :usage, :ssbo,
-          :stage, :compute
-        )
+        ds.hashmap(:type, :uniform, :stage, :compute),
+        ds.hashmap(:type, :ssbo, :stage, :compute),
+        ds.hashmap(:type, :ssbo, :stage, :compute)
       ]
     ),
     :shader, ds.hashmap(

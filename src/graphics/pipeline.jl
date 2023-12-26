@@ -59,7 +59,7 @@ function computepipeline(dev, config)
   computeshader = shader(
     dev,
     get(shaderconfig, :file),
-    get(shaderstagebits, get(shaderconfig, :stage))
+    get(shaderconfig, :stage)
   )
 
   ds.hashmap(

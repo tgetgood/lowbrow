@@ -131,7 +131,7 @@ function textureimage(system, filename)
     :usage, vk.IMAGE_USAGE_TRANSFER_SRC_BIT |
             vk.IMAGE_USAGE_TRANSFER_DST_BIT |
             vk.IMAGE_USAGE_SAMPLED_BIT,
-    :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    :memoryflags, :device_local
   ))
 
   sem = commands.cmdseq(system, :transfer) do cmd

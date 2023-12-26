@@ -11,6 +11,31 @@ import DataStructures: into, hashmap
 
 ##### Enumerations
 
+const bufferusagebits = hashmap(
+  :vertex_buffer, vk.BUFFER_USAGE_VERTEX_BUFFER_BIT,
+  :index_buffer, vk.BUFFER_USAGE_INDEX_BUFFER_BIT,
+  :storage_buffer, vk.BUFFER_USAGE_STORAGE_BUFFER_BIT,
+  :uniform_buffer, vk.BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+  :transfer_dst, vk.BUFFER_USAGE_TRANSFER_DST_BIT,
+  :transfer_src, vk.BUFFER_USAGE_TRANSFER_SRC_BIT
+)
+
+const memorypropertybits = hashmap(
+  :device_local, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+  :host_coherent, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT,
+  :host_visible, vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
+)
+
+const sharingmodes = hashmap()
+
+const imageusagebits = hashmap()
+
+const imagelayouts = hashmap()
+
+const accessbits = hashmap()
+
+const pipelinestagebits = hashmap()
+
 const shaderstagebits = hashmap(
   :vertex, vk.SHADER_STAGE_VERTEX_BIT,
   :fragment, vk.SHADER_STAGE_FRAGMENT_BIT,
@@ -47,7 +72,7 @@ function descriptorsetlayout(bindings)
       [],
       ds.mapindexed((i, m) -> vk.DescriptorSetLayoutBinding(
         i - 1,
-        get(descriptortypes, get(m, :usage)),
+        get(descriptortypes, get(m, :type)),
         get(shaderstagebits, get(m, :stage));
         descriptor_count=get(m, :descriptor_count, 1)
       )),

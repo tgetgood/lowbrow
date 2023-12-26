@@ -66,22 +66,32 @@ end
 
 function binddescriptors(dev, config, bindings)
   dsets = get(config, :sets)
-  usages = map(x -> get(x, :usage), get(config, :bindings))
 
-  writes = ds.into(
+  dtypes = ds.into!(
+    [],
+    map(x -> get(x, :type))
+    ∘
+    map(t -> get(rd.descriptortypes, t))
+    ,
+    get(config, :bindings)
+  )
+
+  @info dtypes
+
+  writes = ds.into!(
     [],
     ds.mapindexed((i, dset) -> ds.into(
       [],
-      ds.mapindexed((j, usage) -> begin
+      ds.mapindexed((j, dtype) -> begin
         vk.WriteDescriptorSet(
           dset,
           j - 1,
           0,
-          get(rd.descriptortypes, usage),
+          dtype,
           descriptorinfos(bindings[i][j])...
         )
       end),
-      usages
+      dtypes
     )),
     dsets
   )

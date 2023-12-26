@@ -13,7 +13,10 @@ function init()
 end
 
 function send!(ev, value)
-  put!(get(ds.deref(streams), ev), value)
+  s = ds.deref(streams)
+  if ds.containsp(s, ev)
+    put!(get(s, ev), value)
+  end
 end
 
 function getstream(name)

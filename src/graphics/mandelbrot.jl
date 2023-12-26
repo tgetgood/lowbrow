@@ -165,9 +165,9 @@ function pixel_buffers(system, frames, winsize)
   ds.into(
     ds.emptyvector,
     map(_ -> hw.buffer(system, ds.hashmap(
-      :usage, vk.BUFFER_USAGE_STORAGE_BUFFER_BIT,
+      :usage, :storage_buffer,
       :size, sizeof(Pixel) * winsize.width * winsize.height,
-      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+      :memoryflags, :device_local,
       :queues, [:compute]
     ))),
     1:frames
