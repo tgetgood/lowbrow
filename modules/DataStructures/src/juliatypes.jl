@@ -62,6 +62,9 @@ function typeset()
     function inner()
       emit()
     end
+    function inner(x::InitOnly)
+      []
+    end
     function inner(x)
       emit(x)
     end
