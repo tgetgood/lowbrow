@@ -91,16 +91,16 @@ prog = hashmap(
       :count, frames,
       :bindings, [
         ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-          :stage, vk.SHADER_STAGE_COMPUTE_BIT
+          :usage, :uniform,
+          :stage, :compute
         ),
         ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-          :stage, vk.SHADER_STAGE_COMPUTE_BIT
+          :usage, :ssbo,
+          :stage, :compute
         ),
         ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-          :stage, vk.SHADER_STAGE_COMPUTE_BIT
+          :usage, :ssbo,
+          :stage, :compute
         )
       ]
     ),
@@ -160,7 +160,7 @@ function main()
       deltas[i], ssbos[(i % frames) + 1], ssbos[((i + 1) % frames) + 1]
     ],
     1:frames
-  # )
+  )
 
   fw.binddescriptors(dev, get(cpconfig, :descriptorsets), compute_bindings)
 

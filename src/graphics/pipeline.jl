@@ -1,7 +1,7 @@
 module pipeline
 
 import hardware as hw
-import resources
+import resources: shaderstagebits
 
 import Vulkan as vk
 import DataStructures as ds
@@ -20,15 +20,6 @@ function compileshader(device, fname)
   code = reinterpret(UInt32, bin)
   vk.unwrap(vk.create_shader_module(device, size, code))
 end
-
-const shaderstagebits = hashmap(
-  :vertex, vk.SHADER_STAGE_VERTEX_BIT,
-  :fragment, vk.SHADER_STAGE_FRAGMENT_BIT,
-  :compute, vk.SHADER_STAGE_COMPUTE_BIT,
-  :geometry, vk.SHADER_STAGE_GEOMETRY_BIT,
-  :tessellationcontrol, vk.SHADER_STAGE_TESSELLATION_CONTROL_BIT,
-  :tessellationeval, vk.SHADER_STAGE_TESSELLATION_EVALUATION_BIT
-)
 
 function shader(device, fname, stage, entry="main")
   vk.PipelineShaderStageCreateInfo(
@@ -65,7 +56,11 @@ function computepipeline(dev, config)
   ))
 
   shaderconfig = get(config, :shader)
-  computeshader = shader(dev, get(shaderconfig, :file), get(shaderconfig, :stage))
+  computeshader = shader(
+    dev,
+    get(shaderconfig, :file),
+    get(shaderstagebits, get(shaderconfig, :stage))
+  )
 
   ds.hashmap(
     :layout, pipelinelayout,

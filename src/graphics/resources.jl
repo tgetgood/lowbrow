@@ -9,6 +9,28 @@ import Vulkan as vk
 import DataStructures as ds
 import DataStructures: into, hashmap
 
+##### Enumerations
+
+const shaderstagebits = hashmap(
+  :vertex, vk.SHADER_STAGE_VERTEX_BIT,
+  :fragment, vk.SHADER_STAGE_FRAGMENT_BIT,
+  :compute, vk.SHADER_STAGE_COMPUTE_BIT,
+  :geometry, vk.SHADER_STAGE_GEOMETRY_BIT,
+  :tessellationcontrol, vk.SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+  :tessellationeval, vk.SHADER_STAGE_TESSELLATION_EVALUATION_BIT
+)
+
+const descriptortypes = hashmap(
+  :uniform, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+  :sampler, vk.DESCRIPTOR_TYPE_SAMPLER,
+  :sampled_image, vk.DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+  :combined_sampler, vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+  :ssbo, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+  :image, vk.DESCRIPTOR_TYPE_STORAGE_IMAGE
+)
+
+##### Resource Creation
+
 """
 Returns Vector{DescriptorSetLayoutBinding} for data of `types` at `stages`.
 
@@ -25,8 +47,8 @@ function descriptorsetlayout(bindings)
       [],
       ds.mapindexed((i, m) -> vk.DescriptorSetLayoutBinding(
         i - 1,
-        get(m, :usage),
-        get(m, :stage);
+        get(descriptortypes, get(m, :usage)),
+        get(shaderstagebits, get(m, :stage));
         descriptor_count=get(m, :descriptor_count, 1)
       )),
       bindings

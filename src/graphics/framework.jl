@@ -77,7 +77,7 @@ function binddescriptors(dev, config, bindings)
           dset,
           j - 1,
           0,
-          usage,
+          get(rd.descriptortypes, usage),
           descriptorinfos(bindings[i][j])...
         )
       end),
