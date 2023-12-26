@@ -3,6 +3,7 @@ module commands
 import Vulkan as vk
 
 import hardware as hw
+import resources: shaderstagebits
 
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
@@ -53,6 +54,49 @@ function cmdseq(body, system, qf;
   end
 
   return signal
+end
+
+function recordcomputation(cb, cmd, pipeline, layout, dsets=[], pcs=ds.emptymap)
+  vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
+
+  vk.cmd_bind_pipeline(cmd, vk.PIPELINE_BIND_POINT_COMPUTE, pipeline)
+
+  if !ds.emptyp(pcs)
+    vk.cmd_push_constants(
+      cmd,
+      layout,
+      # REVIEW: We could get the stage from the push constant definition map,
+      # but it has to be compute in a compute pipeline, so why? Maybe we ought
+      # to validate or at least assert the stage is reasonably set.
+      #
+      # This brings up a problem with my design: I've intertwined what and where
+      # in this case, and most likely in others. The shape of push constants
+      # (size and offset) are orthogonal to where they will be used.
+      #
+      # Maybe the stage should be inferred from where they are used. That would
+      # be the logical thing.
+      #
+      # The problem comes up in render pipelines where the vertex, indirect,
+      # geom, fragment, etc. stages all need to be defined in a clump.
+      vk.SHADER_STAGE_COMPUTE_BIT,
+      get(pcs, :offset, 0),
+      get(pcs, :size),
+      Ptr{Nothing}(get(pcs, :value))
+    )
+  end
+
+  vk.cmd_bind_descriptor_sets(
+    cmd,
+    vk.PIPELINE_BIND_POINT_COMPUTE,
+    layout,
+    0,
+    dsets,
+    []
+  )
+
+  cb(cmd)
+
+  vk.end_command_buffer(cmd)
 end
 
 function copybuffertoimage(cmd, system, src, dst, size, qf=:transfer)

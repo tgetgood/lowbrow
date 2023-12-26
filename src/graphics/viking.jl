@@ -76,11 +76,11 @@ prog = ds.hashmap(
       :count, frames,
       :bindings, [
         ds.hashmap(
-          :usage, :uniform,
+          :type, :uniform,
           :stage, :vertex
         ),
         ds.hashmap(
-          :usage, :combined_sampler,
+          :type, :combined_sampler,
           :stage, :fragment
         )
       ]

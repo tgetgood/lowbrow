@@ -50,12 +50,7 @@ prog = ds.hashmap(
     # FIXME: push constants must be at least 16 bytes. Remember glsl padding!!
     :pushconstants, [ds.hashmap(:stage, :fragment, :size, 16)],
     :descriptorsets, ds.hashmap(
-      :bindings, [
-        ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-          :stage, vk.SHADER_STAGE_FRAGMENT_BIT
-        )
-      ]
+      :bindings, [ds.hashmap(:type, :storage_buffer, :stage, :fragment)]
     )
   ),
   :compute, ds.hashmap(
@@ -67,12 +62,7 @@ prog = ds.hashmap(
       :pushconstants, [ds.hashmap(:stage, :compute, :size, 20)],
       :descriptorsets, ds.hashmap(
         :count, 1,
-        :bindings, [
-          ds.hashmap(
-            :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            :stage, vk.SHADER_STAGE_COMPUTE_BIT
-          )
-        ]
+        :bindings, [ds.hashmap(:type, :storage_buffer, :stage, :compute)]
       )
     ),
     :separator, ds.hashmap(
@@ -84,12 +74,13 @@ prog = ds.hashmap(
       :descriptorsets, ds.hashmap(
         :bindings, [
           ds.hashmap(
-            :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            :stage, vk.SHADER_STAGE_COMPUTE_BIT
+            :usage, :storage_buffer,
+            :stage, :compute
           ),
           ds.hashmap(
-            :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            :stage, vk.SHADER_STAGE_COMPUTE_BIT
+            :usage, :storage_buffer,
+            # FIXME: Given where this is defined, `:compute` should be inferred.
+            :stage, :compute
           )
         ]
       )

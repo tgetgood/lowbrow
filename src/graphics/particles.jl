@@ -88,9 +88,9 @@ prog = hashmap(
     :descriptorsets, ds.hashmap(
       :count, frames,
       :bindings, [
-        ds.hashmap(:type, :uniform, :stage, :compute),
-        ds.hashmap(:type, :ssbo, :stage, :compute),
-        ds.hashmap(:type, :ssbo, :stage, :compute)
+        ds.hashmap(:type, :uniform),
+        ds.hashmap(:type, :ssbo),
+        ds.hashmap(:type, :ssbo)
       ]
     ),
     :shader, ds.hashmap(
@@ -139,11 +139,7 @@ function main()
 
   ### compute
 
-  cpconfig = get(config, :compute)
-
-  cpconfig = ds.update(
-    cpconfig, :descriptorsets, x -> merge(x, fw.descriptors(dev, x))
-  )
+  config = ds.update(config, :compute, x -> fw.computepipeline(dev, x))
 
   compute_bindings = ds.map(i -> [
       deltas[i], ssbos[(i % frames) + 1], ssbos[((i + 1) % frames) + 1]
@@ -151,11 +147,11 @@ function main()
     1:frames
   )
 
-  fw.binddescriptors(dev, get(cpconfig, :descriptorsets), compute_bindings)
-
-  cpconfig = ds.assoc(cpconfig, :pipeline, gp.computepipeline(dev, cpconfig))
-
-  config = ds.assoc(config, :computeparticles, cpconfig)
+  fw.binddescriptors(
+    dev,
+    ds.getin(config, [:compute, :descriptorsets]),
+    compute_bindings
+  )
 
   ### record compute commands once since they never change.
 
@@ -165,26 +161,14 @@ function main()
 
   for i in 1:frames
     ccmd = ccmds[i]
-    vk.begin_command_buffer(ccmd, vk.CommandBufferBeginInfo())
-
-    vk.cmd_bind_pipeline(
+    commands.recordcomputation(
       ccmd,
-      vk.PIPELINE_BIND_POINT_COMPUTE,
-      ds.getin(cpconfig, [:pipeline, :pipeline])
-    )
-
-    vk.cmd_bind_descriptor_sets(
-      ccmd,
-      vk.PIPELINE_BIND_POINT_COMPUTE,
-      ds.getin(cpconfig, [:pipeline, :layout]),
-      0,
-      [ds.getin(cpconfig, [:descriptorsets, :sets])[i]],
-      [],
-    )
-
-    vk.cmd_dispatch(ccmd, Int(floor(get(config, :particles) / 256)), 1, 1)
-
-    vk.end_command_buffer(ccmd)
+      ds.getin(config, [:compute, :pipeline, :pipeline]),
+      ds.getin(config, [:compute, :pipeline, :layout]),
+      [ds.getin(config, [:compute, :descriptorsets, :sets])[i]],
+    ) do cmd
+      vk.cmd_dispatch(cmd, Int(floor(get(config, :particles) / 256)), 1, 1)
+    end
   end
 
   csemcounters::Vector{UInt} = map(x->UInt(0), 1:frames)
