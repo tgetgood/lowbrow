@@ -31,6 +31,8 @@ function cmdseq(body, system, qf;
   pool = hw.getpool(system, qf)
   queue = hw.getqueue(system, qf)
 
+  # REVIEW: I ought to always use pools and just allocate bigger ones if I find
+  # them full. Like (mutable) vectors.
   cmds = hw.commandbuffers(system, 1, qf, level)
   cmd = cmds[1]
 
@@ -153,6 +155,8 @@ function mipblit(cmd, config)
   )
 end
 
+# FIXME: Should be (cmd, image, newstate)
+# where `image` is a map that holds the current state of the image.
 function transitionimage(cmd::vk.CommandBuffer, config)
   aspect = get(config, :aspect, vk.IMAGE_ASPECT_COLOR_BIT)
 
@@ -186,11 +190,11 @@ end
 
 function copybuffer(system::ds.Map, src, dst, size, queuefamily=:transfer)
   commands.cmdseq(system, queuefamily) do cmd
-    copybuffer(cmd, system, src, dst, size, queuefamily)
+    copybuffer(cmd, src, dst, size, queuefamily)
   end
 end
 
-function copybuffer(cmd::vk.CommandBuffer, system, src, dst, size,
+function copybuffer(cmd::vk.CommandBuffer, src, dst, size,
                     queuefamily=:transfer)
     vk.cmd_copy_buffer(cmd, src, dst, [vk.BufferCopy(0,0,size)])
 end
@@ -210,7 +214,6 @@ function todevicelocal(system, data, buffers...)
     for buffer in buffers
       copybuffer(
         cmd,
-        system,
         get(staging, :buffer),
         get(buffer, :buffer),
         get(staging, :size),
@@ -219,9 +222,8 @@ function todevicelocal(system, data, buffers...)
     end
   end
 
-  # TODO: Test if this solves the use after free on dedicated hardware.
-  # Can't replicate on laptop (embedded gpu).
-
+  # This *seems* to fix a highly intermittent use after free of the staging buffer.
+  # I can't replicate the issue reliably enough to call it fixed.
   @async begin
     vk.wait_semaphores(
       get(system, :device),
