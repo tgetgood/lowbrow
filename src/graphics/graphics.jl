@@ -172,8 +172,8 @@ function renderloop(framefn, system, config)
 
             @info "resized"
 
-            system = ds.assoc(system, :window_size,
-                              window.size(get(system, :window))
+            system = ds.assoc(system,
+              :window_size, window.size(get(system, :window))
             )
 
             system = dynamicinit(system, config)

@@ -30,9 +30,9 @@ function velocity(p)
   (25f-3/n) .* (x, y)
 end
 
-function init(count)::Vector{Particle}
-  ds.into(
-    ds.emptyvector,
+function init(count)
+  ds.into!(
+    Particle[],
     ds.partition(5)
     ∘
     map(x -> (sqrt(x[1]) * 25.0f-2, x[2] * 2pi, x[3:5]))
