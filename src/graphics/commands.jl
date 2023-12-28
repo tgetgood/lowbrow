@@ -31,7 +31,7 @@ function cmdseq(body, system, qf;
   pool = hw.getpool(system, qf)
   queue = hw.getqueue(system, qf)
 
-  # REVIEW: I ought to always use pools and just allocate bigger ones if I find
+  # TODO: I ought to always use pools and just allocate bigger ones if I find
   # them full. Like (mutable) vectors.
   cmds = hw.commandbuffers(system, 1, qf, level)
   cmd = cmds[1]

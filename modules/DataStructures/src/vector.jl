@@ -20,13 +20,6 @@ struct VectorLeaf{T} <: PersistentVector
   elements::Base.Vector{T}
 end
 
-# REVIEW: Play with setting nodelength on a per vector basis and set it based on
-# the size of the leaf element type.
-#
-# Actually doing the math, it looks like for very large trees of i8s the savings
-# would approach 18%. That's not all that much. Might be worth it in some
-# specialised settings, but not a priority until one of those come up.
-
 vl(v::Base.Vector) = VectorLeaf(v)
 vl(t::Tuple) = VectorLeaf([x for x in t])
 vl(x) = VectorLeaf(convert(Base.Vector, x))
@@ -41,7 +34,6 @@ end
 
 struct VectorNode{T} <: PersistentVector where T <: PersistentVector
   elements::Base.Vector{T}
-  # FIXME: This shouldn't be fixed size, but memory indirection is killing me.
   count::Int64
   # max depth is log(nodelength, typemax(typeof(count))). 4 bits would suffice.
   # But, due to alignment using u8 saves no space and creates extra work.
@@ -181,7 +173,6 @@ nth(v::EmptyVector, n) = throw(BoundsError(v, n))
 Returns the nth element (starting at 1) of vector v.
 """
 function nth(v::VectorNode, n)
-  # REVIEW: Cast to and from 0-indexing. Not pretty.
   (d, r) = divrem(n-1, nodelength^(depth(v) - 1))
   nth(v.elements[d+1], r+1)
 end
@@ -261,27 +252,6 @@ vector(a,b,c,d) = vectorleaf([a,b,c,d])
 vec() = emptyvector
 vec(v::Vector) = v
 
-# REVIEW: We could have a vector where one leaf contains UInt16s, another
-# contains float32s, etc.. Alignment would be a kind of magic and not practical
-# for most applications.
-#
-# jl tries very hard to make array elements homogenous bits types. The benefits
-# are obvious.
-#
-# But what if we allowed the length of leaves to vary and ensured each leaf was
-# a vector of homogenous bits type?
-#
-# Would that ever be useful in real life? I haven't come across that need, so
-# these vectors are still homogeneous at a given level (though possibly not just
-# bits types since we use `typejoin` when needed).
-#
-# But so far, for my purposes, a vector is either homogeneous
-# ints/floats/etc. or effectively Any.
-#
-# It *might* be useful to be more granular in joining types since right now if
-# you add a UInt16 to a vector of UInt32s it boxes everything instead of padding
-# the UInt16. Again, I don't need this yet.
-
 function leafpartition(; init=[])
   acc::Ref{Any} = 0
   i = length(init)
@@ -300,7 +270,6 @@ function leafpartition(; init=[])
       if acc[] !== 0 && i > 0
         t = [acc[][j] for j in 1:i]
         # Need to guard against multiple finalisation calls.
-        # REVIEW: Every transducer is idempotent at cleanup, isn't it?
         acc[] = 0
         emit(emit(result, t))
       else
@@ -415,18 +384,6 @@ function rightmost(v, depth)
   end
 end
 
-# REVIEW: RRB tries would let us use the above plus `cat` for general
-# into(_::Vector,... and would be a lot more efficient that updateing the `to`
-# vector for every new value.
-#
-# We could also do something like `intoemptyvec` where we group elements by how
-# many are needed to fill out tail nodes at various levels in the target. This
-# would also minimise useless allocations.
-#
-# But I think I have some other use cases for O(1) catenation that doesn't
-# impinge on iteration speed. We'll see if those actually become a pain point
-# though, I think, before implementing yet another data structure.
-
 reverse(v::EmptyVector) = v
 
 function reverse(v::Vector)
@@ -458,7 +415,7 @@ function showrecur(io::IO, depth, v::Vector)
   print(io, string(count(v)) * "-element PersistentVector{" * string(eltype(v)) * "}: [\n")
   indent(io, depth)
 
-  # REVIEW: Why 33? Because it had to be something...
+  # Why 33? Because it had to be something...
   if count(v) > 33
     showseq(io, depth, take(16, v))
     print(io, "\n ...\n")

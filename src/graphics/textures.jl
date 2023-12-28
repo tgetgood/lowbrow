@@ -6,10 +6,10 @@ import DataStructures as ds
 import Vulkan as vk
 import commands
 
-# REVIEW: This import automagically allows us to read the bytes out of the
+# N.B: This import automagically allows us to read the bytes out of the
 # image. *Do not remove it*!
 #
-# N.B.: Find a different jpg library. The nested opaque abstractions here are
+# TODO: Find a different jpg library. The nested opaque abstractions here are
 # shitty to work with.
 #
 # png and jpg load as transposes of each other. Is that my fault?

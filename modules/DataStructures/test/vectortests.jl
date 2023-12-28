@@ -52,10 +52,6 @@
 end
 
 @testset "Balanced Trees" begin
-  # TODO: My vectors are not balanced trees. So long as you're just iterating, I
-  # don't think this is a big deal, but the asymptotic lookup behaviour is O(n)
-  # instead of O(log(n)) which is a big deal.
-
   @test begin
     x::Vector = 1:nodelength
     depth(x) == 1

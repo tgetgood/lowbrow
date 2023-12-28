@@ -23,8 +23,7 @@ struct VKRender <: VKSystem
   commandpools::ds.Map
 end
 
-##### REVIEW: Seems I'll want these eventually, but they're just reminders at
-##### present.
+##### Seems I'll want these eventually, but they're just reminders at present.
 struct VKHeadlessRender <: VKSystem
 end
 
