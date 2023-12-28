@@ -26,9 +26,21 @@ const memorypropertybits = hashmap(
   :host_visible, vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
 )
 
-const sharingmodes = hashmap()
+const sharingmodes = hashmap(
+  :exclusive, vk.SHARING_MODE_EXCLUSIVE,
+  :concurrent, vk.SHARING_MODE_CONCURRENT
+)
 
-const imageusagebits = hashmap()
+const imageusagebits = hashmap(
+  :colour_attachment, vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+  :depth_stencil_attachment, vk.IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+  :input_attachment, vk.IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
+  :sampled, vk.IMAGE_USAGE_SAMPLED_BIT,
+  :storage, vk.IMAGE_USAGE_STORAGE_BIT,
+  :transfer_dst, vk.IMAGE_USAGE_TRANSFER_DST_BIT,
+  :transfer_src, vk.IMAGE_USAGE_TRANSFER_SRC_BIT,
+  :transient_attachment, vk.IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT
+)
 
 const imagelayouts = hashmap()
 

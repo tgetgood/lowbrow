@@ -127,10 +127,8 @@ function textureimage(system, filename)
     :queues, [:transfer, :graphics],
     :size, size(image),
     :miplevels, mips,
-    :sharingmode, vk.SHARING_MODE_EXCLUSIVE,
-    :usage, vk.IMAGE_USAGE_TRANSFER_SRC_BIT |
-            vk.IMAGE_USAGE_TRANSFER_DST_BIT |
-            vk.IMAGE_USAGE_SAMPLED_BIT,
+    :sharingmode, :exclusive,
+    :usage, [:transfer_src, :transfer_dst, :sampled],
     :memoryflags, :device_local
   ))
 

@@ -9,7 +9,7 @@ import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
 
-import resources: bufferusagebits, memorypropertybits
+import resources: bufferusagebits, memorypropertybits, sharingmodes, imageusagebits
 
 abstract type VKSystem end
 
@@ -460,16 +460,31 @@ function findmemtype(system, config)
   mt[1]
 end
 
+# How do we catch typographical errors in a dynamic language?
+
+struct Typo end
+typo = Typo()
+
 function orlist(bitmap, x::Symbol)
-  get(bitmap, x)
+  get(bitmap, x, typo)
 end
 
+# OR is such a basic monoid, but because |() needs to return a *typed* zero, we
+# can't treat it as such. If you're going to insist on a type system of this
+# sort, the identity should be its own type.
+#
+# I've run into the same problem with datastructures. Making the empty list,
+# empty map, empty set, &c. into singleton types is the only way I've figured
+# out how to make generic sequence operations play nice with type inference.
+#
+# It doesn't matter in this case since the bitmasks Vulkan uses will cast the
+# zero to their own empty set
 bitor() = 0
 bitor(x) = x
 bitor(x, y) = x | y
 
 function orlist(bitmap, xs)
-  flags = ds.transduce(map(k -> get(bitmap, k)), bitor, xs)
+  flags = ds.transduce(map(k -> get(bitmap, k, typo)), bitor, xs)
   @assert flags !== 0
   flags
 end
@@ -479,9 +494,9 @@ function buffer(system, config)
 
   queues = into(ds.emptyset, map(x -> getin(system, [:queues, x]), get(config, :queues)))
 
-  mode = get(config, :sharingmode,
-    ds.count(queues) == 1 ? vk.SHARING_MODE_EXCLUSIVE : vk.SHARING_MODE_CONCURRENT
-  )
+  mode = get(sharingmodes, get(config, :sharingmode,
+    ds.count(queues) == 1 ? :exclusive : :concurrent
+  ))
 
   bci = vk.BufferCreateInfo(
     get(config, :size),
@@ -537,9 +552,9 @@ function createimage(system, config)
     [], map(x -> ds.getin(system, [:queues, x])), get(config, :queues)
   )
 
-  sharingmode = get(config, :sharingmode,
-    length(queues) == 1 ? vk.SHARING_MODE_EXCLUSIVE : vk.SHARING_MODE_CONCURRENT
-  )
+  sharingmode = get(sharingmodes, get(config, :sharingmode,
+    length(queues) == 1 ? :exclusive : :concurrent
+  ))
 
   image = vk.unwrap(vk.create_image(
     dev,
@@ -550,7 +565,7 @@ function createimage(system, config)
     1,
     samples,
     get(config, :tiling, vk.IMAGE_TILING_OPTIMAL),
-    get(config, :usage),
+    orlist(imageusagebits, get(config, :usage)),
     sharingmode,
     queues,
     get(config, :layout, vk.IMAGE_LAYOUT_UNDEFINED)
@@ -590,8 +605,7 @@ function colourresources(system, config)
     :samples, get(system, :max_msaa),
     :memoryflags, :device_local,
     :queues, [:graphics],
-    :usage, vk.IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-            vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+    :usage, [:transient_attachment, :colour_attachment]
   ))
 
   view = imageview(system, hashmap(:format, format), image)
@@ -672,7 +686,7 @@ function depthresources(system, config)
       :format, format,
       :samples, get(system, :max_msaa),
       :size, [ex.width, ex.height],
-      :usage, vk.IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+      :usage, :depth_stencil_attachment,
       :queues, [:graphics],
       :memoryflags, :device_local
     )
