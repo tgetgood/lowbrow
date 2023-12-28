@@ -36,3 +36,13 @@ terminal. That's about it.
    line of code where I merge config with one of its submaps.
 
    Why? I have no idea. I suspect this is a half finished refactor.
+* To Do List
+** Switch to Synchronization2
+** wrap images to make transitions easier
+   Vulkan doesn't rememeber anything for you, which makes life unduly difficult.
+** find some way to order queue submissions
+   Manually juggling semaphores is error prone and just feels wrong. What we
+   need is a way to establish finish-before-start relations, topologically sort
+   those, and then automate the barriers/semaphores/fences
+** fix resizing bug
+   "bug" being segfault when shrinking windows.
