@@ -86,6 +86,9 @@ function staticinit(config)
     # the device, or just create all of the queues I might need and a command
     # pool for each? Right now the latter is simpler, but it might not be a good
     # choice.
+    # However, if we start with an empty command pool and allocate on demand,
+    # then the current strategy of figuring out what pool to use for everything
+    # up front is fine.
     hw.createdevice,
 
     # This ^ is the core setup.
@@ -122,7 +125,6 @@ function dynamicinit(system, config)
   ds.reduce((s, f) -> begin @info f; merge(s, f(s, config)) end, system, steps)
 end
 
-# TODO: This is where the config negotiation will happen
 function instantiate(system, config)
 
   system = dynamicinit(system, config)
