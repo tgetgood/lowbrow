@@ -80,7 +80,11 @@ prog = hashmap(
       v"1.0", ds.set(:sampler_anisotropy),
       v"1.2", ds.set(:timeline_semaphore)
     ),
-    :extensions, ds.set("VK_KHR_swapchain", "VK_KHR_timeline_semaphore")
+    :extensions, ds.set(
+      "VK_KHR_swapchain",
+      "VK_KHR_timeline_semaphore",
+      "VK_KHR_synchronization2"
+    )
   ),
   :concurrent_frames, frames,
   :particles, 2^14,

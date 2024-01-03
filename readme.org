@@ -52,6 +52,8 @@ terminal. That's about it.
 
    So why are all buffers relegated to concurrent access? The speed degradation
    is not an issue yet, but it's not a hard thing to fix.
+
+   Note: use VkBufferMemoryBarrier(2)
 ** Embrace the VkRender struct
    Having a fixed struct sort of violates my basic principle of accumulating
    state to create a uniform API.

@@ -109,11 +109,7 @@ function recorder(cmd, i, framebuffers, config)
 
   vb = get(vert, :buffer)
 
-  vk.cmd_bind_vertex_buffers(
-    cmdbuf,
-    [get(vert, :buffer)],
-    Vector{vk.VkDeviceSize}([0])
-  )
+  vk.cmd_bind_vertex_buffers(cmdbuf, [vb], vk.VkDeviceSize[0])
 
   if ds.containsp(config, :indexbuffer)
     ind = get(config, :indexbuffer)
@@ -164,6 +160,9 @@ function draw(system, cmd, renderstate)
     vk.queue_submit(hw.getqueue(system, :graphics), [submission]; fence)
 
     # end fenced region
+
+    # FIXME: If graphics and present are not the same qf, we need to transfer
+    # the framebuffer image.
 
     preres = vk.queue_present_khr(
       hw.getqueue(system, :presentation),
