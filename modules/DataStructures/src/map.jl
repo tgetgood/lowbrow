@@ -2,7 +2,6 @@ abstract type Map <: Sequential end
 
 abstract type MapNode end
 
-# REVIEW: Would adding {K,V} type parameters do anything except bloat code size?
 struct MapEntry <: MapNode
   key::Any
   value::Any
@@ -25,7 +24,6 @@ struct EmptyMap <: Map end
 const emptymap = EmptyMap()
 
 # Clojure uses 8 and I don't want to dig into it just yet.
-# TODO: Analysis
 const arraymapsizethreashold = 8
 
 struct PersistentArrayMap <: Map
@@ -41,7 +39,6 @@ const emptymarker = EmptyMarker()
 # full fledged maps is bound to end in confusion and disaster.
 struct PersistentHashNode <: MapNode
   ht::Base.Vector{MapNode}
-  # FIXME: Should not be fixed size
   level::Int
   count::Int
 end
@@ -50,8 +47,8 @@ const emptyhash::Base.Vector{MapNode} = [emptymarker for i in 1:nodelength]
 
 emptyhashnode(level) = PersistentHashNode(emptyhash, level, 0)
 
-# REVIEW: One extra memory indirection makes all the ensuing code cleaner. I'll
-# consider it worth it until proven otherwise.
+# One extra memory indirection makes all the ensuing code cleaner. I'll consider
+# it worth it until proven otherwise.
 struct PersistentHashMap <: Map
   root::PersistentHashNode
 end
@@ -86,8 +83,6 @@ nth(h::HashSeq, n) = first(HashSeq(h.hash, h.current+n))
 
 ##### General methods
 
-# REVIEW: This might be a tad slow for large maps. At least it's cacheable (and
-# incremental!). But then how do I make use of that?
 function hash(m::Map)
   # 0xd45866ec3759ca93 is a random seed. I want any two maps with the same
   # elements to have the same hash and be equal. This seems like a decent way to
@@ -102,7 +97,7 @@ count(m::PersistentHashNode) = m.count
 count(m::MapEntry) = 1
 count(m::EmptyMap) = 0
 count(m::PersistentArrayMap) = div(length(m.kvs), 2) # inline kvs
-count(m::PersistentHashMap) = m.root.count # REVIEW: Too much indirection?
+count(m::PersistentHashMap) = m.root.count
 
 emptyp(m::Map) = count(m) == 0
 
@@ -225,7 +220,6 @@ function zipmap(x, y)
   reduce(assoc, emptymap, x, y)
 end
 
-## FIXME: Sooo much boilerplate. I need to write macros for building xforms.
 function mapkeys(f)
   function(emit)
     function inner()
@@ -344,7 +338,8 @@ function dissoc(m::PersistentArrayMap, k)
 end
 
 function seq(m::PersistentArrayMap)
-  # FIXME: We ought to return an iterable, not a realised vector.
+  # Array maps have limited length, so I'm not worried about realising them as
+  # vectors.
   map(i -> MapEntry(m.kvs[i], m.kvs[i+1]), 1:2:length(m.kvs))
 end
 
@@ -457,7 +452,8 @@ merge(x::PersistentArrayMap, y::PersistentHashMap ) = into(y, x)
 merge(x::PersistentHashMap,  y::PersistentArrayMap) = into(x, y)
 
 merge() = emptymap
-# REVIEW: There's a more efficient way to merge N hashmaps in one downward
+
+# TODO: There's a more efficient way to merge N hashmaps in one downward
 # pass. Currently I'm not seeing merge performance as any kind of bottleneck,
 # but this is the kind of thing a more mature datastructures lib would think
 # about.
@@ -484,9 +480,9 @@ function mergewith(f, m1, m2)
 end
 
 function dissoc(m::PersistentHashMap, k)
-  # REVIEW: It's telling that I haven't actually hit this error in the months
-  # I've been using this library. Is it just my style of programming?
-  # Monotonicity has a lot of benefits. And there's always `selectkeys`.
+  # It's telling that I haven't actually hit this error in the months I've been
+  # using this library. Is it just my style of programming?  Monotonicity has a
+  # lot of benefits. And there's always `selectkeys`.
   throw("not implemented")
 end
 
@@ -559,7 +555,7 @@ end
 # the head get collected, but that won't help in this case...
 function iterate(m::PersistentHashMap, state)
   if emptyp(state)
-    nothine
+    nothing
   else
     first(state), rest(state)
   end
@@ -568,5 +564,4 @@ end
 depth(m::PersistentArrayMap) = 1
 depth(m::PersistentHashMap) = depth(m.root)
 depth(n::PersistentHashNode) = 1 + max(map(depth, n.ht)...)
-# REVIEW: Do leaves count as a level? I guess it depends on what you're doing.
 depth(n::MapNode) = 0

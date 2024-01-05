@@ -18,7 +18,6 @@ struct PushbackReduced{T, V} <: EarlyTermination
   unconsumed::V
 end
 
-# REVIEW: This is too much like Scala's null zoo for my liking.
 struct NoEmission end
 const none = NoEmission()
 
@@ -460,8 +459,8 @@ more argument at each step.
 
 Terminates pipeline when `ys` is exhausted.
 """
-function inject(ys)
-  # REVIEW: Is is better to create a local or box the argument?
+function inject(stream)
+  ys = stream
   function (emit)
     function inner()
       emit()

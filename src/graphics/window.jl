@@ -132,7 +132,7 @@ function createsurface(system, config)
   #
   # The problem is: to what do I set the initial refcount?
   #
-  # I'll need to dig a lot deeper into the library to know what's what.
+  # Reloading over and over will eventually segfault. Is this the source?
   surface = vk.SurfaceKHR(
     surface,
     instance,
@@ -146,8 +146,8 @@ function configure()
   # FIXME: This is an odd place to do side effects, but I don't see anywhere
   # better to do this. Explicit window.init() is not a good alternative.
   #
-  # REVIEW: What if the window is a system thing like stdout (stdwin?). I'm
-  # trying to get away from syscalls and globals, so that's the wrong direction.
+  # What if the window is a system thing like stdout (stdwin?). I'm trying to
+  # get away from syscalls and globals, so that's the wrong direction.
   #
   # I do like the idea of treating the window as something "out
   # there". Conceptually you just send off frames to have rendered. That way

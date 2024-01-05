@@ -76,12 +76,12 @@ prog = ds.hashmap(
       :count, frames,
       :bindings, [
         ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-          :stage, vk.SHADER_STAGE_VERTEX_BIT,
+          :type, :uniform,
+          :stage, :vertex
         ),
         ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-          :stage, vk.SHADER_STAGE_FRAGMENT_BIT,
+          :type, :combined_sampler,
+          :stage, :fragment
         )
       ]
     )

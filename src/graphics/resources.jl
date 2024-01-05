@@ -9,6 +9,65 @@ import Vulkan as vk
 import DataStructures as ds
 import DataStructures: into, hashmap
 
+##### Enumerations
+
+const bufferusagebits = hashmap(
+  :vertex_buffer, vk.BUFFER_USAGE_VERTEX_BUFFER_BIT,
+  :index_buffer, vk.BUFFER_USAGE_INDEX_BUFFER_BIT,
+  :storage_buffer, vk.BUFFER_USAGE_STORAGE_BUFFER_BIT,
+  :uniform_buffer, vk.BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+  :transfer_dst, vk.BUFFER_USAGE_TRANSFER_DST_BIT,
+  :transfer_src, vk.BUFFER_USAGE_TRANSFER_SRC_BIT
+)
+
+const memorypropertybits = hashmap(
+  :device_local, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+  :host_coherent, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT,
+  :host_visible, vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
+)
+
+const sharingmodes = hashmap(
+  :exclusive, vk.SHARING_MODE_EXCLUSIVE,
+  :concurrent, vk.SHARING_MODE_CONCURRENT
+)
+
+const imageusagebits = hashmap(
+  :colour_attachment, vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+  :depth_stencil_attachment, vk.IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+  :input_attachment, vk.IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
+  :sampled, vk.IMAGE_USAGE_SAMPLED_BIT,
+  :storage, vk.IMAGE_USAGE_STORAGE_BIT,
+  :transfer_dst, vk.IMAGE_USAGE_TRANSFER_DST_BIT,
+  :transfer_src, vk.IMAGE_USAGE_TRANSFER_SRC_BIT,
+  :transient_attachment, vk.IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT
+)
+
+const imagelayouts = hashmap()
+
+const accessbits = hashmap()
+
+const pipelinestagebits = hashmap()
+
+const shaderstagebits = hashmap(
+  :vertex, vk.SHADER_STAGE_VERTEX_BIT,
+  :fragment, vk.SHADER_STAGE_FRAGMENT_BIT,
+  :compute, vk.SHADER_STAGE_COMPUTE_BIT,
+  :geometry, vk.SHADER_STAGE_GEOMETRY_BIT,
+  :tessellationcontrol, vk.SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+  :tessellationeval, vk.SHADER_STAGE_TESSELLATION_EVALUATION_BIT
+)
+
+const descriptortypes = hashmap(
+  :uniform, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+  :sampler, vk.DESCRIPTOR_TYPE_SAMPLER,
+  :sampled_image, vk.DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+  :combined_sampler, vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+  :ssbo, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
+  :image, vk.DESCRIPTOR_TYPE_STORAGE_IMAGE
+)
+
+##### Resource Creation
+
 """
 Returns Vector{DescriptorSetLayoutBinding} for data of `types` at `stages`.
 
@@ -25,8 +84,8 @@ function descriptorsetlayout(bindings)
       [],
       ds.mapindexed((i, m) -> vk.DescriptorSetLayoutBinding(
         i - 1,
-        get(m, :usage),
-        get(m, :stage);
+        get(descriptortypes, get(m, :type)),
+        get(shaderstagebits, get(m, :stage));
         descriptor_count=get(m, :descriptor_count, 1)
       )),
       bindings

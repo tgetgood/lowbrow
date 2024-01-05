@@ -6,10 +6,10 @@ import DataStructures as ds
 import Vulkan as vk
 import commands
 
-# REVIEW: This import automagically allows us to read the bytes out of the
+# N.B: This import automagically allows us to read the bytes out of the
 # image. *Do not remove it*!
 #
-# N.B.: Find a different jpg library. The nested opaque abstractions here are
+# TODO: Find a different jpg library. The nested opaque abstractions here are
 # shitty to work with.
 #
 # png and jpg load as transposes of each other. Is that my fault?
@@ -127,11 +127,9 @@ function textureimage(system, filename)
     :queues, [:transfer, :graphics],
     :size, size(image),
     :miplevels, mips,
-    :sharingmode, vk.SHARING_MODE_EXCLUSIVE,
-    :usage, vk.IMAGE_USAGE_TRANSFER_SRC_BIT |
-            vk.IMAGE_USAGE_TRANSFER_DST_BIT |
-            vk.IMAGE_USAGE_SAMPLED_BIT,
-    :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    :sharingmode, :exclusive,
+    :usage, [:transfer_src, :transfer_dst, :sampled],
+    :memoryflags, :device_local
   ))
 
   sem = commands.cmdseq(system, :transfer) do cmd

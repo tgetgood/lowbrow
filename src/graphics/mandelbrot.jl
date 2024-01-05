@@ -52,12 +52,7 @@ prog = ds.hashmap(
     # But Why does 12 fail and 20 seem to work?
     :pushconstants, [ds.hashmap(:stage, :fragment, :size, 16)],
     :descriptorsets, ds.hashmap(
-      :bindings, [
-        ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-          :stage, vk.SHADER_STAGE_FRAGMENT_BIT
-        )
-      ]
+      :bindings, [ds.hashmap(:type, :storage_buffer, :stage, :fragment)]
     )
   ),
   :compute, ds.hashmap(
@@ -69,12 +64,7 @@ prog = ds.hashmap(
       :pushconstants, [ds.hashmap(:stage, :compute, :size, 20)],
       :descriptorsets, ds.hashmap(
         :count, 1,
-        :bindings, [
-          ds.hashmap(
-            :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            :stage, vk.SHADER_STAGE_COMPUTE_BIT
-          )
-        ]
+        :bindings, [ds.hashmap(:type, :storage_buffer, :stage, :compute)]
       )
     ),
     :separator, ds.hashmap(
@@ -86,12 +76,13 @@ prog = ds.hashmap(
       :descriptorsets, ds.hashmap(
         :bindings, [
           ds.hashmap(
-            :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            :stage, vk.SHADER_STAGE_COMPUTE_BIT
+            :usage, :storage_buffer,
+            :stage, :compute
           ),
           ds.hashmap(
-            :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            :stage, vk.SHADER_STAGE_COMPUTE_BIT
+            :usage, :storage_buffer,
+            # FIXME: Given where this is defined, `:compute` should be inferred.
+            :stage, :compute
           )
         ]
       )
@@ -167,9 +158,9 @@ function pixel_buffers(system, frames, winsize)
   ds.into(
     ds.emptyvector,
     map(_ -> hw.buffer(system, ds.hashmap(
-      :usage, vk.BUFFER_USAGE_STORAGE_BUFFER_BIT,
+      :usage, :storage_buffer,
       :size, sizeof(Pixel) * winsize.width * winsize.height,
-      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+      :memoryflags, :device_local,
       :queues, [:compute]
     ))),
     1:frames

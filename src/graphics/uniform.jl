@@ -10,10 +10,9 @@ function allocatebuffers(system, T, n)
     [],
     map(_ -> hw.buffer(system, ds.hashmap(
       :size, sizeof(T),
-      :usage, vk.BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+      :usage, :uniform_buffer,
       :queues, [:graphics],
-      :memoryflags, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT |
-                    vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
+      :memoryflags, [:host_visible, :host_coherent]
     )))
     ∘
     map(x -> ds.assoc(x,

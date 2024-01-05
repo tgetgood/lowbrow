@@ -36,3 +36,31 @@ terminal. That's about it.
    line of code where I merge config with one of its submaps.
 
    Why? I have no idea. I suspect this is a half finished refactor.
+* To Do List
+** Switch to Synchronization2
+** wrap images to make transitions easier
+   Vulkan doesn't rememeber anything for you, which makes life unduly difficult.
+** find some way to order queue submissions
+   Manually juggling semaphores is error prone and just feels wrong. What we
+   need is a way to establish finish-before-start relations, topologically sort
+   those, and then automate the barriers/semaphores/fences
+** fix resizing bug
+   "bug" being segfault when shrinking windows.
+** exclusive buffers
+   currently images are generally sharing mode exclusive and there's transition
+   logic to load them then hand them off to graphics. It's not bad.
+
+   So why are all buffers relegated to concurrent access? The speed degradation
+   is not an issue yet, but it's not a hard thing to fix.
+
+   Note: use VkBufferMemoryBarrier(2)
+** Embrace the VkRender struct
+   Having a fixed struct sort of violates my basic principle of accumulating
+   state to create a uniform API.
+
+   But I'm starting to run into some issues with handling hashmaps in hot spots
+   like the render loop.
+
+   Something like a clj record could be a nice interim solution, but really, if
+   you want to work with C you need *closed* types, which clojure rejects pretty
+   uniformly.

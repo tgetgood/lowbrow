@@ -1,0 +1,32 @@
+#+TITLE: High Level Vulkan Wrapper
+
+The Vulkan API has some wonderful properties, not least of which is the fact
+that it's specified as data and works (mostly) by passing around data.
+
+The canonical C implementation obfuscates that quite a bit, partly in the name
+of performance, and partly because C doesn't have much syntax with which to
+express — nor indeed much concept of — literal data.
+
+Let's not talk about C macros and global constants...
+
+I've always wanted to explore what a high level language can do with such an
+API.
+
+The goal is something like Julia itself, but much less ambitious. Performance
+should be "good enough", within a constant factor of what you could do in C
+would be great, but that's too much to commit to in an exploratory
+prototype. So I'll leave "good enough" informally defined for now.
+
+The ability to "copy and modify" existing pipelines should be easy to facilitate
+if a pipeline is just a data structure. Of course, "just a datastructure" is
+hard to get my head around when there's a render loop involved. How close might
+we get the that ideal?
+
+Would a relational algebra, or Kanren style logic engine help with negotiating
+between what the program wants and what the hardware can do? This aspect of
+portability is by far the worst I've ever had to deal with. Of course, I haven't
+worked with embedded systems much.
+
+Sometimes when a feature is unavailable on hardware you can fallback to work
+without it, but you need to modify structs and shaders all through your
+program. Wouldn't it be nice to generate all of that somehow?

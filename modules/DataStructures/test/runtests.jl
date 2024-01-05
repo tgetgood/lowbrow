@@ -4,10 +4,8 @@ using DataStructures
 import DataStructures as ds
 import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, EmptyVector, Vector, sibling, vectornode, vectorleaf, depth, emptyhashmap, reduce, arraymapsizethreashold, conj!, zip, intoemptyvec
 
-# FIXME: This should be doable with modules with a standard function. The
-# support structure to let the runtime find all of these modules is ugly though.
-#
-# Requiring modules to be published to import them is a mistake.
+# TODO: Look into dev modules to separate these tests as the suite gets
+# larger. Not really a problem yet, but I have pasting files together.
 #
 # The fact that the official docs say to use `include` statements internally is
 # saddening. Julia is such a forward thinking language in so many ways, but from

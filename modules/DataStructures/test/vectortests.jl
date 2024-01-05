@@ -52,10 +52,6 @@
 end
 
 @testset "Balanced Trees" begin
-  # TODO: My vectors are not balanced trees. So long as you're just iterating, I
-  # don't think this is a big deal, but the asymptotic lookup behaviour is O(n)
-  # instead of O(log(n)) which is a big deal.
-
   @test begin
     x::Vector = 1:nodelength
     depth(x) == 1
@@ -120,4 +116,12 @@ end
 
 @testset "Vector Seqs" begin
   #TODO:
+end
+
+@testset "into!" begin
+  @test into!([], []) == []
+  @test into([], map(identity), []) == []
+
+  @test into!([], []; infertype=false) == []
+  @test into([], map(identity), [], false) == []
 end

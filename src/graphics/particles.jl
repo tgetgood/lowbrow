@@ -30,9 +30,9 @@ function velocity(p)
   (25f-3/n) .* (x, y)
 end
 
-function init(count)::Vector{Particle}
-  ds.into(
-    ds.emptyvector,
+function init(count)
+  ds.into!(
+    Particle[],
     ds.partition(5)
     ∘
     map(x -> (sqrt(x[1]) * 25.0f-2, x[2] * 2pi, x[3:5]))
@@ -51,11 +51,9 @@ function particle_buffers(system, config)
   ssbos = into(
     emptyvector,
     map(_ -> hw.buffer(system, ds.hashmap(
-      :usage, vk.BUFFER_USAGE_VERTEX_BUFFER_BIT |
-              vk.BUFFER_USAGE_TRANSFER_DST_BIT |
-              vk.BUFFER_USAGE_STORAGE_BUFFER_BIT,
+      :usage, ds.set(:vertex_buffer, :storage_buffer, :transfer_dst),
       :size,  sizeof(Particle) * n,
-      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+      :memoryflags, :device_local,
       :queues, [:transfer, :graphics, :compute]
     )))
     ∘
@@ -82,7 +80,11 @@ prog = hashmap(
       v"1.0", ds.set(:sampler_anisotropy),
       v"1.2", ds.set(:timeline_semaphore)
     ),
-    :extensions, ds.set("VK_KHR_swapchain", "VK_KHR_timeline_semaphore")
+    :extensions, ds.set(
+      "VK_KHR_swapchain",
+      "VK_KHR_timeline_semaphore",
+      "VK_KHR_synchronization2"
+    )
   ),
   :concurrent_frames, frames,
   :particles, 2^14,
@@ -90,18 +92,9 @@ prog = hashmap(
     :descriptorsets, ds.hashmap(
       :count, frames,
       :bindings, [
-        ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-          :stage, vk.SHADER_STAGE_COMPUTE_BIT
-        ),
-        ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-          :stage, vk.SHADER_STAGE_COMPUTE_BIT
-        ),
-        ds.hashmap(
-          :usage, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-          :stage, vk.SHADER_STAGE_COMPUTE_BIT
-        )
+        ds.hashmap(:type, :uniform),
+        ds.hashmap(:type, :ssbo),
+        ds.hashmap(:type, :ssbo)
       ]
     ),
     :shader, ds.hashmap(
@@ -150,23 +143,19 @@ function main()
 
   ### compute
 
-  cpconfig = get(config, :compute)
-
-  cpconfig = ds.update(
-    cpconfig, :descriptorsets, x -> merge(x, fw.descriptors(dev, x))
-  )
+  config = ds.update(config, :compute, x -> fw.computepipeline(dev, x))
 
   compute_bindings = ds.map(i -> [
       deltas[i], ssbos[(i % frames) + 1], ssbos[((i + 1) % frames) + 1]
     ],
     1:frames
-  # )
+  )
 
-  fw.binddescriptors(dev, get(cpconfig, :descriptorsets), compute_bindings)
-
-  cpconfig = ds.assoc(cpconfig, :pipeline, gp.computepipeline(dev, cpconfig))
-
-  config = ds.assoc(config, :computeparticles, cpconfig)
+  fw.binddescriptors(
+    dev,
+    ds.getin(config, [:compute, :descriptorsets]),
+    compute_bindings
+  )
 
   ### record compute commands once since they never change.
 
@@ -176,26 +165,14 @@ function main()
 
   for i in 1:frames
     ccmd = ccmds[i]
-    vk.begin_command_buffer(ccmd, vk.CommandBufferBeginInfo())
-
-    vk.cmd_bind_pipeline(
+    commands.recordcomputation(
       ccmd,
-      vk.PIPELINE_BIND_POINT_COMPUTE,
-      ds.getin(cpconfig, [:pipeline, :pipeline])
-    )
-
-    vk.cmd_bind_descriptor_sets(
-      ccmd,
-      vk.PIPELINE_BIND_POINT_COMPUTE,
-      ds.getin(cpconfig, [:pipeline, :layout]),
-      0,
-      [ds.getin(cpconfig, [:descriptorsets, :sets])[i]],
-      [],
-    )
-
-    vk.cmd_dispatch(ccmd, Int(floor(get(config, :particles) / 256)), 1, 1)
-
-    vk.end_command_buffer(ccmd)
+      ds.getin(config, [:compute, :pipeline, :pipeline]),
+      ds.getin(config, [:compute, :pipeline, :layout]),
+      [ds.getin(config, [:compute, :descriptorsets, :sets])[i]],
+    ) do cmd
+      vk.cmd_dispatch(cmd, Int(floor(get(config, :particles) / 256)), 1, 1)
+    end
   end
 
   csemcounters::Vector{UInt} = map(x->UInt(0), 1:frames)

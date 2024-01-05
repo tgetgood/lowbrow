@@ -10,6 +10,7 @@ import DataStructures as ds
 import uniform
 import resources as rd
 import vertex
+import pipeline as pipe
 
 function descriptors(dev, dsetspec)
   bindings = get(dsetspec, :bindings)
@@ -40,6 +41,27 @@ function descriptors(dev, dsetspec)
   end
 end
 
+function computepipeline(dev, config)
+  stage = ds.hashmap(:stage, :compute)
+  stagesetter = sets -> map(set -> merge(stage, set), sets)
+
+  # In a compute pipeline, everything happens at the compute stage.
+  config = ds.updatein(config, [:descriptorsets, :bindings], stagesetter)
+
+  if ds.containsp(config, :pushconstants)
+    config = ds.update(config, :pushconstants, stagesetter)
+  end
+
+  config = ds.update(
+    config, :descriptorsets, x -> merge(x, descriptors(dev, x))
+  )
+
+  config = ds.assoc(config, :pipeline, pipe.computepipeline(dev, config))
+
+  # FIXME: Find something like clojure's `->` macro. This is ugly as shit.
+  return config
+end
+
 function descriptorinfos(binding)
   if ds.containsp(binding, :buffer)
     (
@@ -66,22 +88,30 @@ end
 
 function binddescriptors(dev, config, bindings)
   dsets = get(config, :sets)
-  usages = map(x -> get(x, :usage), get(config, :bindings))
 
-  writes = ds.into(
+  dtypes = ds.into!(
+    [],
+    map(x -> get(x, :type))
+    ∘
+    map(t -> get(rd.descriptortypes, t))
+    ,
+    get(config, :bindings)
+  )
+
+  writes = ds.into!(
     [],
     ds.mapindexed((i, dset) -> ds.into(
       [],
-      ds.mapindexed((j, usage) -> begin
+      ds.mapindexed((j, dtype) -> begin
         vk.WriteDescriptorSet(
           dset,
           j - 1,
           0,
-          usage,
+          dtype,
           descriptorinfos(bindings[i][j])...
         )
       end),
-      usages
+      dtypes
     )),
     dsets
   )

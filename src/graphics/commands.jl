@@ -3,6 +3,7 @@ module commands
 import Vulkan as vk
 
 import hardware as hw
+import resources: shaderstagebits
 
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
@@ -30,6 +31,8 @@ function cmdseq(body, system, qf;
   pool = hw.getpool(system, qf)
   queue = hw.getqueue(system, qf)
 
+  # TODO: I ought to always use pools and just allocate bigger ones if I find
+  # them full. Like (mutable) vectors.
   cmds = hw.commandbuffers(system, 1, qf, level)
   cmd = cmds[1]
 
@@ -53,6 +56,49 @@ function cmdseq(body, system, qf;
   end
 
   return signal
+end
+
+function recordcomputation(cb, cmd, pipeline, layout, dsets=[], pcs=ds.emptymap)
+  vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
+
+  vk.cmd_bind_pipeline(cmd, vk.PIPELINE_BIND_POINT_COMPUTE, pipeline)
+
+  if !ds.emptyp(pcs)
+    vk.cmd_push_constants(
+      cmd,
+      layout,
+      # REVIEW: We could get the stage from the push constant definition map,
+      # but it has to be compute in a compute pipeline, so why? Maybe we ought
+      # to validate or at least assert the stage is reasonably set.
+      #
+      # This brings up a problem with my design: I've intertwined what and where
+      # in this case, and most likely in others. The shape of push constants
+      # (size and offset) are orthogonal to where they will be used.
+      #
+      # Maybe the stage should be inferred from where they are used. That would
+      # be the logical thing.
+      #
+      # The problem comes up in render pipelines where the vertex, indirect,
+      # geom, fragment, etc. stages all need to be defined in a clump.
+      vk.SHADER_STAGE_COMPUTE_BIT,
+      get(pcs, :offset, 0),
+      get(pcs, :size),
+      Ptr{Nothing}(get(pcs, :value))
+    )
+  end
+
+  vk.cmd_bind_descriptor_sets(
+    cmd,
+    vk.PIPELINE_BIND_POINT_COMPUTE,
+    layout,
+    0,
+    dsets,
+    []
+  )
+
+  cb(cmd)
+
+  vk.end_command_buffer(cmd)
 end
 
 function copybuffertoimage(cmd, system, src, dst, size, qf=:transfer)
@@ -109,6 +155,8 @@ function mipblit(cmd, config)
   )
 end
 
+# FIXME: Should be (cmd, image, newstate)
+# where `image` is a map that holds the current state of the image.
 function transitionimage(cmd::vk.CommandBuffer, config)
   aspect = get(config, :aspect, vk.IMAGE_ASPECT_COLOR_BIT)
 
@@ -142,11 +190,11 @@ end
 
 function copybuffer(system::ds.Map, src, dst, size, queuefamily=:transfer)
   commands.cmdseq(system, queuefamily) do cmd
-    copybuffer(cmd, system, src, dst, size, queuefamily)
+    copybuffer(cmd, src, dst, size, queuefamily)
   end
 end
 
-function copybuffer(cmd::vk.CommandBuffer, system, src, dst, size,
+function copybuffer(cmd::vk.CommandBuffer, src, dst, size,
                     queuefamily=:transfer)
     vk.cmd_copy_buffer(cmd, src, dst, [vk.BufferCopy(0,0,size)])
 end
@@ -166,7 +214,6 @@ function todevicelocal(system, data, buffers...)
     for buffer in buffers
       copybuffer(
         cmd,
-        system,
         get(staging, :buffer),
         get(buffer, :buffer),
         get(staging, :size),
@@ -175,9 +222,8 @@ function todevicelocal(system, data, buffers...)
     end
   end
 
-  # TODO: Test if this solves the use after free on dedicated hardware.
-  # Can't replicate on laptop (embedded gpu).
-
+  # This *seems* to fix a highly intermittent use after free of the staging buffer.
+  # I can't replicate the issue reliably enough to call it fixed.
   @async begin
     vk.wait_semaphores(
       get(system, :device),

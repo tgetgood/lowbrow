@@ -17,10 +17,9 @@ function vertexbuffer(system, data)
     system,
     ds.hashmap(
       :size, sizeof(data),
-      :usage, vk.BUFFER_USAGE_VERTEX_BUFFER_BIT |
-              vk.BUFFER_USAGE_TRANSFER_DST_BIT,
+      :usage, [:vertex_buffer, :transfer_dst],
       :queues, [:graphics, :transfer],
-      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+      :memoryflags, :device_local
     )
   )
 
@@ -49,10 +48,9 @@ function indexbuffer(system, indicies)
     system,
     ds.hashmap(
       :size, bytes,
-      :usage, vk.BUFFER_USAGE_INDEX_BUFFER_BIT |
-              vk.BUFFER_USAGE_TRANSFER_DST_BIT,
+      :usage, [:index_buffer, :transfer_dst],
       :queues, [:graphics, :transfer],
-      :memoryflags, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+      :memoryflags, :device_local
     )
   )
 
