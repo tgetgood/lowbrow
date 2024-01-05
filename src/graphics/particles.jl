@@ -164,18 +164,16 @@ function main()
   ccmds = hw.commandbuffers(system, frames, :compute)
 
   for i in 1:frames
-    ccmd = ccmds[i]
     commands.recordcomputation(
-      ccmd,
+      ccmds[i],
       ds.getin(config, [:compute, :pipeline, :pipeline]),
       ds.getin(config, [:compute, :pipeline, :layout]),
-      [ds.getin(config, [:compute, :descriptorsets, :sets])[i]],
-    ) do cmd
-      vk.cmd_dispatch(cmd, Int(floor(get(config, :particles) / 256)), 1, 1)
-    end
+      [Int(floor(get(config, :particles) / 256)), 1, 1],
+      [ds.getin(config, [:compute, :descriptorsets, :sets])[i]]
+    )
   end
 
-  csemcounters::Vector{UInt} = map(x->UInt(0), 1:frames)
+  csemcounters::Vector{UInt} = map(x -> UInt(0), 1:frames)
 
   csems = map(x -> vk.unwrap(vk.create_semaphore(
       get(system, :device),

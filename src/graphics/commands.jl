@@ -58,7 +58,9 @@ function cmdseq(body, system, qf;
   return signal
 end
 
-function recordcomputation(cb, cmd, pipeline, layout, dsets=[], pcs=ds.emptymap)
+function recordcomputation(
+  cmd, pipeline, layout, workgroup=[1,1,1], dsets=[], pcs=ds.emptymap
+)
   vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
 
   vk.cmd_bind_pipeline(cmd, vk.PIPELINE_BIND_POINT_COMPUTE, pipeline)
@@ -96,7 +98,7 @@ function recordcomputation(cb, cmd, pipeline, layout, dsets=[], pcs=ds.emptymap)
     []
   )
 
-  cb(cmd)
+  vk.cmd_dispatch(cmd, workgroup...)
 
   vk.end_command_buffer(cmd)
 end
