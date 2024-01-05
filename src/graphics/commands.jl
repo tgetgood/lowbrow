@@ -69,19 +69,6 @@ function recordcomputation(
     vk.cmd_push_constants(
       cmd,
       layout,
-      # REVIEW: We could get the stage from the push constant definition map,
-      # but it has to be compute in a compute pipeline, so why? Maybe we ought
-      # to validate or at least assert the stage is reasonably set.
-      #
-      # This brings up a problem with my design: I've intertwined what and where
-      # in this case, and most likely in others. The shape of push constants
-      # (size and offset) are orthogonal to where they will be used.
-      #
-      # Maybe the stage should be inferred from where they are used. That would
-      # be the logical thing.
-      #
-      # The problem comes up in render pipelines where the vertex, indirect,
-      # geom, fragment, etc. stages all need to be defined in a clump.
       vk.SHADER_STAGE_COMPUTE_BIT,
       get(pcs, :offset, 0),
       get(pcs, :size),
@@ -119,16 +106,6 @@ function copybuffertoimage(cmd, system, src, dst, size, qf=:transfer)
 end
 
 function mipblit(cmd, config)
-  gd(x, k) = get(x, k, [0,1])
-
-  function gd(k)
-    x = get(config, k)
-    return (
-      [gd(x, :x)[1], gd(x, :y)[1], gd(x, :z)[1]],
-      [gd(x, :x)[2], gd(x, :y)[2], gd(x, :z)[2]]
-    )
-  end
-
   (x, y) = get(config, :size)
 
   b = vk.ImageBlit(
