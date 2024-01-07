@@ -115,27 +115,27 @@ function findgraphicsqueue(device)
   end
 end
 
-function findpresentationqueue(system, device)
+function findpresentationqueue(pdevice, surface)
   first(
     filter(
       i -> vk.unwrap(vk.get_physical_device_surface_support_khr(
-        device,
+        pdevice,
         i,
-        get(system, :surface)
+        surface
       )),
-      0:length(vk.get_physical_device_queue_family_properties(device))-1
+      0:length(vk.get_physical_device_queue_family_properties(pdevice))-1
     )
   )
 end
 
-function findtransferqueue(device)
+function findtransferqueue(qfproperties)
   transferqs = into(
     emptyvector,
     ds.mapindexed((i, x) -> (x, i - 1))
     ∘
     filter(x -> (x[1].queue_flags & vk.QUEUE_TRANSFER_BIT).val > 0)
     ,
-    vk.get_physical_device_queue_family_properties(device)
+    qfproperties
   )
 
   # REVIEW: Is this productive? I.e. could there be a case where we have an
@@ -163,14 +163,14 @@ function findtransferqueue(device)
   end
 end
 
-function findcomputequeue(device)
+function findcomputequeue(qfproperties)
   computeqs = into(
     emptyvector,
     ds.mapindexed((i, x) -> (x, i - 1))
     ∘
     filter(x -> (x[1].queue_flags & vk.QUEUE_COMPUTE_BIT).val > 0)
     ,
-    vk.get_physical_device_queue_family_properties(device)
+    qfproperties
   )
 
   if ds.emptyp(computeqs)
@@ -280,12 +280,23 @@ function findpresentmode(system, config)
   end
 end
 
-function findqueues(system, device)
+const queuefinders = hashmap(
+  :graphics, findgraphicsqueue,
+  # a device doesn't have a "presentation queue", it may have a queue that can
+  # present to a given surface. Thus `findpresentationqueue` is different in kind.
+  # :presentation, findpresentationqueue,
+  :transfer, findtransferqueue,
+  :compute, findcomputequeue
+)
+
+function findqueues(system)
+  pdevice = get(system, :physicaldevice)
+  qfproperties = get(system, :qf_properties)
   hashmap(
-    :graphics, findgraphicsqueue(device),
-    :presentation, findpresentationqueue(system, device),
-    :transfer, findtransferqueue(device),
-    :compute, findcomputequeue(device)
+    :graphics, findgraphicsqueue(pdevice),
+    :presentation, findpresentationqueue(pdevice, get(system, :surface)),
+    :transfer, findtransferqueue(qfproperties),
+    :compute, findcomputequeue(qfproperties)
   )
 end
 
@@ -302,10 +313,13 @@ function pdevice(system, config)
     emptyvector,
     map(x -> merge(system, hashmap(
       :physicaldevice, x,
-      :queues, findqueues(system, x),
+      :qf_properties, vk.get_physical_device_queue_family_properties(x),
       :max_msaa, multisamplemax(x)
     )))
-    ∘ filter(system -> checkdevice(system, config)),
+    ∘
+    map(x -> assoc(x, :queues, findqueues(x)))
+    ∘
+    filter(system -> checkdevice(system, config)),
     vk.unwrap(vk.enumerate_physical_devices(get(system, :instance)))
   )
 
@@ -397,20 +411,17 @@ function imageview(system, config, image)
   ))
 end
 
+function commandpool(dev, qf, flags=vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT)
+  vk.unwrap(vk.create_command_pool(dev, qf, flags=flags))
+end
+
 function createcommandpools(system, config)
   dev = get(system, :device)
   qfs = collect(Set(ds.vals(get(system, :queues))))
 
   hashmap(
     :commandpools,
-    ds.zipmap(qfs, map(qf ->
-        vk.unwrap(vk.create_command_pool(
-          dev,
-          qf,
-          flags=vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-        )),
-      qfs
-    ))
+    ds.zipmap(qfs, map(qf -> commandpool(dev, qf), qfs))
   )
 end
 
