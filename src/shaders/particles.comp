@@ -10,11 +10,11 @@ layout(push_constant) uniform constants {
   float delta;
 } time;
 
-layout(std140, binding = 1) readonly buffer ParticleSSBOIn {
+layout(std140, binding = 0) readonly buffer ParticleSSBOIn {
    Particle particlesIn[ ];
 };
 
-layout(std140, binding = 2) writeonly restrict buffer ParticleSSBOOut {
+layout(std140, binding = 1) writeonly restrict buffer ParticleSSBOOut {
    Particle particlesOut[ ];
 };
 
