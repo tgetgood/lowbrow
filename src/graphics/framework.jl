@@ -11,14 +11,14 @@ import uniform
 import resources as rd
 import vertex
 import pipeline as pipe
+import hardware as hw
 
-function descriptors(dev, dsetspec)
-  bindings = get(dsetspec, :bindings)
-  frames = get(dsetspec, :count)
+const initialpoolsize = 3
 
+function descriptors(dev, bindings, poolsize=initialpoolsize)
   if length(bindings) > 0
     layoutci = rd.descriptorsetlayout(bindings)
-    poolci = rd.descriptorpool(layoutci, frames)
+    poolci = rd.descriptorpool(layoutci, poolsize)
 
     layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
 
@@ -28,11 +28,12 @@ function descriptors(dev, dsetspec)
       dev,
       vk.DescriptorSetAllocateInfo(
         pool,
-        ds.into([], ds.take(frames), ds.repeat(layout))
+        ds.into([], ds.take(poolsize), ds.repeat(layout))
       )
     ))
 
     ds.hashmap(
+      :pool, pool,
       :layout, layout,
       :sets, sets
     )
@@ -45,21 +46,23 @@ function computepipeline(dev, config)
   stage = ds.hashmap(:stage, :compute)
   stagesetter = sets -> map(set -> merge(stage, set), sets)
 
-  # In a compute pipeline, everything happens at the compute stage.
-  config = ds.updatein(config, [:descriptorsets, :bindings], stagesetter)
-
   if ds.containsp(config, :pushconstants)
     config = ds.update(config, :pushconstants, stagesetter)
   end
 
-  config = ds.update(
-    config, :descriptorsets, x -> merge(x, descriptors(dev, x))
-  )
+  bindings = stagesetter(vcat(get(config, :inputs, []), get(config, :outputs)))
+
+  config = ds.assoc(config, :descriptorsets, descriptors(dev, bindings))
 
   config = ds.assoc(config, :pipeline, pipe.computepipeline(dev, config))
 
-  # FIXME: Find something like clojure's `->` macro. This is ugly as shit.
+  commandpool = hw.commandpool(dev, hw.findcomputequeue(get(config, :qf_properties)))
+  commandbuffers = hw.commandbuffers(dev, commandpool, initialpoolsize)
+
   return config
+end
+
+function computetask(pipeline, inputs, pcs=[])
 end
 
 function descriptorinfos(binding)

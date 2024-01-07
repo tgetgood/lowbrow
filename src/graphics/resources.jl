@@ -96,12 +96,12 @@ end
 """
 Returns a DescriptorPoolCreateInfo appropriate to the given layout and config.
 """
-function descriptorpool(layout, frames)
+function descriptorpool(layout, size)
   vk.DescriptorPoolCreateInfo(
-    frames * length(layout.bindings),
+    size * length(layout.bindings),
     into([], map(x -> vk.DescriptorPoolSize(
         x.descriptor_type,
-        x.descriptor_count * frames
+        x.descriptor_count * size
       )),
       layout.bindings
     )

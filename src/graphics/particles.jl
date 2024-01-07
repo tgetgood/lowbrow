@@ -68,6 +68,7 @@ function particle_buffers(system, config)
 end
 
 frames = 3
+nparticles = 2^14
 
 prog = hashmap(
   :name, "VK tutorial particle sim.",
@@ -75,6 +76,7 @@ prog = hashmap(
   :vulkan_req, ds.hashmap(
     :version, v"1.3"
   ),
+  :window, hashmap(:width, 1000, :height, 1000),
   :device_req, ds.hashmap(
     :features, ds.hashmap(
       v"1.0", ds.set(:sampler_anisotropy),
@@ -87,16 +89,16 @@ prog = hashmap(
     )
   ),
   :concurrent_frames, frames,
-  :particles, 2^14,
+  :particles, nparticles,
   :compute, ds.hashmap(
-    :descriptorsets, ds.hashmap(
-      :count, frames,
-      :bindings, [
-        ds.hashmap(:type, :uniform),
-        ds.hashmap(:type, :ssbo),
-        ds.hashmap(:type, :ssbo)
-      ]
-    ),
+    # inputs and outputs are combined to create descriptor sets.
+    :inputs, [ds.hashmap(:type, :ssbo)],
+    :outputs, [ds.hashmap(:type, :ssbo)],
+    # push constants are... constants. Treat them accordingly.
+    :pushconstants, [ds.hashmap(:stage, :compute, :size, 16)],
+    # The workgroup size and shader local size are tightly coupled, so this is,
+    # in fact, a property of the pipeline, not of any task on it.
+    :workgroups, [Int(floor(nparticles / 256)), 1, 1],
     :shader, ds.hashmap(
       :stage, :compute,
       :file, *(@__DIR__, "/../shaders/particles.comp"),
@@ -116,12 +118,17 @@ prog = hashmap(
   )
 )
 
+function computecommands(config, frame, Δt)
+end
+
 function main()
   config = graphics.configure(prog)
   frames = get(config, :concurrent_frames)
 
   system = graphics.staticinit(config)
   dev = get(system, :device)
+
+  config = ds.associn(config, [:compute, :qf_properties], get(system, :qf_properties))
 
   ### rendering
 
@@ -137,8 +144,6 @@ function main()
 
   ### Bound buffers
 
-  deltas = uniform.allocatebuffers(system, Float32, frames)
-
   ssbos = particle_buffers(system, config)
 
   ### compute
@@ -146,7 +151,7 @@ function main()
   config = ds.update(config, :compute, x -> fw.computepipeline(dev, x))
 
   compute_bindings = ds.map(i -> [
-      deltas[i], ssbos[(i % frames) + 1], ssbos[((i + 1) % frames) + 1]
+      ssbos[(i % frames) + 1], ssbos[((i + 1) % frames) + 1]
     ],
     1:frames
   )
@@ -187,9 +192,9 @@ function main()
   t1 = time()
 
   graphics.renderloop(system, config) do i, renderstate
-    t2 = time()
-    uniform.setubo!(deltas[i], Float32(t2-t1))
-    t1 = t2
+    # t2 = time()
+    # uniform.setubo!(deltas[i], Float32(t2-t1))
+    # t1 = t2
 
     csem = csems[i]
 

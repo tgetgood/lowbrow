@@ -119,7 +119,11 @@ function main()
 
   ubos = uniform.allocatebuffers(system, MVP, frames)
 
-  dsets = fw.descriptors(dev, ds.getin(config, [:render, :descriptorsets]))
+  dsets = fw.descriptors(
+    dev,
+    ds.getin(config, [:render, :descriptorsets, :bindings]),
+    frames
+  )
 
   config = ds.updatein(config, [:render, :descriptorsets], merge, dsets)
 

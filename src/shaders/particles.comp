@@ -6,7 +6,7 @@ struct Particle {
   vec4 color;
 };
 
-layout(binding = 0) uniform UniformBufferObject {
+layout(push_constant) uniform constants {
   float delta;
 } time;
 

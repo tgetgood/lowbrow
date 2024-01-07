@@ -545,13 +545,16 @@ function transferbuffer(system, size)
   )
 end
 
-function commandbuffers(system, n::Int, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
-  pool = getpool(system, qf)
+function commandbuffers(
+  dev::vk.Device, pool::vk.CommandPool, n::Int, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY
+)
+  vk.unwrap(
+    vk.allocate_command_buffers(dev, vk.CommandBufferAllocateInfo(pool, level, n))
+  )
+end
 
-  buffers = vk.unwrap(vk.allocate_command_buffers(
-    get(system, :device),
-    vk.CommandBufferAllocateInfo(pool, level, n)
-  ))
+function commandbuffers(system, n::Int, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
+  commandbuffers(get(system, :device), getpool(system, qf), n, level)
 end
 
 function createimage(system, config)
