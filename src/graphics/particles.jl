@@ -128,7 +128,9 @@ function main()
   system = graphics.staticinit(config)
   dev = get(system, :device)
 
-  config = ds.associn(config, [:compute, :qf_properties], get(system, :qf_properties))
+  # TODO: The data description of hardware should be its own thing. At the very
+  # least a dedicated submap of `system`.
+  hardwaredesc = ds.selectkeys(system, [:qf_properties])
 
   ### rendering
 
@@ -148,7 +150,9 @@ function main()
 
   ### compute
 
-  config = ds.update(config, :compute, x -> fw.computepipeline(dev, x))
+  compute = fw.computepipeline(dev, merge(get(config, :compute), hardwaredesc))
+
+  config = ds.update(config, :compute, merge, compute)
 
   compute_bindings = ds.map(i -> [
       ssbos[(i % frames) + 1], ssbos[((i + 1) % frames) + 1]
