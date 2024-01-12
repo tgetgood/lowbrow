@@ -118,8 +118,9 @@ function dynamicinit(system, config)
     hw.createimageviews,
     # TODO: There's so much config in the renderpass, it shouldn't be hardcoded.
     gp.renderpass,
-    gp.creategraphicspipeline,
     gp.createframebuffers,
+
+    gp.creategraphicspipeline,
   ]
 
   ds.reduce((s, f) -> begin @info f; merge(s, f(s, config)) end, system, steps)
