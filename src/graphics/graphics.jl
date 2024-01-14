@@ -24,7 +24,7 @@ defaults = hashmap(
     :features, [:sampler_anisotropy],
     :vk12features, [:timeline_semaphore],
     # FIXME: logically these are sets. How does vk handle repeats?
-    :extensions, ["VK_KHR_swapchain", "VK_KHR_timeline_semaphore"]
+    :extensions, ["VK_KHR_swapchain"]
   ),
   :window, hashmap(:width, 1200, :height, 1200),
   :swapchain, hashmap(

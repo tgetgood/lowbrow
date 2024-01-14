@@ -80,13 +80,11 @@ prog = hashmap(
   :device_req, ds.hashmap(
     :features, ds.hashmap(
       v"1.0", ds.set(:sampler_anisotropy),
-      v"1.2", ds.set(:timeline_semaphore)
+      v"1.2", ds.set(:timeline_semaphore),
+      v"1.3", [:synchronization2]
+
     ),
-    :extensions, ds.set(
-      "VK_KHR_swapchain",
-      "VK_KHR_timeline_semaphore",
-      "VK_KHR_synchronization2"
-    )
+    :extensions, ds.set("VK_KHR_swapchain")
   ),
   :concurrent_frames, frames,
   :particles, nparticles,
