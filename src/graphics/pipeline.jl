@@ -1,7 +1,7 @@
 module pipeline
 
 import hardware as hw
-import resources: shaderstagebits
+import resources: shaderstagebits, emptydescriptorsetlayout
 
 import Vulkan as vk
 import DataStructures as ds
@@ -48,14 +48,14 @@ end
 ##### Compute Pipelines
 
 # TODO: Map this over multiple configs for multiple pipelines (minimise vk calls).
-function computepipeline(dev, config)
-  pcrs = ds.into!([], map(pushconstantrange), get(config, :pushconstants, []))
+function computepipeline(
+  dev, shaderconfig, descriptorsetlayout, pushconstantconfigs=[]
+)
+  pcrs = ds.into!([], map(pushconstantrange), pushconstantconfigs)
 
   pipelinelayout = vk.unwrap(vk.create_pipeline_layout(
-    dev, [ds.getin(config, [:descriptorsets, :layout])], pcrs
+    dev, [descriptorsetlayout], pcrs
   ))
-
-  shaderconfig = get(config, :shader)
 
   computeshader = shader(
     dev,

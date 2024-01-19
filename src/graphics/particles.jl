@@ -150,6 +150,25 @@ function main()
 
   compute = fw.computepipeline(dev, merge(get(config, :compute), hardwaredesc))
 
+  network = ds.hashmap(
+    :nodes, ds.hashmap(
+      :compute, compute,
+      :render, ds.hashmap(),
+      :swapchain, ds.hashmap(),
+      :clock, ds.hashmap(),
+      :presentation, ds.hashmap()
+    ),
+    :initialvalues, ds.hashmap(
+      [:compute, :input], ssbos[1]
+    ),
+    :wires, ds.hashmap(
+      [:compute, :output], ds.set([:compute, :input], [:render, :input]),
+      [:render, :output], ds.set([:presentation, :input]),
+      [:clock, :output], ds.set([:compute, :deltat]),
+      [:swapchain, :frame], ds.set([:clock, :tick], [:render, :frame])
+    )
+  )
+
   config = ds.update(config, :compute, merge, compute)
 
   compute_bindings = ds.map(i -> [

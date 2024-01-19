@@ -52,24 +52,20 @@ function computepipeline(dev, config)
 
   bindings = stagesetter(vcat(get(config, :inputs, []), get(config, :outputs)))
 
-  descriptorsets = descriptors(dev, bindings)
-  config = ds.assoc(config, :descriptorsets, descriptorsets)
+  layoutci = rd.descriptorsetlayout(bindings)
+  layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
 
-  pipeline = pipe.computepipeline(dev, config)
+  pipeline = pipe.computepipeline(
+    dev, get(config, :shader), layout, pushconstants
+  )
 
   queue = hw.findcomputequeue(get(config, :qf_properties))
 
-  commandpool = hw.commandpool(dev, queue)
-  commandbuffers = hw.commandbuffers(dev, commandpool, initialpoolsize)
-
   ds.hashmap(
-    :descriptorsets, descriptorsets,
+    :definition, config,
+    :descriptorsetlayout, layout,
     :pipeline, pipeline,
-    :queue, queue,
-    :commands, ds.hashmap(
-      :pool, commandpool,
-      :buffers, commandbuffers
-    )
+    :queuefamily, queue,
   )
 end
 

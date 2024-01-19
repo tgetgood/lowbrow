@@ -1,0 +1,4 @@
+name = "Xprl"
+uuid = "78325d71-b7ee-4eb7-a944-72b98c47b048"
+authors = ["Thomas Getgood <thomas@macroexpanse.com>"]
+version = "0.1.0"
