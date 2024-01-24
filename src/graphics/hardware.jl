@@ -415,7 +415,7 @@ function imageview(system, config, image)
   ))
 end
 
-function commandpool(dev, qf, flags=vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT)
+function commandpool(dev, qf, flags=vk.CommandPoolCreateFlag(0))
   vk.unwrap(vk.create_command_pool(dev, qf, flags=flags))
 end
 
@@ -425,7 +425,11 @@ function createcommandpools(system, config)
 
   hashmap(
     :commandpools,
-    ds.zipmap(qfs, map(qf -> commandpool(dev, qf), qfs))
+    ds.zipmap(
+      qfs,
+      map(qf -> commandpool(
+          dev, qf, vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
+        ), qfs))
   )
 end
 
