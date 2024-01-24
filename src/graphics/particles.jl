@@ -12,22 +12,22 @@ import DataStructures: hashmap, into, emptyvector
 import Vulkan as vk
 
 struct Particle
-  position::NTuple{2, Float32}
-  velocity::NTuple{2, Float32}
-  colour::NTuple{4, Float32}
+  position::NTuple{2,Float32}
+  velocity::NTuple{2,Float32}
+  colour::NTuple{4,Float32}
 end
 
 function position(r, θ)
-  (r*cos(θ) , r*sin(θ))
+  (r * cos(θ), r * sin(θ))
 end
 
 function velocity(p)
   x = p[1]
   y = p[2]
 
-  n = sqrt(x^2+y^2)
+  n = sqrt(x^2 + y^2)
 
-  (25f-3/n) .* (x, y)
+  (25.0f-3 / n) .* (x, y)
 end
 
 function init(count)
@@ -39,32 +39,32 @@ function init(count)
     ∘
     map(x -> (position(x[1], x[2]), x[3]))
     ∘
-    map(x -> Particle(x[1], velocity(x[1]), tuple(x[2]..., 1f0))),
+    map(x -> Particle(x[1], velocity(x[1]), tuple(x[2]..., 1.0f0))),
     rand(Float32, 5, count)
   )
 end
 
-function particle_buffers(system, config)
+function init_particle_buffer(system, config)
   n = get(config, :particles)
   particles = init(n)
 
-  ssbos = into(
-    emptyvector,
-    map(_ -> hw.buffer(system, ds.hashmap(
-      :usage, ds.set(:vertex_buffer, :storage_buffer, :transfer_dst),
-      :size,  sizeof(Particle) * n,
-      :memoryflags, :device_local,
-      :queues, [:transfer, :graphics, :compute]
-    )))
-    ∘
-    map(x -> ds.assoc(x, :verticies, n))
-    ,
-    1:get(config, :concurrent_frames)
-    )
+  buffconfig = ds.hashmap(
+    :usage, ds.set(:vertex_buffer, :storage_buffer, :transfer_dst),
+    # Need simultaneous readonly access from compute and graphics pipelines if
+    # we want async parallelism without copying.
+    # TODO: Copying wouldn't be quicker, would it? That's potentially a lot of
+    # wasted vram.
+    :sharingmode, :concurrent,
+    :size, sizeof(Particle) * n,
+    :memoryflags, :device_local,
+    :queues, [:transfer, :graphics, :compute]
+  )
 
-  commands.todevicelocal(system, particles, ssbos...)
+  ssbo = ds.assoc(hw.buffer(system, buffconfig), :verticies, n)
 
-  ssbos
+  next = commands.todevicelocal(system, particles, ssbo)
+
+  return ds.assoc(ssbo, :next, next, :config, buffconfig, )
 end
 
 frames = 3
@@ -82,7 +82,6 @@ prog = hashmap(
       v"1.0", ds.set(:sampler_anisotropy),
       v"1.2", ds.set(:timeline_semaphore),
       v"1.3", [:synchronization2]
-
     ),
     :extensions, ds.set("VK_KHR_swapchain")
   ),
@@ -111,7 +110,7 @@ prog = hashmap(
     ),
     :shaders, hashmap(
       :vertex, *(@__DIR__, "/../shaders/particles.vert"),
-      :fragment, *(@__DIR__, "/../shaders/particles.frag"),
+      :fragment, *(@__DIR__, "/../shaders/particles.frag")
     )
   )
 )
@@ -144,38 +143,11 @@ function main()
 
   ### Bound buffers
 
-  ssbos = particle_buffers(system, config)
+  current_particles = init_particle_buffer(system, config)
 
   ### compute
 
   compute = fw.computepipeline(dev, merge(get(config, :compute), hardwaredesc))
-
-  network = ds.hashmap(
-    :nodes, ds.hashmap(
-      :compute, compute,
-      :render, ds.hashmap(),
-      :swapchain, ds.hashmap(),
-      :clock, ds.hashmap(),
-      :presentation, ds.hashmap()
-    ),
-    :initialvalues, ds.hashmap(
-      [:compute, :input], ssbos[1]
-    ),
-    :wires, ds.hashmap(
-      [:compute, :output], ds.set([:compute, :input], [:render, :input]),
-      [:render, :output], ds.set([:presentation, :input]),
-      [:clock, :output], ds.set([:compute, :deltat]),
-      [:swapchain, :frame], ds.set([:clock, :tick], [:render, :frame])
-    )
-  )
-
-  config = ds.update(config, :compute, merge, compute)
-
-  compute_bindings = ds.map(i -> [
-      ssbos[(i % frames) + 1], ssbos[((i + 1) % frames) + 1]
-    ],
-    1:frames
-  )
 
   fw.binddescriptors(
     dev,
@@ -213,11 +185,16 @@ function main()
   t1 = time()
 
   graphics.renderloop(system, config) do i, renderstate
-    # t2 = time()
-    # uniform.setubo!(deltas[i], Float32(t2-t1))
-    # t1 = t2
 
-    csem = csems[i]
+    fw.wait_readable(current_particles)
+
+    t2 = time()
+    next_particles = fw.runcomputepipeline(compute, current_particles, [Float32(t2-t1)])
+    t1 = t2
+
+    # Buffer maps contain all of the metadata you need to wait to read from
+    # them, but it's the queue submissions that should read them. That's the
+    # kicker here.
 
     # wait on cpu, signal on gpu. Not the most efficient, but with multiple
     # frames in flight it should be just fine.
@@ -227,16 +204,17 @@ function main()
       typemax(UInt)
     )
 
-    vk.queue_submit(cqueue, [vk.SubmitInfo([],[],[ccmds[i]], [csem];
+    vk.queue_submit(cqueue, [vk.SubmitInfo([], [], [ccmds[i]], [csem];
       next=vk.TimelineSemaphoreSubmitInfo(
-        signal_semaphore_values=[csemcounters[i]+1]
+        signal_semaphore_values=[csemcounters[i] + 1]
       )
     )])
 
-    csemcounters[i] += 1
+    out = ds.assoc(renderstate, :vertexbuffer, current_particles)
+    current_particles = next_particles
 
-    return ds.assoc(renderstate, :vertexbuffer, ssbos[i])
+    return out
   end
 end
 
-# main()
+main()

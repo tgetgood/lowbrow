@@ -132,7 +132,7 @@ function textureimage(system, filename)
     :memoryflags, :device_local
   ))
 
-  sem = commands.cmdseq(system, :transfer) do cmd
+  post = commands.cmdseq(system, :transfer) do cmd
     commands.transitionimage(cmd, ds.hashmap(
       :image, vkim,
       :miplevels, mips,
@@ -170,7 +170,7 @@ function textureimage(system, filename)
   # happens only at load time?
   vk.wait_semaphores(
     get(system, :device),
-    vk.SemaphoreWaitInfo([sem], [UInt(1)]),
+    vk.SemaphoreWaitInfo([post.semaphore], [post.value]),
     typemax(UInt)
   )
 

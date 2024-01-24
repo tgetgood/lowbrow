@@ -16,7 +16,7 @@ Also starts a new task which waits and collects the command buffer. Some sort of
 pool would be a better design, but this suffices for now.
 """
 function cmdseq(body, system, qf;
-                level=vk.COMMAND_BUFFER_LEVEL_PRIMARY, wait=[])
+  level=vk.COMMAND_BUFFER_LEVEL_PRIMARY, wait=[])
 
   signal = vk.unwrap(vk.create_semaphore(
     get(system, :device),
@@ -42,9 +42,10 @@ function cmdseq(body, system, qf;
 
   vk.end_command_buffer(cmd)
 
-  vk.queue_submit(queue, [vk.SubmitInfo(wait,[],[cmd], [signal];
-    next=vk.TimelineSemaphoreSubmitInfo(signal_semaphore_values=[UInt(1)])
-  )])
+  post = vk.SemaphoreSubmitInfo(signal, UInt(1), 0)
+  cbi = vk.CommandBufferSubmitInfo(cmd, 0)
+
+  vk.queue_submit_2(queue, [vk.SubmitInfo2(wait, [cbi], [post])])
 
   @async begin
     vk.wait_semaphores(
@@ -55,11 +56,11 @@ function cmdseq(body, system, qf;
     vk.free_command_buffers(get(system, :device), pool, cmds)
   end
 
-  return signal
+  return post
 end
 
 function recordcomputation(
-  cmd, pipeline, layout, workgroup=[1,1,1], dsets=[], pcs=ds.emptymap
+  cmd, pipeline, layout, workgroup=[1, 1, 1], dsets=[], pcs=ds.emptymap
 )
   vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
 
@@ -114,13 +115,13 @@ function mipblit(cmd, config)
       get(config, :level),
       0, 1
     ),
-    (vk.Offset3D(0,0,0), vk.Offset3D(x, y, 1)),
+    (vk.Offset3D(0, 0, 0), vk.Offset3D(x, y, 1)),
     vk.ImageSubresourceLayers(
       vk.IMAGE_ASPECT_COLOR_BIT,
       get(config, :level) + 1,
       0, 1
     ),
-    (vk.Offset3D(0,0,0), vk.Offset3D(div(x, 2), div(y, 2), 1))
+    (vk.Offset3D(0, 0, 0), vk.Offset3D(div(x, 2), div(y, 2), 1))
   )
 
   vk.cmd_blit_image(
@@ -174,8 +175,9 @@ function copybuffer(system::ds.Map, src, dst, size, queuefamily=:transfer)
 end
 
 function copybuffer(cmd::vk.CommandBuffer, src, dst, size,
-                    queuefamily=:transfer)
-    vk.cmd_copy_buffer(cmd, src, dst, [vk.BufferCopy(0,0,size)])
+  queuefamily=:transfer
+)
+  vk.cmd_copy_buffer(cmd, src, dst, [vk.BufferCopy(0, 0, size)])
 end
 
 function todevicelocal(system, data, buffers...)
@@ -189,7 +191,7 @@ function todevicelocal(system, data, buffers...)
 
   vk.unmap_memory(get(system, :device), get(staging, :memory))
 
-  cmdseq(system, :transfer) do cmd
+  sem = cmdseq(system, :transfer) do cmd
     for buffer in buffers
       copybuffer(
         cmd,
@@ -213,6 +215,13 @@ function todevicelocal(system, data, buffers...)
     staging
   end
 
+  ds.hashmap(
+    :semaphore, sem,
+    :await, UInt(1),
+    :qf, :transfer,
+    :readable, true,
+    :writable, false
+  )
 end
 
 end # module

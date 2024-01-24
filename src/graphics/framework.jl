@@ -56,7 +56,7 @@ function computepipeline(dev, config)
   layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
 
   pipeline = pipe.computepipeline(
-    dev, get(config, :shader), layout, pushconstants
+    dev, get(config, :shader), layout, get(config, :pushconstants)
   )
 
   queue = hw.findcomputequeue(get(config, :qf_properties))
@@ -67,6 +67,9 @@ function computepipeline(dev, config)
     :pipeline, pipeline,
     :queuefamily, queue,
   )
+end
+
+function runcomputepipeline(cp, bindings, pushconstants=[])
 end
 
 function computetask(pipeline, inputs, pcs=[])

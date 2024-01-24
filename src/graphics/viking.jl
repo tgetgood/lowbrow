@@ -61,6 +61,14 @@ Static description of the program to be run. Pure data. Shouldn't invoke
 anything.
 """
 prog = ds.hashmap(
+  :device_req, ds.hashmap(
+    :features, ds.hashmap(
+      v"1.0", ds.set(:sampler_anisotropy),
+      v"1.2", ds.set(:timeline_semaphore),
+      v"1.3", [:synchronization2]
+    ),
+    :extensions, ds.set("VK_KHR_swapchain")
+  ),
   :model_file, *(@__DIR__, "/../../assets/viking_room.obj"),
   :texture_file, *(@__DIR__, "/../../assets/viking_room.png"),
   :concurrent_frames, frames,

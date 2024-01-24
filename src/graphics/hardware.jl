@@ -357,8 +357,12 @@ function createdevice(system, config)
     # FIXME: Confirm that these features are available before enabling.
     # How do I do that?
     # Not urgent since vulkan 1.2+ requires :timeline_semaphore.
-    next=
-    vk.PhysicalDeviceVulkan12Features(ds.getin(config, [:device, :vk12features])...)
+    next=vk.PhysicalDeviceVulkan12Features(
+      ds.getin(config, [:device, :vk12features])...;
+      next=vk.PhysicalDeviceVulkan13Features(
+        ds.getin(config, [:device, :vk13features])...
+      )
+    )
   )
 
   assoc(system, :device, vk.unwrap(vk.create_device(pdev, dci)))

@@ -23,6 +23,7 @@ defaults = hashmap(
   :device, hashmap(
     :features, [:sampler_anisotropy],
     :vk12features, [:timeline_semaphore],
+    :vk13features, [:synchronization2],
     # FIXME: logically these are sets. How does vk handle repeats?
     :extensions, ["VK_KHR_swapchain"]
   ),
@@ -198,7 +199,9 @@ function renderloop(framefn, system, config)
       system = nothing
       renderstate = nothing
 
-      take!(sigkill)
+      if isready(sigkill)
+        take!(sigkill)
+      end
 
       tear_down[] = () -> nothing
 
