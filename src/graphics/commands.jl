@@ -8,6 +8,14 @@ import resources: shaderstagebits
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
 
+function wait_semaphore(
+  dev::vk.Device, info::vk.SemaphoreSubmitInfo, timeout=typemax(UInt)
+)
+  vk.wait_semaphores(
+    dev, vk.SemaphoreWaitInfo([info.semaphore], [info.value]), timeout
+  )
+end
+
 """
 Returns a timeline semaphore which will signal `1` when submitted commands are
 finished.
@@ -31,8 +39,8 @@ function cmdseq(body, system, qf;
   pool = hw.getpool(system, qf)
   queue = hw.getqueue(system, qf)
 
-  # TODO: I ought to always use pools and just allocate bigger ones if I find
-  # them full. Like (mutable) vectors.
+  # FIXME: command pools are not thread safe, so this whole mechanism needs to
+  # be rethought.
   cmds = hw.commandbuffers(system, 1, qf, level)
   cmd = cmds[1]
 
@@ -48,12 +56,12 @@ function cmdseq(body, system, qf;
   vk.queue_submit_2(queue, [vk.SubmitInfo2(wait, [cbi], [post])])
 
   @async begin
-    vk.wait_semaphores(
-      get(system, :device),
-      vk.SemaphoreWaitInfo([signal], [UInt(1)]),
-      typemax(UInt)
-    )
-    vk.free_command_buffers(get(system, :device), pool, cmds)
+    try
+      wait_semaphore(get(system, :device), post,)
+      vk.free_command_buffers(get(system, :device), pool, cmds)
+    catch e
+      ds.handleerror(e)
+    end
   end
 
   return post
@@ -191,7 +199,7 @@ function todevicelocal(system, data, buffers...)
 
   vk.unmap_memory(get(system, :device), get(staging, :memory))
 
-  sem = cmdseq(system, :transfer) do cmd
+  post = cmdseq(system, :transfer) do cmd
     for buffer in buffers
       copybuffer(
         cmd,
@@ -206,22 +214,17 @@ function todevicelocal(system, data, buffers...)
   # This *seems* to fix a highly intermittent use after free of the staging buffer.
   # I can't replicate the issue reliably enough to call it fixed.
   @async begin
-    vk.wait_semaphores(
-      get(system, :device),
-      vk.SemaphoreWaitInfo([sem], [UInt(1)]),
-      typemax(UInt)
-    )
-
-    staging
+    try
+      wait_semaphore(get(system, :device), post)
+      staging
+    catch e
+      ds.handleerror(e)
+    end
   end
 
-  ds.hashmap(
-    :semaphore, sem,
-    :await, UInt(1),
-    :qf, :transfer,
-    :readable, true,
-    :writable, false
-  )
+  # REVIEW: I'm trying a convention where functions which submit modifications
+  # to buffers return SemaphoreSubmitInfos. Then we package those with the buffer and any downstream consumers know for what to wait when submitting further changes.
+  post
 end
 
 end # module
