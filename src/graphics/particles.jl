@@ -5,6 +5,7 @@ import pipeline as gp
 import uniform
 import commands
 import graphics
+import render
 
 import DataStructures as ds
 import DataStructures: hashmap, into, emptyvector
@@ -64,7 +65,7 @@ function init_particle_buffer(system, config)
 
   next = commands.todevicelocal(system, particles, ssbo)
 
-  return ds.assoc(ssbo, :next, next, :config, buffconfig, )
+  ds.assoc(ssbo, :wait, [next], :config, buffconfig)
 end
 
 frames = 3
@@ -76,7 +77,7 @@ prog = hashmap(
   :vulkan_req, ds.hashmap(
     :version, v"1.3"
   ),
-  :window, hashmap(:width, 1000, :height, 1000),
+  # TODO: Rectify this :device/:device_req split
   :device_req, ds.hashmap(
     :features, ds.hashmap(
       v"1.0", ds.set(:sampler_anisotropy),
@@ -85,7 +86,11 @@ prog = hashmap(
     ),
     :extensions, ds.set("VK_KHR_swapchain")
   ),
-  :concurrent_frames, frames,
+  :window, hashmap(:width, 1000, :height, 1000),
+  :swapchain, hashmap(
+    # Triple buffering.
+    :images, 3
+  ),
   :particles, nparticles,
   :compute, ds.hashmap(
     # inputs and outputs are combined to create descriptor sets.
@@ -141,80 +146,75 @@ function main()
 
   system, config = graphics.instantiate(system, config)
 
-  ### Bound buffers
+  ### Initial sim state
 
   current_particles = init_particle_buffer(system, config)
 
-  ### compute
+  ### compute pipeline
 
   compute = fw.computepipeline(dev, merge(get(config, :compute), hardwaredesc))
 
-  fw.binddescriptors(
-    dev,
-    ds.getin(config, [:compute, :descriptorsets]),
-    compute_bindings
-  )
+  ### render loop
 
-  ### record compute commands once since they never change.
-
-  cqueue = hw.getqueue(system, :compute)
-
-  ccmds = hw.commandbuffers(system, frames, :compute)
-
-  for i in 1:frames
-    commands.recordcomputation(
-      ccmds[i],
-      ds.getin(config, [:compute, :pipeline, :pipeline]),
-      ds.getin(config, [:compute, :pipeline, :layout]),
-      [Int(floor(get(config, :particles) / 256)), 1, 1],
-      [ds.getin(config, [:compute, :descriptorsets, :sets])[i]]
-    )
-  end
-
-  csemcounters::Vector{UInt} = map(x -> UInt(0), 1:frames)
-
-  csems = map(x -> vk.unwrap(vk.create_semaphore(
-      get(system, :device),
-      vk.SemaphoreCreateInfo(
-        next=vk.SemaphoreTypeCreateInfo(vk.SEMAPHORE_TYPE_TIMELINE, x)
-      )
-    )), csemcounters)
-
-  ### run
+  renderstate = fw.assemblerender(system, config)
 
   t1 = time()
+  cjoin = Channel()
+  gjoin = Channel()
 
-  graphics.renderloop(system, config) do i, renderstate
-
-    fw.wait_readable(current_particles)
-
+  # while true
     t2 = time()
-    next_particles = fw.runcomputepipeline(compute, current_particles, [Float32(t2-t1)])
+    dt = Float32(t2 - t1)
+    @async begin
+      try
+        put!(cjoin, fw.runcomputepipeline(system, compute, current_particles, [dt]))
+      catch e
+        ds.handleerror(e)
+      end
+    end
     t1 = t2
 
-    # Buffer maps contain all of the metadata you need to wait to read from
-    # them, but it's the queue submissions that should read them. That's the
-    # kicker here.
+    # Graphics is async mostly for proof of concept. Doesn't accomplish much
+    # here
 
-    # wait on cpu, signal on gpu. Not the most efficient, but with multiple
-    # frames in flight it should be just fine.
-    vk.wait_semaphores(
-      get(system, :device),
-      vk.SemaphoreWaitInfo([csem], [csemcounters[i]]),
-      typemax(UInt)
-    )
+    @async begin
+      try
+        commandpool = hw.commandpool(dev, get(cp, :queuefamily))
+        cmd = hw.commandbuffers(dev, commandpool, 1)[1]
 
-    vk.queue_submit(cqueue, [vk.SubmitInfo([], [], [ccmds[i]], [csem];
-      next=vk.TimelineSemaphoreSubmitInfo(
-        signal_semaphore_values=[csemcounters[i] + 1]
-      )
-    )])
+        gsig = render.draw(
+          system,
+          cmd,
+          ds.assoc(renderstate, :vertexbuffer, current_particles))
 
-    out = ds.assoc(renderstate, :vertexbuffer, current_particles)
+        put!(gjoin, gsig)
+
+        commands.wait_semaphore(dev, gsig)
+        # Again, wait to save from gc... This is getting to be an ugly
+        # pattern. We're blocking threads inside tasks, which seems like a
+        # terrible idea.
+        # REVIEW: Send these waits to a special wait pool?
+      catch e
+        ds.handleerror(e)
+      end
+    end
+
+    next_particles = take!(cjoin)
+
+    @async begin
+      try
+        gsig = take!(gjoin)
+        commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
+        # It's safe to free the particle buffer after the above signals.
+        current_particles
+      catch e
+        ds.handleerror(e)
+      end
+    end
+
     current_particles = next_particles
 
-    return out
-  end
+  # end
 end
 
-main()
+# main()

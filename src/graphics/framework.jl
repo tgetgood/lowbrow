@@ -7,7 +7,7 @@ module framework
 import Vulkan as vk
 import DataStructures as ds
 
-import uniform
+import commands
 import resources as rd
 import vertex
 import pipeline as pipe
@@ -62,17 +62,80 @@ function computepipeline(dev, config)
   queue = hw.findcomputequeue(get(config, :qf_properties))
 
   ds.hashmap(
-    :definition, config,
+    :config, config,
     :descriptorsetlayout, layout,
+    :descriptorsetlayoutci, layoutci,
+    :bindings, bindings,
     :pipeline, pipeline,
     :queuefamily, queue,
   )
 end
 
-function runcomputepipeline(cp, bindings, pushconstants=[])
-end
+function runcomputepipeline(system, cp, inputs, pushconstants=[])
 
-function computetask(pipeline, inputs, pcs=[])
+  # Need
+  # 1) pool for descriptor sets
+  # 2) pool for commanpools
+  # 3) pool for ssbos (output)
+  #
+  # OR, just create a new one each time and throw it away. Good enough for a
+  # proof of concept.
+
+  layout = get(cp, :descriptorsetlayout)
+  layoutci = get(cp, :descriptorsetlayoutci)
+
+  dev = get(system, :dev)
+
+  dsetpool = vk.unwrap(vk.create_descriptor_pool(
+    dev,
+    rd.descriptorpool(layoutci, 1)
+  ))
+
+  dsets = vk.unwrap(vk.allocate_descriptor_sets(
+    dev,
+    vk.DescriptorSetAllocateInfo(dsetpool, [layout])
+  ))
+
+  commandpool = hw.commandpool(dev, get(cp, :queuefamily))
+  cmd = hw.commandbuffers(dev, commandpool, 1)[1]
+
+  output = merge(inputs, hw.buffer(system, get(inputs, :config)))
+
+  fw.binddescriptors(dev, ds.assoc(bindings, :sets, dsets), [inputs, output])
+
+  ### record compute commands once since they never change.
+
+  cqueue = vk.get_device_queue(get(cmd, :queuefamily), 0)
+
+  commands.recordcomputation(
+    cmd,
+    ds.getin(cp, [:pipeline, :pipeline]),
+    ds.getin(cp, [:pipeline, :layout]),
+    ds.getin(cp, [:config, :workgroups]),
+    dsets
+  )
+
+  sem = vk.unwrap(vk.create_semaphore(
+    dev,
+    vk.SemaphoreCreateInfo(
+      next=vk.SemaphoreTypeCreateInfo(vk.SEMAPHORE_TYPE_TIMELINE, UInt(1))
+    )))
+
+  post = vk.SemaphoreSubmitInfo(sem, UInt(2))
+
+  cmdsub = vk.CommandBufferSubmitInfo(cmd, 0)
+
+  submit = vk.SubmitInfo2(get(inputs, :wait), [cmdsub], [post])
+
+  vk.queue_submit_2(cqueue, [submit])
+
+  @async begin
+    wait_semaphore(dev, post)
+    # withhold refs from gc until gpu is done with them.
+    (dsetpool, dsets, commandpool, cmds)
+  end
+
+  ds.assoc(output, :wait, [post])
 end
 
 function descriptorinfos(binding)

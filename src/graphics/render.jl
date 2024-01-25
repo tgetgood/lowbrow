@@ -150,14 +150,19 @@ function draw(system, cmd, renderstate)
 
     recorder(cmd, image + 1, get(system, :framebuffers), renderstate)
 
-    submission = vk.SubmitInfo(
-      [imagesem],
-      [vk.PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT],
-      [get(cmd, :commandbuffer)],
-      [rendersem]
+    sigsem = hw.timelinesemaphore(dev, 1)
+    sig = vk.SemaphoreSubmitInfo(sigsem, UInt(2))
+
+    submission = vk.SubmitInfo2(
+      [vk.SemaphoreSubmitInfo(
+        imagesem, 0, 0;
+        stage_mask=vk.PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+      )],
+      [vk.CommandBufferSubmitInfo(get(cmd, :commandbuffer), 0)],
+      [vk.SemaphoreSubmitInfo(rendersem, 0, 0), sig]
     )
 
-    vk.queue_submit(hw.getqueue(system, :graphics), [submission]; fence)
+    vk.queue_submit_2(hw.getqueue(system, :graphics), [submission]; fence)
 
     # end fenced region
 
@@ -175,6 +180,8 @@ function draw(system, cmd, renderstate)
 
     if vk.iserror(preres)
       return vk.unwrap_error(preres).code
+    else
+      return sig
     end
   end
 end
