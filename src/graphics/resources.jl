@@ -101,7 +101,7 @@ function descriptorpool(layout, size)
     size * length(layout.bindings),
     into([], map(x -> vk.DescriptorPoolSize(
         x.descriptor_type,
-        x.descriptor_count * size
+        x.descriptor_count
       )),
       layout.bindings
     )

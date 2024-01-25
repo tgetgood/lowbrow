@@ -16,6 +16,17 @@ function wait_semaphore(
   )
 end
 
+function wait_semaphores(
+  dev::vk.Device, infos::Vector{vk.SemaphoreSubmitInfo}, timeout=typemax(UInt)
+)
+  vk.wait_semaphores(
+    dev, vk.SemaphoreWaitInfo(
+      ds.into!([], map(x -> x.semaphore), infos),
+      ds.into!([], map(x -> x.value), infos),
+      timeout
+  ))
+end
+
 """
 Returns a timeline semaphore which will signal `1` when submitted commands are
 finished.
