@@ -165,56 +165,45 @@ function main()
   # while true
     t2 = time()
     dt = Float32(t2 - t1)
-    @async begin
-      try
-        put!(cjoin, fw.runcomputepipeline(system, compute, current_particles, [dt]))
-      catch e
-        ds.handleerror(e)
-      end
-    end
+
+    cjoin = fw.thread(
+      fw.runcomputepipeline, system, compute, current_particles, [dt]
+    )
+
     t1 = t2
 
     # Graphics is async mostly for proof of concept. Doesn't accomplish much
     # here
 
+  gjoin = fw.thread() do
+    commandpool = hw.commandpool(dev, get(cp, :queuefamily))
+    cmd = hw.commandbuffers(dev, commandpool, 1)[1]
+
+    gsig = render.draw(
+      system,
+      cmd,
+      ds.assoc(renderstate, :vertexbuffer, current_particles))
+
     @async begin
-      try
-        commandpool = hw.commandpool(dev, get(cp, :queuefamily))
-        cmd = hw.commandbuffers(dev, commandpool, 1)[1]
-
-        gsig = render.draw(
-          system,
-          cmd,
-          ds.assoc(renderstate, :vertexbuffer, current_particles))
-
-        put!(gjoin, gsig)
-
-        commands.wait_semaphore(dev, gsig)
-        # Again, wait to save from gc... This is getting to be an ugly
-        # pattern. We're blocking threads inside tasks, which seems like a
-        # terrible idea.
-        # REVIEW: Send these waits to a special wait pool?
-      catch e
-        ds.handleerror(e)
-      end
+      commands.wait_semaphore(dev, gsig)
+      cmd, commandpool
     end
+
+    gsig
+  end
 
     next_particles = take!(cjoin)
 
-    @async begin
-      try
-        gsig = take!(gjoin)
-        commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
-        # It's safe to free the particle buffer after the above signals.
-        current_particles
-      catch e
-        ds.handleerror(e)
-      end
-    end
+  fw.thread() do
+    gsig = take!(gjoin)
+    commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
+    # It's safe to free the particle buffer after the above signals.
+    current_particles
+  end
 
     current_particles = next_particles
 
   # end
 end
 
-# main()
+ main()
