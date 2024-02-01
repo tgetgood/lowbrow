@@ -22,9 +22,10 @@ function wait_semaphores(
   vk.wait_semaphores(
     dev, vk.SemaphoreWaitInfo(
       ds.into!([], map(x -> x.semaphore), infos),
-      ds.into!([], map(x -> x.value), infos),
-      timeout
-  ))
+      ds.into!([], map(x -> x.value), infos)
+    ),
+    timeout
+  )
 end
 
 """
@@ -66,13 +67,9 @@ function cmdseq(body, system, qf;
 
   vk.queue_submit_2(queue, [vk.SubmitInfo2(wait, [cbi], [post])])
 
-  @async begin
-    try
-      wait_semaphore(get(system, :device), post,)
-      vk.free_command_buffers(get(system, :device), pool, cmds)
-    catch e
-      ds.handleerror(e)
-    end
+  hw.thread() do
+    wait_semaphore(get(system, :device), post,)
+    vk.free_command_buffers(get(system, :device), pool, cmds)
   end
 
   return post
@@ -92,7 +89,7 @@ function recordcomputation(
       vk.SHADER_STAGE_COMPUTE_BIT,
       get(pcs, :offset, 0),
       get(pcs, :size),
-      Ptr{Nothing}(get(pcs, :value))
+      Ptr{Nothing}(pointer(get(pcs, :value)))
     )
   end
 
@@ -224,13 +221,9 @@ function todevicelocal(system, data, buffers...)
 
   # This *seems* to fix a highly intermittent use after free of the staging buffer.
   # I can't replicate the issue reliably enough to call it fixed.
-  @async begin
-    try
-      wait_semaphore(get(system, :device), post)
-      staging
-    catch e
-      ds.handleerror(e)
-    end
+  hw.thread() do
+    wait_semaphore(get(system, :device), post)
+    staging
   end
 
   # REVIEW: I'm trying a convention where functions which submit modifications

@@ -1,7 +1,7 @@
 module pipeline
 
 import hardware as hw
-import resources: shaderstagebits, emptydescriptorsetlayout
+import resources: shaderstagebits
 
 import Vulkan as vk
 import DataStructures as ds

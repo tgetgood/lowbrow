@@ -148,16 +148,20 @@ function draw(system, cmd, renderstate)
     #  Don't record over unsubmitted buffer
     vk.reset_fences(dev, [fence])
 
+    @info get(renderstate, :vertexbuffer)
+
     recorder(cmd, image + 1, get(system, :framebuffers), renderstate)
 
     sigsem = hw.timelinesemaphore(dev, 1)
-    sig = vk.SemaphoreSubmitInfo(sigsem, UInt(2))
+    sig = vk.SemaphoreSubmitInfo(sigsem, 2, 0)
+
+    vwait = ds.getin(renderstate, [:vertexbuffer, :wait], [])
 
     submission = vk.SubmitInfo2(
-      [vk.SemaphoreSubmitInfo(
+      ds.conj(vwait, vk.SemaphoreSubmitInfo(
         imagesem, 0, 0;
         stage_mask=vk.PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-      )],
+      )),
       [vk.CommandBufferSubmitInfo(get(cmd, :commandbuffer), 0)],
       [vk.SemaphoreSubmitInfo(rendersem, 0, 0), sig]
     )

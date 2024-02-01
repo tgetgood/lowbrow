@@ -416,7 +416,7 @@ function imageview(system, config, image)
 end
 
 function commandpool(dev, qf, flags=vk.CommandPoolCreateFlag(0))
-  vk.unwrap(vk.create_command_pool(dev, qf, flags=flags))
+  vk.unwrap(vk.create_command_pool(dev, qf; flags=flags))
 end
 
 function createcommandpools(system, config)
@@ -743,20 +743,43 @@ function createimageviews(system, config)
   )
 end
 
-function timelinesemaphore(dev::vk.Device, init::UInt=1)
+function timelinesemaphore(dev::vk.Device, init=1)
   vk.unwrap(vk.create_semaphore(
     dev,
     vk.SemaphoreCreateInfo(
       next=vk.SemaphoreTypeCreateInfo(
         vk.SEMAPHORE_TYPE_TIMELINE,
-        init
+        UInt(init)
       )
     )
   ))
 end
 
 function tick(ss::vk.SemaphoreSubmitInfo)
-  vk.SemaphoreSubmitInfo(ss.semaphore, ss.value + 1)
+  vk.SemaphoreSubmitInfo(ss.semaphore, ss.value + 1, ss.device_index)
+end
+
+"""
+Takes a function and args and applies it in a thread, returning a channel which
+will eventually yield the result.
+"""
+function thread(f, args...)
+  # TODO: Flag to disable in production
+  invocation_trace = stacktrace()
+
+  join = Channel()
+  Threads.@spawn begin
+      try
+        put!(join, f(args...))
+      catch e
+        ds.handleerror(e)
+        print(stderr, "\n Thread launched from:\n")
+        # FIXME: This doesn't seem to be lexically captured, but gets
+        # dynamically bound to the most recent invocation of `thread`.
+        show(stderr, "text/plain", invocation_trace)
+      end
+  end
+  return join
 end
 
 end

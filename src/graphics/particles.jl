@@ -162,48 +162,54 @@ function main()
   cjoin = Channel()
   gjoin = Channel()
 
-  # while true
+  for i in 1:2
     t2 = time()
     dt = Float32(t2 - t1)
 
-    cjoin = fw.thread(
-      fw.runcomputepipeline, system, compute, current_particles, [dt]
-    )
+    # cjoin = hw.thread(
+      next_particles = fw.runcomputepipeline(system, compute, current_particles, [dt])
+    # )
 
     t1 = t2
 
     # Graphics is async mostly for proof of concept. Doesn't accomplish much
     # here
 
-  gjoin = fw.thread() do
-    commandpool = hw.commandpool(dev, get(cp, :queuefamily))
-    cmd = hw.commandbuffers(dev, commandpool, 1)[1]
+    # gjoin = hw.thread() do
+      # commandpool = hw.commandpool(
+      #   dev,
+      #   ds.getin(system, [:queues, :graphics]),
+      #   vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
+      # )
 
-    gsig = render.draw(
-      system,
-      cmd,
-      ds.assoc(renderstate, :vertexbuffer, current_particles))
+      # cmd = hw.commandbuffers(dev, commandpool, 1)[1]
 
-    @async begin
-      commands.wait_semaphore(dev, gsig)
-      cmd, commandpool
+      # co = ds.assoc(render.syncsetup(system, config), :commandbuffer, cmd)
+      gsig = render.draw(
+        system,
+        get(system, :commandbuffers)[((i + 1) % 3) + 1],
+        ds.assoc(renderstate, :vertexbuffer, current_particles))
+
+      # @async begin
+      #   commands.wait_semaphore(dev, gsig)
+      #   co, commandpool
+      # end
+
+    #   gsig
+    # end
+
+    # next_particles = take!(cjoin)
+
+    hw.thread() do
+      gsig = take!(gjoin)
+      commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
+      # It's safe to free the particle buffer after the above signals.
+      current_particles
     end
-
-    gsig
-  end
-
-    next_particles = take!(cjoin)
-
-  fw.thread() do
-    gsig = take!(gjoin)
-    commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
-    # It's safe to free the particle buffer after the above signals.
-    current_particles
-  end
 
     current_particles = next_particles
 
-  # end
+  end
 end
 
- main()
+main()

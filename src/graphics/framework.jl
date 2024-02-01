@@ -84,12 +84,14 @@ function runcomputepipeline(system, cp, inputs, pushconstants=[])
   layout = get(cp, :descriptorsetlayout)
   layoutci = get(cp, :descriptorsetlayoutci)
 
-  dev = get(system, :dev)
+  dev = get(system, :device)
 
-  dsetpool = vk.unwrap(vk.create_descriptor_pool(
+  dsetpoolr = vk.create_descriptor_pool(
     dev,
     rd.descriptorpool(layoutci, 1)
-  ))
+  )
+
+  dsetpool = vk.unwrap(dsetpoolr)
 
   dsets = vk.unwrap(vk.allocate_descriptor_sets(
     dev,
@@ -101,18 +103,19 @@ function runcomputepipeline(system, cp, inputs, pushconstants=[])
 
   output = merge(inputs, hw.buffer(system, get(inputs, :config)))
 
-  fw.binddescriptors(dev, ds.assoc(bindings, :sets, dsets), [inputs, output])
+  binddescriptors(dev, get(cp, :bindings), dsets[1], [inputs, output])
 
   ### record compute commands once since they never change.
 
-  cqueue = vk.get_device_queue(get(cmd, :queuefamily), 0)
+  cqueue = vk.get_device_queue(dev, get(cp, :queuefamily), 0)
 
   commands.recordcomputation(
     cmd,
     ds.getin(cp, [:pipeline, :pipeline]),
     ds.getin(cp, [:pipeline, :layout]),
     ds.getin(cp, [:config, :workgroups]),
-    dsets
+    dsets,
+    ds.assoc(ds.getin(cp, [:config, :pushconstants])[1], :value, pushconstants)
   )
 
   sem = vk.unwrap(vk.create_semaphore(
@@ -121,7 +124,7 @@ function runcomputepipeline(system, cp, inputs, pushconstants=[])
       next=vk.SemaphoreTypeCreateInfo(vk.SEMAPHORE_TYPE_TIMELINE, UInt(1))
     )))
 
-  post = vk.SemaphoreSubmitInfo(sem, UInt(2))
+  post = vk.SemaphoreSubmitInfo(sem, UInt(2), 0)
 
   cmdsub = vk.CommandBufferSubmitInfo(cmd, 0)
 
@@ -129,10 +132,10 @@ function runcomputepipeline(system, cp, inputs, pushconstants=[])
 
   vk.queue_submit_2(cqueue, [submit])
 
-  @async begin
-    wait_semaphore(dev, post)
+  hw.thread() do
+    commands.wait_semaphore(dev, post)
     # withhold refs from gc until gpu is done with them.
-    (dsetpool, dsets, commandpool, cmds)
+    (dsetpool, dsets, commandpool, cmd)
   end
 
   ds.assoc(output, :wait, [post])
@@ -143,7 +146,7 @@ function descriptorinfos(binding)
     (
       [],
       [vk.DescriptorBufferInfo(
-        0, get(binding, :size), buffer=get(binding, :buffer)
+        0, get(binding, :size); buffer=get(binding, :buffer)
       )],
       []
     )
@@ -162,6 +165,29 @@ function descriptorinfos(binding)
   end
 end
 
+function binddescriptors(dev, layout, dset, buffers)
+  vk.update_descriptor_sets(dev,
+    ds.into!(
+      [],
+      map(x -> get(x, :type))
+      ∘
+      map(t -> get(rd.descriptortypes, t))
+      ∘
+      ds.mapindexed((j, dtype) -> begin
+        vk.WriteDescriptorSet(
+          dset,
+          j - 1,
+          0,
+          dtype,
+          descriptorinfos(buffers[j])...
+        )
+      end),
+      layout
+    ),
+    []
+  )
+end
+
 function binddescriptors(dev, config, bindings)
   dsets = get(config, :sets)
 
@@ -176,7 +202,7 @@ function binddescriptors(dev, config, bindings)
 
   writes = ds.into!(
     [],
-    ds.mapindexed((i, dset) -> ds.into(
+    ds.mapindexed((i, dset) -> ds.into!(
       [],
       ds.mapindexed((j, dtype) -> begin
         vk.WriteDescriptorSet(
@@ -192,6 +218,7 @@ function binddescriptors(dev, config, bindings)
     dsets
   )
 
+  @info writes
   for write in writes
     vk.update_descriptor_sets(dev, write, [])
   end
@@ -272,22 +299,6 @@ function assemblerender(system, config)
       :bindings
     ])
   )
-end
-
-"""
-Takes a function and args and applies it in a thread, returning a channel which
-will eventually yield the result.
-"""
-function thread(f, args...)
-  join = Channel()
-  Threads.@spawn begin
-      try
-        put!(join, f(args...))
-      catch e
-        ds.handleerror(e)
-      end
-  end
-  return join
 end
 
 end
