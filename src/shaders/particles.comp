@@ -3,7 +3,7 @@
 struct Particle {
   vec2 position;
   vec2 velocity;
-  vec4 color;
+  vec4 colour;
 };
 
 layout(push_constant) uniform constants {
@@ -26,4 +26,5 @@ void main() {
 
   particlesOut[i].position = p.position + p.velocity.xy * time.delta;
   particlesOut[i].velocity = p.velocity;
+  particlesOut[i].colour = p.colour;
 }
