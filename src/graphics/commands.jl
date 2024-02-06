@@ -231,4 +231,38 @@ function todevicelocal(system, data, buffers...)
   post
 end
 
+"""
+Copy outputs of compute shaders back to cpu ram. Returns Vector<T>.
+"""
+function fromdevicelocal(system, T, buffer)
+  size = get(buffer, :size)
+  dev = get(system, :device)
+
+  staging = hw.transferbuffer(system, size)
+
+  post = cmdseq(system, :transfer) do cmd
+    copybuffer(
+      cmd,
+      get(buffer, :buffer),
+      get(staging, :buffer),
+      get(staging, :size),
+      :transfer
+    )
+  end
+
+  wait_semaphore(dev, post)
+
+  out = Vector{T}(undef, Int(size / sizeof(T)))
+
+  memptr::Ptr{T} = vk.unwrap(vk.map_memory(
+    dev, get(staging, :memory), 0, size
+  ))
+
+  unsafe_copyto!(memptr, pointer(out), length(out))
+
+  vk.unmap_memory(dev, get(staging, :memory))
+
+  return out
+end
+
 end # module
