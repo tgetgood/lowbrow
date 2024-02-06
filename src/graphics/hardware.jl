@@ -546,7 +546,7 @@ function transferbuffer(system, size)
     system,
     ds.hashmap(
       :size, size,
-      :usage, :transfer_src,
+      :usage, [:transfer_src, :transfer_dst],
       :queues, [:transfer],
       :memoryflags, [:host_coherent, :host_visible]
     )
