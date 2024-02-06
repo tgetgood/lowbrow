@@ -6,6 +6,7 @@ import uniform
 import commands
 import graphics
 import render
+import window
 
 import DataStructures as ds
 import DataStructures: hashmap, into, emptyvector
@@ -64,7 +65,7 @@ function init_particle_buffer(system, config)
 end
 
 frames = 3
-nparticles = 2^14 + 511
+nparticles = 2^12
 
 prog = hashmap(
   :name, "VK tutorial particle sim.",
@@ -119,6 +120,7 @@ function computecommands(config, frame, Δt)
 end
 
 function main()
+  window.shutdown()
   config = graphics.configure(prog)
   frames = get(config, :concurrent_frames)
 
@@ -154,63 +156,62 @@ function main()
   renderstate = fw.assemblerender(system, config)
 
   t1 = time()
-  cjoin = Channel()
-  gjoin = Channel()
+  t0 = t1
 
-  for i in 1:6000
+  iters = 300
+  for i in 1:iters
     t2 = time()
     dt = Float32(t2 - t1)
 
-    cjoin = hw.thread(() -> begin
+    cjoin = hw.thread() do
       next_particles = fw.runcomputepipeline(
         system, compute, current_particles,
         [dt]
       )
         return next_particles
       end
-    )
+
 
     t1 = t2
 
-    # Graphics is async mostly for proof of concept. Doesn't accomplish much
-    # here
-
     # gjoin = hw.thread() do
-      # commandpool = hw.commandpool(
-      #   dev,
-      #   ds.getin(system, [:queues, :graphics]),
-      #   vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-      # )
+      commandpool = hw.commandpool(
+        dev,
+        ds.getin(system, [:queues, :graphics]),
+        vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
+      )
 
-      # cmd = hw.commandbuffers(dev, commandpool, 1)[1]
+      cmd = hw.commandbuffers(dev, commandpool, 1)[1]
 
-      # co = ds.assoc(render.syncsetup(system, config), :commandbuffer, cmd)
+      co = ds.assoc(render.syncsetup(system, config), :commandbuffer, cmd)
       gsig = render.draw(
         system,
-        get(system, :commandbuffers)[((i + 1) % 3) + 1],
+        co,
         ds.assoc(renderstate, :vertexbuffer, current_particles))
 
 
-      # @async begin
-      #   commands.wait_semaphore(dev, gsig)
-      #   co, commandpool
-      # end
+      @async begin
+        commands.wait_semaphore(dev, gsig)
+        co, commandpool
+      end
 
-    #   gsig
+       # return gsig
     # end
 
     next_particles = take!(cjoin)
 
-    hw.thread() do
-      gsig = take!(gjoin)
-      commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
-      # It's safe to free the particle buffer after the above signals.
-      current_particles
-    end
+    # hw.thread() do
+    #   gsig = take!(gjoin)
+    #   commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
+    #   # It's safe to free the particle buffer after the above signals.
+    #   current_particles
+    # end
 
     current_particles = next_particles
 
   end
+
+  @info "Average fps: " * string(round(iters / (t1 - t0)))
 end
 
 main()
