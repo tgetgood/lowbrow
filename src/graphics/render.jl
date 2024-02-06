@@ -148,8 +148,6 @@ function draw(system, cmd, renderstate)
     #  Don't record over unsubmitted buffer
     vk.reset_fences(dev, [fence])
 
-    @info get(renderstate, :vertexbuffer)
-
     recorder(cmd, image + 1, get(system, :framebuffers), renderstate)
 
     sigsem = hw.timelinesemaphore(dev, 1)

@@ -218,7 +218,6 @@ function binddescriptors(dev, config, bindings)
     dsets
   )
 
-  @info writes
   for write in writes
     vk.update_descriptor_sets(dev, write, [])
   end
