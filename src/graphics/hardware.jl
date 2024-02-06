@@ -765,7 +765,8 @@ will eventually yield the result.
 """
 function thread(f, args...)
   # TODO: Flag to disable in production
-  invocation_trace = stacktrace()
+  # HACK: This is slow as hell. Do not use except in dire straights.
+  invocation_trace = "disabled" #stacktrace()
 
   join = Channel()
   Threads.@spawn begin
