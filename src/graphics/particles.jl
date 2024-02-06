@@ -51,11 +51,6 @@ function init_particle_buffer(system, config)
 
   buffconfig = ds.hashmap(
     :usage, ds.set(:vertex_buffer, :storage_buffer, :transfer_dst),
-    # Need simultaneous readonly access from compute and graphics pipelines if
-    # we want async parallelism without copying.
-    # TODO: Copying wouldn't be quicker, would it? That's potentially a lot of
-    # wasted vram.
-    :sharingmode, :concurrent,
     :size, sizeof(Particle) * n,
     :memoryflags, :device_local,
     :queues, [:transfer, :graphics, :compute]
@@ -69,7 +64,7 @@ function init_particle_buffer(system, config)
 end
 
 frames = 3
-nparticles = 2^14
+nparticles = 2^14 + 511
 
 prog = hashmap(
   :name, "VK tutorial particle sim.",
@@ -162,13 +157,18 @@ function main()
   cjoin = Channel()
   gjoin = Channel()
 
-  for i in 1:2
+  for i in 1:6000
     t2 = time()
     dt = Float32(t2 - t1)
 
-    # cjoin = hw.thread(
-      next_particles = fw.runcomputepipeline(system, compute, current_particles, [dt])
-    # )
+    cjoin = hw.thread(() -> begin
+      next_particles = fw.runcomputepipeline(
+        system, compute, current_particles,
+        [dt]
+      )
+        return next_particles
+      end
+    )
 
     t1 = t2
 
@@ -190,6 +190,7 @@ function main()
         get(system, :commandbuffers)[((i + 1) % 3) + 1],
         ds.assoc(renderstate, :vertexbuffer, current_particles))
 
+
       # @async begin
       #   commands.wait_semaphore(dev, gsig)
       #   co, commandpool
@@ -198,7 +199,7 @@ function main()
     #   gsig
     # end
 
-    # next_particles = take!(cjoin)
+    next_particles = take!(cjoin)
 
     hw.thread() do
       gsig = take!(gjoin)
