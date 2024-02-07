@@ -57,7 +57,7 @@ function init_particle_buffer(system, config)
     :queues, [:transfer, :graphics, :compute]
   )
 
-  ssbo = ds.assoc(hw.buffer(system, buffconfig), :verticies, n)
+  ssbo = hw.buffer(system, buffconfig)
 
   next = commands.todevicelocal(system, particles, ssbo)
 
@@ -91,9 +91,15 @@ prog = hashmap(
   :compute, ds.hashmap(
     # inputs and outputs are combined to create descriptor sets.
     :inputs, [ds.hashmap(:type, :ssbo)],
-    :outputs, [ds.hashmap(:type, :ssbo)],
+    :outputs, [ds.hashmap(
+      :type, :ssbo,
+      :usage, ds.set(:vertex_buffer, :storage_buffer),
+      :size, sizeof(Particle) * nparticles,
+      :memoryflags, :device_local,
+      :queues, [:graphics, :compute]
+    )],
     # push constants are... constants. Treat them accordingly.
-    :pushconstants, [ds.hashmap(:stage, :compute, :size, 16)],
+    :pushconstants, [ds.hashmap(:size, 16)],
     # The workgroup size and shader local size are tightly coupled, so this is,
     # in fact, a property of the pipeline, not of any task on it.
     :workgroups, [Int(floor(nparticles / 256)), 1, 1],
@@ -116,13 +122,11 @@ prog = hashmap(
   )
 )
 
-function computecommands(config, frame, Δt)
-end
-
 function main()
   window.shutdown()
   config = graphics.configure(prog)
   frames = get(config, :concurrent_frames)
+  nparticles = get(config, :particles)
 
   system = graphics.staticinit(config)
   dev = get(system, :device)
@@ -158,56 +162,29 @@ function main()
   t1 = time()
   t0 = t1
 
-  iters = 300
+  iters = 600
   for i in 1:iters
     t2 = time()
     dt = Float32(t2 - t1)
-
-    cjoin = hw.thread() do
-      next_particles = fw.runcomputepipeline(
-        system, compute, current_particles,
-        [dt]
-      )
-        return next_particles
-      end
-
-
     t1 = t2
 
-    # gjoin = hw.thread() do
-      commandpool = hw.commandpool(
-        dev,
-        ds.getin(system, [:queues, :graphics]),
-        vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-      )
-
-      cmd = hw.commandbuffers(dev, commandpool, 1)[1]
-
-      co = ds.assoc(render.syncsetup(system, config), :commandbuffer, cmd)
-      gsig = render.draw(
-        system,
-        co,
-        ds.assoc(renderstate, :vertexbuffer, current_particles))
-
-
-      @async begin
-        commands.wait_semaphore(dev, gsig)
-        co, commandpool
-      end
-
-       # return gsig
+    # cjoin = hw.thread() do
+    comp_outputs = fw.runcomputepipeline(
+      system,
+      compute,
+      [current_particles],
+      [dt]
+    )
+    #   return next_particles
     # end
 
-    next_particles = take!(cjoin)
+    gsig = fw.rungraphicspipeline(
+      system,
+      ds.assoc(renderstate, :vertexbuffer,
+               ds.assoc(current_particles, :verticies, nparticles))
+    )
 
-    # hw.thread() do
-    #   gsig = take!(gjoin)
-    #   commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
-    #   # It's safe to free the particle buffer after the above signals.
-    #   current_particles
-    # end
-
-    current_particles = next_particles
+    current_particles = comp_outputs[1]
 
   end
 

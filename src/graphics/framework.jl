@@ -12,6 +12,7 @@ import resources as rd
 import vertex
 import pipeline as pipe
 import hardware as hw
+import render
 
 const initialpoolsize = 3
 
@@ -73,13 +74,13 @@ end
 
 function runcomputepipeline(system, cp, inputs, pushconstants=[])
 
-  # Need
-  # 1) pool for descriptor sets
-  # 2) pool for commanpools
-  # 3) pool for ssbos (output)
-  #
-  # OR, just create a new one each time and throw it away. Good enough for a
-  # proof of concept.
+  # # Need
+  # # 1) pool for descriptor sets
+  # # 2) pool for commanpools
+  # # 3) pool for ssbos (output)
+  # #
+  # # OR, just create a new one each time and throw it away. Good enough for a
+  # # proof of concept.
 
   layout = get(cp, :descriptorsetlayout)
   layoutci = get(cp, :descriptorsetlayoutci)
@@ -101,9 +102,13 @@ function runcomputepipeline(system, cp, inputs, pushconstants=[])
   commandpool = hw.commandpool(dev, get(cp, :queuefamily))
   cmd = hw.commandbuffers(dev, commandpool, 1)[1]
 
-  output = merge(inputs, hw.buffer(system, get(inputs, :config)))
+  outputs = ds.into!(
+    [],
+    map(x -> ds.assoc(hw.buffer(system, x), :config, x)),
+    ds.getin(cp, [:config, :outputs])
+  )
 
-  binddescriptors(dev, get(cp, :bindings), dsets[1], [inputs, output])
+  binddescriptors(dev, get(cp, :bindings), dsets[1], vcat(inputs, outputs))
 
   ### record compute commands once since they never change.
 
@@ -124,11 +129,13 @@ function runcomputepipeline(system, cp, inputs, pushconstants=[])
       next=vk.SemaphoreTypeCreateInfo(vk.SEMAPHORE_TYPE_TIMELINE, UInt(1))
     )))
 
+  wait = ds.into!([],  map(x -> get(x, :wait)) ∘ ds.cat(), inputs)
+
   post = vk.SemaphoreSubmitInfo(sem, UInt(2), 0)
 
   cmdsub = vk.CommandBufferSubmitInfo(cmd, 0)
 
-  submit = vk.SubmitInfo2(get(inputs, :wait), [cmdsub], [post])
+  submit = vk.SubmitInfo2(wait, [cmdsub], [post])
 
   vk.queue_submit_2(cqueue, [submit])
 
@@ -138,7 +145,30 @@ function runcomputepipeline(system, cp, inputs, pushconstants=[])
     (dsetpool, dsets, commandpool, cmd)
   end
 
-  ds.assoc(output, :wait, [post])
+  ds.into!([], map(x -> ds.assoc(x, :wait, [post])), outputs)
+end
+
+function rungraphicspipeline(system, renderstate)
+  dev = get(system, :device)
+
+  commandpool = hw.commandpool(
+    dev,
+    ds.getin(system, [:queues, :graphics]),
+    vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
+  )
+
+  cmd = hw.commandbuffers(dev, commandpool, 1)[1]
+
+  co = ds.assoc(render.syncsetup(system, ds.emptymap), :commandbuffer, cmd)
+
+  gsig = render.draw(system, co, renderstate)
+
+  @async begin
+    commands.wait_semaphore(dev, gsig)
+    co, commandpool
+  end
+
+  return gsig
 end
 
 function descriptorinfos(binding)
