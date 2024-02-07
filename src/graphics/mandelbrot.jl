@@ -38,6 +38,7 @@ prog = ds.hashmap(
   :device, ds.hashmap(
     :features, [] #[:shader_float_64]
   ),
+  :window, hashmap(:width, 1024, :height, 1024),
   :render, ds.hashmap(
     :texture_file, *(@__DIR__, "/../../assets/texture.jpg"),
     :shaders, ds.hashmap(
@@ -45,7 +46,7 @@ prog = ds.hashmap(
       :fragment, *(@__DIR__, "/../shaders/mand.frag")
     ),
     :inputassembly, ds.hashmap(
-      :topology, :points
+      :topology, :triangles
     ),
     # FIXME: push constants must be at least 16 bytes.
     # Is it because of glsl 16 byte alignment?
@@ -57,40 +58,30 @@ prog = ds.hashmap(
   ),
   :compute, ds.hashmap(
     :bufferinit, ds.hashmap(
-      :shader, ds.hashmap(
-        :stage, :compute,
-        :file, *(@__DIR__, "/../shaders/mand-region.comp")
-      ),
-      :pushconstants, [ds.hashmap(:stage, :compute, :size, 20)],
-      :descriptorsets, ds.hashmap(
-        :count, 1,
-        :bindings, [ds.hashmap(:type, :storage_buffer, :stage, :compute)]
-      )
+      :shader, ds.hashmap(:file, *(@__DIR__, "/../shaders/mand-region.comp")),
+      :workgroups, [32,32,1],
+      :pushconstants, [ds.hashmap( :size, 20)],
+      :inputs, [],
+      :outputs, [ds.hashmap(:type, :ssbo,
+        :usage, :storage_buffer,
+        :size, sizeof(Pixel) * 1024 * 1024,
+        :memoryflags, :device_local,
+        :queues, [:compute, :graphics]
+      )],
     ),
     :separator, ds.hashmap(
-      :shader, ds.hashmap(
-        :stage, :compute,
-        :file, *(@__DIR__, "/../shaders/mand-iter.comp")
-      ),
-      :pushconstants, [ds.hashmap(:stage, :compute, :size, 16)],
-      :descriptorsets, ds.hashmap(
-        :bindings, [
-          ds.hashmap(
-            :usage, :storage_buffer,
-            :stage, :compute
-          ),
-          ds.hashmap(
-            :usage, :storage_buffer,
-            # FIXME: Given where this is defined, `:compute` should be inferred.
-            :stage, :compute
-          )
-        ]
-      )
+      :shader, ds.hashmap(:file, *(@__DIR__, "/../shaders/mand-iter.comp")),
+      :workgroups, [32,32,1],
+      :pushconstants, [ds.hashmap(:size, 16)],
+      :inputs, [ds.hashmap(:type, :ssbo)],
+      :outputs, [ds.hashmap(
+        :type, :ssbo,
+        :usage, :storage_buffer,
+        :size, sizeof(Pixel) * 1024 * 1024,
+        :memoryflags, :device_local,
+        :queues, [:compute, :graphics]
+      )],
     )
-  ),
-  :model, ds.hashmap(
-    :loader, load,
-    :vertex_type, Vertex
   ),
   :verticies, [
     [-1.0f0, -1.0f0],
@@ -168,6 +159,8 @@ function pixel_buffers(system, frames, winsize)
 end
 
 function main()
+  # cleanup
+  window.shutdown()
 
   ## UI setup
 
@@ -194,7 +187,6 @@ function main()
   )
 
   coords = take!(viewstate)
-  new = true
 
   ## VK wrapper setup
 
@@ -220,174 +212,55 @@ function main()
   # REVIEW: I need to encapsulate pipelines as wholes. graphics and compute.
   config = merge(config, get(config, :render))
 
-  w = get(system, :window)
-  winsize = window.size(w)
+  hardwaredesc = ds.selectkeys(system, [:qf_properties])
 
-  ## Compute init buffer
+  ## Compute pipelines
 
-  initconfig = ds.getin(config, [:compute, :bufferinit])
-
-  initconfig = ds.update(
-    initconfig, :descriptorsets, x -> merge(x, fw.descriptors(dev, x))
+  init = fw.computepipeline(
+    dev,
+    merge(ds.getin(config, [:compute, :bufferinit]), hardwaredesc)
   )
 
-  initconfig = ds.assoc(
-    initconfig, :pipeline, gp.computepipeline(dev, initconfig)
+  sep = fw.computepipeline(
+    dev,
+    merge(ds.getin(config, [:compute, :separator]), hardwaredesc)
   )
-
-  ## Compute separator
-  sepconfig = ds.getin(config, [:compute, :separator])
-
-  sepconfig = ds.associn(sepconfig, [:descriptorsets, :count], frames)
-
-  sepconfig = ds.update(
-    sepconfig, :descriptorsets, x -> merge(x, fw.descriptors(dev, x))
-  )
-
-  sepconfig = ds.assoc(sepconfig,
-    :pipeline, gp.computepipeline(dev, sepconfig),
-    :cmdbuffers, hw.commandbuffers(system, frames, :compute)
-  )
-
-  semcounters::Vector{UInt} = map(x -> UInt(0), 1:frames)
-  sems = map(x -> vk.unwrap(vk.create_semaphore(
-    get(system, :device),
-    vk.SemaphoreCreateInfo(
-      next=vk.SemaphoreTypeCreateInfo(vk.SEMAPHORE_TYPE_TIMELINE, x)
-    )
-  )), semcounters)
-
-  pbuffs = []
 
   ## Render loop
   framecounter = 0
   itercount = 50
 
-  graphics.renderloop(system, config) do i, renderstate
+  new = true
+  current_frame = ds.emptymap
+
+  renderstate = fw.assemblerender(system, config)
+
+  iters = 600
+  t0 = time()
+
+  for i in 1:iters
     framecounter += 1
 
-    if new
+    if new || current_frame === ds.emptymap
       @info "new"
       framecounter = 1
-      pbuffs = pixel_buffers(system, frames, winsize)
-      fw.binddescriptors(dev, get(initconfig, :descriptorsets), [[pbuffs[1]]])
 
-      fw.binddescriptors(dev, get(sepconfig, :descriptorsets), map(j -> [
-          pbuffs[((j-1)%frames)+1],
-          pbuffs[(j%frames)+1]
-        ],
-        1:frames
-      ))
+      initout = fw.runcomputepipeline(system, init, [])
 
-      fw.binddescriptors(
-        dev, ds.getin(config, [:render, :descriptorsets]), map(x -> [x], pbuffs)
-      )
-
-      pipeline = ds.getin(initconfig, [:pipeline, :pipeline])
-      layout = ds.getin(initconfig, [:pipeline, :layout])
-
-      offset = get(coords, :offset)
-
-      pcvs = [(
-        winsize.width, winsize.height,
-        Float32(offset[1]), Float32(offset[2]),
-        normalisezoom(Float32(get(coords, :zoom)))
-      )]
-
-      # Prevent GC.
-      initconfig = ds.assoc(initconfig, :pushconstantvalues, pcvs)
-
-      initsem = commands.cmdseq(system, :compute) do cmd
-        vk.cmd_bind_pipeline(cmd, vk.PIPELINE_BIND_POINT_COMPUTE, pipeline)
-
-        vk.cmd_push_constants(
-          cmd,
-          layout,
-          vk.SHADER_STAGE_COMPUTE_BIT,
-          0,
-          sizeof(pcvs),
-          Ptr{Nothing}(pointer(pcvs))
-        )
-
-        vk.cmd_bind_descriptor_sets(
-          cmd,
-          vk.PIPELINE_BIND_POINT_COMPUTE,
-          layout,
-          0,
-          ds.getin(initconfig, [:descriptorsets, :sets]),
-          []
-        )
-
-        vk.cmd_dispatch(
-          cmd,
-          Int(ceil(winsize.width/32)), Int(ceil(winsize.height/32)), 1
-        )
-      end
-
-      initsems = [initsem]
-
-      vk.wait_semaphores(
-        get(system, :device),
-        vk.SemaphoreWaitInfo([initsem], [UInt(1)]),
-        typemax(UInt)
-      )
+      @info initout
+      current_frame = initout[1]
 
       new = false
     else
       initsems = []
     end
 
-    sepbuffer = get(sepconfig, :cmdbuffers)[i]
-    pcs = [(winsize.width, winsize.height, framecounter * itercount)]
+    pcs = [(1024, 1024, framecounter * itercount)]
+    sepouts = fw.runcomputepipeline(system, sep, [current_frame], pcs)
 
-    vk.wait_semaphores(
-      get(system, :device),
-      vk.SemaphoreWaitInfo([sems[i]], [semcounters[i]]),
-      typemax(UInt)
-    )
+    renderstate = ds.assoc(renderstate, :pushconstantvalues, pcs)
 
-    layout = ds.getin(sepconfig, [:pipeline, :layout])
-    pipeline = ds.getin(sepconfig, [:pipeline, :pipeline])
-
-    vk.reset_command_buffer(sepbuffer)
-
-    vk.begin_command_buffer(sepbuffer, vk.CommandBufferBeginInfo())
-
-    vk.cmd_bind_pipeline(sepbuffer, vk.PIPELINE_BIND_POINT_COMPUTE, pipeline)
-
-    vk.cmd_push_constants(
-      sepbuffer,
-      layout,
-      vk.SHADER_STAGE_COMPUTE_BIT,
-      0,
-      sizeof(pcs),
-      Ptr{Nothing}(pointer(pcs))
-    )
-
-    vk.cmd_bind_descriptor_sets(
-      sepbuffer,
-      vk.PIPELINE_BIND_POINT_COMPUTE,
-      layout,
-      0,
-      [ds.getin(sepconfig, [:descriptorsets, :sets])[i]],
-      []
-    )
-
-    vk.cmd_dispatch(
-      sepbuffer,
-      Int(ceil(winsize.width / 32)), Int(ceil(winsize.height / 32)), 1
-    )
-
-    vk.end_command_buffer(sepbuffer)
-
-    vk.queue_submit(hw.getqueue(system, :compute),
-      [vk.SubmitInfo([], [], [sepbuffer], [sems[i]];
-        next=vk.TimelineSemaphoreSubmitInfo(
-          signal_semaphore_values=[semcounters[i] + 1]
-        )
-      )])
-
-    semcounters[i] += 1
+    fw.rungraphicspipeline(system, renderstate)
 
     # Check for updated inputs.
     #
@@ -400,15 +273,14 @@ function main()
     new = new || wtemp != winsize
     winsize = wtemp
 
-    renderstate = ds.assoc(renderstate, :pushconstantvalues, pcs)
 
-    if framecounter % 100 == 0
+    if framecounter % 1000 == 0
       @info pcs
     end
-
-    return renderstate
   end
 
+  t1 = time()
+  @info "Average fps: " * string(round(iters / (t1 - t0)))
 end
 
 main()
