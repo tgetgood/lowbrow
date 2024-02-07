@@ -175,7 +175,7 @@ function main()
       [current_particles],
       [dt]
     )
-    #   return next_particles
+    #   return comp_outputs
     # end
 
     gsig = fw.rungraphicspipeline(
@@ -183,6 +183,12 @@ function main()
       ds.assoc(renderstate, :vertexbuffer,
                ds.assoc(current_particles, :verticies, nparticles))
     )
+
+    @async begin
+      commands.wait_semaphores(dev, ds.conj(get(comp_outputs[1], :wait), gsig))
+      # It's safe to free the particle buffer after the above signals.
+      current_particles
+    end
 
     current_particles = comp_outputs[1]
 
