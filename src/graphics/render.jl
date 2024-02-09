@@ -92,12 +92,13 @@ function recorder(cmd, i, framebuffers, config)
     )
   end
 
-  pcvs = get(config, :pushconstantvalues, [])
+  pcvs = get(config, :pushconstants, [])
 
   if length(pcvs) > 0
     vk.cmd_push_constants(
       cmdbuf,
       layout,
+      # FIXME: what about the other stages?
       vk.SHADER_STAGE_FRAGMENT_BIT,
       0,
       sizeof(pcvs),
