@@ -72,6 +72,19 @@ function computepipeline(dev, config)
   )
 end
 
+function allocout(system, config)
+  type = get(config, :type)
+  if type === :ssbo
+    out = hw.buffer(system, config)
+  elseif type === :image
+    out = hw.createimage(system, config)
+  else
+    throw("not implemented")
+  end
+
+  ds.assoc(out, :config, config)
+end
+
 function runcomputepipeline(system, cp, inputs, pushconstants=[])
 
   # # Need
@@ -104,7 +117,7 @@ function runcomputepipeline(system, cp, inputs, pushconstants=[])
 
   outputs = ds.into!(
     [],
-    map(x -> ds.assoc(hw.buffer(system, x), :config, x)),
+    map(x -> allocout(system, x)),
     ds.getin(cp, [:config, :outputs])
   )
 
@@ -221,6 +234,7 @@ end
 function binddescriptors(dev, config, bindings)
   dsets = get(config, :sets)
 
+  @info config
   dtypes = ds.into!(
     [],
     map(x -> get(x, :type))

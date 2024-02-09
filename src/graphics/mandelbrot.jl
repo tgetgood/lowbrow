@@ -27,10 +27,10 @@ function load(config)
 end
 
 struct Pixel
-  done::Bool
-  count::Int
-  mu::NTuple{2, Float64}
-  z::NTuple{2, Float64}
+  done::UInt32
+  count::UInt32
+  mu::NTuple{2, Float32}
+  z::NTuple{2, Float32}
 end
 
 prog = ds.hashmap(
@@ -38,7 +38,7 @@ prog = ds.hashmap(
   :device, ds.hashmap(
     :features, [] #[:shader_float_64]
   ),
-  :window, hashmap(:width, 1024, :height, 1024),
+  :window, ds.hashmap(:width, 1024, :height, 1024),
   :render, ds.hashmap(
     :texture_file, *(@__DIR__, "/../../assets/texture.jpg"),
     :shaders, ds.hashmap(
@@ -53,14 +53,14 @@ prog = ds.hashmap(
     # But why does 12 fail and 20 seem to work?
     :pushconstants, [ds.hashmap(:stage, :fragment, :size, 16)],
     :descriptorsets, ds.hashmap(
-      :bindings, [ds.hashmap(:type, :storage_buffer, :stage, :fragment)]
+      :bindings, [ds.hashmap(:type, :ssbo, :stage, :fragment)]
     )
   ),
   :compute, ds.hashmap(
     :bufferinit, ds.hashmap(
       :shader, ds.hashmap(:file, *(@__DIR__, "/../shaders/mand-region.comp")),
       :workgroups, [32,32,1],
-      :pushconstants, [ds.hashmap( :size, 20)],
+      :pushconstants, [ds.hashmap(:size, 20)],
       :inputs, [],
       :outputs, [ds.hashmap(:type, :ssbo,
         :usage, :storage_buffer,
@@ -81,7 +81,27 @@ prog = ds.hashmap(
         :memoryflags, :device_local,
         :queues, [:compute, :graphics]
       )],
-    )
+    ),
+    # :image, ds.hashmap(
+    #   :shader, ds.hashmap(:file, *(@__DIR__, "/../shaders/mand-image.comp")),
+    #   :workgroups, [32,32,1],
+    #   :pushconstants, [ds.hashmap(:size, 16)],
+    #   :inputs, [ds.hashmap(
+    #     :type, :ssbo,
+    #     :usage, :storage_buffer,
+    #     :size, sizeof(Pixel) * 1024 * 1024,
+    #     :memoryflags, :device_local,
+    #     :queues, [:compute, :graphics]
+    #   )],
+    #   :outputs, [ds.hashmap(
+    #     :type, :image,
+    #     :format, vk.FORMAT_R8G8B8A8_UINT,
+    #     :usage, [:storage, :sampled],
+    #     :size, (1024, 1024),
+    #     :memoryflags, :device_local,
+    #     :queues, [:compute, :graphics]
+    #   )],
+    # )
   ),
   :verticies, [
     [-1.0f0, -1.0f0],
@@ -158,6 +178,14 @@ function pixel_buffers(system, frames, winsize)
   )
 end
 
+function topcs(window, coords)
+  offset::Tuple{Float32, Float32} = get(coords, :offset)
+  zoom::Float32 = exp(get(coords, :zoom))
+  pcs = [window[1], window[2], offset[1], offset[2], zoom]
+  @info pcs
+  pcs
+end
+
 function main()
   # cleanup
   window.shutdown()
@@ -194,13 +222,13 @@ function main()
 
   frames = get(config, :concurrent_frames)
 
-  config = ds.associn(config, [:render, :descriptorsets, :count], frames)
-
   system = graphics.staticinit(config)
 
   dev = get(system, :device)
 
-  dsets = fw.descriptors(dev, ds.getin(config, [:render, :descriptorsets]))
+  dsets = fw.descriptors(
+    dev, ds.getin(config, [:render, :descriptorsets, :bindings]), frames
+  )
 
   config = ds.updatein(config, [:render, :descriptorsets], merge, dsets)
 
@@ -221,10 +249,10 @@ function main()
     merge(ds.getin(config, [:compute, :bufferinit]), hardwaredesc)
   )
 
-  sep = fw.computepipeline(
-    dev,
-    merge(ds.getin(config, [:compute, :separator]), hardwaredesc)
-  )
+  # sep = fw.computepipeline(
+  #   dev,
+  #   merge(ds.getin(config, [:compute, :separator]), hardwaredesc)
+  # )
 
   ## Render loop
   framecounter = 0
@@ -233,9 +261,12 @@ function main()
   new = true
   current_frame = ds.emptymap
 
+  # FIXME: hardcoded window size
+  w::Tuple{UInt32, UInt32} = (1024, 1024)
+
   renderstate = fw.assemblerender(system, config)
 
-  iters = 600
+  iters = 1
   t0 = time()
 
   for i in 1:iters
@@ -245,22 +276,30 @@ function main()
       @info "new"
       framecounter = 1
 
-      initout = fw.runcomputepipeline(system, init, [])
+      initout = fw.runcomputepipeline(system, init, [], topcs(w, coords))
 
-      @info initout
       current_frame = initout[1]
 
       new = false
-    else
-      initsems = []
     end
 
-    pcs = [(1024, 1024, framecounter * itercount)]
-    sepouts = fw.runcomputepipeline(system, sep, [current_frame], pcs)
+    # o::Tuple{Float32, Float32} = get(coords, :offset)
+    # z::Float32 = get(coords, :zoom)
+    # pcs = [UInt32(1024), UInt32(1024), o, z]
+    # sepouts = fw.runcomputepipeline(system, sep, [current_frame], pcs)
 
-    renderstate = ds.assoc(renderstate, :pushconstantvalues, pcs)
+    for i in 1:2
+    fw.binddescriptors(
+      dev,
+      ds.getin(renderstate, [:descriptorsets, :bindings]),
+      ds.getin(renderstate, [:descriptorsets, :sets])[i],
+      [current_frame]
+    )
+    end
 
-    fw.rungraphicspipeline(system, renderstate)
+    fw.rungraphicspipeline(system, ds.assoc(
+      renderstate, :pushconstants, [w[1], w[2], w[1] * w[2]])
+    )
 
     # Check for updated inputs.
     #
@@ -269,9 +308,9 @@ function main()
     ctemp = take!(viewstate)
     new = ctemp !== coords
     coords = ctemp
-    wtemp = window.size(w)
-    new = new || wtemp != winsize
-    winsize = wtemp
+    # wtemp = window.size(w)
+    # new = new || wtemp != winsize
+    # winsize = wtemp
 
 
     if framecounter % 1000 == 0

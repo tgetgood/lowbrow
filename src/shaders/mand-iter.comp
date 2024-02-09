@@ -1,8 +1,8 @@
 #version 450
 
 struct Pixel {
-  bool done;
-  int count;
+  uint done;
+  uint count;
   vec2 mu;
   vec2 z;
 };
@@ -30,14 +30,14 @@ void main() {
   uint i = gl_GlobalInvocationID.x;
   uint j = gl_GlobalInvocationID.y;
   uint n = j * pcs.window[0] + i;
-  uint N = pcs.window[0] + pcs.window[1];
+  uint N = pcs.window[0] * pcs.window[1];
 
   if (n < N) {
     Pixel p = pixelsIn[n];
-    bool done = p.done;
+    bool done = p.done == 1 ? true : false;
 
     if (!done) {
-      int count = p.count;
+      uint count = p.count;
       vec2 z = p.z;
       const vec2 mu = p.mu;
 

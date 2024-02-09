@@ -1,17 +1,17 @@
 #version 450
 
 struct Pixel {
-  bool done;
-  int count;
+  uint done;
+  uint count;
   vec2 mu;
   vec2 z;
 };
 
-// layout(binding = 1) uniform sampler2D sam;
+// layout(binding = 0) uniform sampler2D sam;
 
 layout(push_constant) uniform constants {
   uvec2 window;
-  int count;
+  uint count;
 } pcs;
 
 layout(location = 0) in vec2 texCoord;
@@ -23,22 +23,35 @@ layout(std140, binding = 0) readonly restrict buffer PixelSSBOIn {
 };
 
 void main() {
-  // outColour = vec4(texture(sam, texCoord * 1.0).rgb, 1.0);
+  // outColour = vec4(texture(sam, texCoord).rgb, 1.0);
   // outColour = vec4(texCoord, 1.0, 1.0);
+  uint i = uint(round(texCoord.x * float(pcs.window[0] - 1)));
+  uint j = uint(round(texCoord.y * float(pcs.window[1] - 1)));
 
-  uint i = uint(texCoord.x * (pcs.window[0] - 1));
-  uint j = uint(texCoord.y * (pcs.window[1] - 1));
+  // if (i < j) {
+  //   discard;
+  // }
 
   uint n = i + j * pcs.window[0];
+  uint N = pcs.window[0] * pcs.window[1];
 
+  if (n >= N) {
+    discard;
+  }
   Pixel p = pixels[n];
+  
+  uint c = pixels[n].count;
 
-  int c = pixels[n].count;
+  if (c < 0) {
+    discard;
+  }
 
-  float r = float(c>>8)/15.0;
-  float g = float((c&((1<<8)-1))>>4)/15.0;
-  float b = float(c&15)/15.0;
+  // float r = float(c>>8)/15.0;
+  // float g = float((c&((1<<8)-1))>>4)/15.0;
+  // float b = float(c&15)/15.0;
 
-  // outColour = vec4(0.0, 0.0, float(c/pcs.count), 1.0);
-  outColour = vec4(r,g,b, 1.0);
+  // outColour = vec4(0.0, 1024.0/float(pcs.window[1]), 0.0, 1.0);
+  // outColour = vec4(1024.0/float(pcs.window[0]), 1024.0/float(pcs.window[1]), 0.0, 1.0);
+  outColour = vec4(1.0, 0.0, float(c)/float(pcs.count), 1.0);
+  // outColour = vec4(r,g,b, 1.0);
 }

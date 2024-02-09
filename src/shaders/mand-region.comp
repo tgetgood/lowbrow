@@ -1,8 +1,8 @@
 #version 450
 
 struct Pixel {
-  bool done;
-  int count;
+  uint done;
+  uint count;
   vec2 mu;
   vec2 z;
 };
@@ -27,10 +27,13 @@ void main() {
   uint n = j * pcs.window[0] + i;
   uint N = pcs.window[0] * pcs.window[1];
 
+  float w = float(pcs.window[0]);
+  float h = float(pcs.window[1]);
+  
   if (n < N) {
-    vec2 coords = vec2(float(i/pcs.window[0]), float(j/pcs.window[1]));
-    vec2 mu = pcs.offset + (pcs.zoom * (2 * coords - vec2(1.0, 1.0)));
+    vec2 coords = vec2(float(i)/w, float(j)/h);
+    vec2 mu = pcs.zoom * (pcs.offset + coords);
 
-    pixels[n] = Pixel(false, 30000, mu, vec2(0.0, 0.0));
+    pixels[n] = Pixel(0, n, mu, vec2(0.0, 0.0));
   }
 }

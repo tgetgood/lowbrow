@@ -5,5 +5,5 @@ layout(location = 0) out vec2 texcoord;
 
 void main() {
     gl_Position = vec4(position, 0.0, 1.0);
-    texcoord = position;
+    texcoord = (1.0 + position) / 2.0; 
 }
