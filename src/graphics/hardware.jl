@@ -187,6 +187,7 @@ function findcomputequeue(qfproperties)
     first(computeqs)[2]
   else
     first(dedicated)[2]
+
   end
 end
 
@@ -314,6 +315,7 @@ function pdevice(system, config)
     map(x -> merge(system, hashmap(
       :physicaldevice, x,
       :qf_properties, vk.get_physical_device_queue_family_properties(x),
+      :memoryproperties, vk.get_physical_device_memory_properties(x),
       :max_msaa, multisamplemax(x)
     )))
     ∘
@@ -343,10 +345,14 @@ function createdevice(system, config)
   queues = get(system, :queues)
   pdev = get(system, :physicaldevice)
 
-  # Uniqify queue family list
-  qs2c = into(ds.emptyset, ds.vals(queues))
+  # Create one queue per op type, even if families overlap.
+  # FIXME: We need to validate the hardware supports the number of queues we're
+  # requesting.
+  rf(acc, e) = ds.containsp(acc, e) ? ds.assoc(acc, e, ds.conj(get(acc, e), 1.0)) : ds.assoc(acc, e, [1.0])
 
-  qcis = ds.into!([], map(qf -> vk.DeviceQueueCreateInfo(qf, [1.0])), qs2c)
+  qs2c = ds.reduce(rf, ds.emptymap, ds.vals(queues))
+
+  qcis = ds.into!([], map(qf -> vk.DeviceQueueCreateInfo(ds.key(qf), ds.val(qf))), qs2c)
 
   dci = vk.DeviceCreateInfo(
     qcis,
@@ -457,9 +463,7 @@ function getpool(system, qf)
 end
 
 function findmemtype(system, config)
-  properties = vk.get_physical_device_memory_properties(
-    get(system, :physicaldevice)
-  )
+  properties = get(system, :memoryproperties)
 
   mask = get(config, :typemask)
   flags = get(config, :flags)

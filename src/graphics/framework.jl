@@ -136,7 +136,7 @@ function computepipeline(dev, config)
   stagesetter = sets -> map(set -> merge(stage, set), sets)
 
   if ds.containsp(config, :pushconstants)
-    config = ds.update(config, :pushconstants, stagesetter)
+    config = ds.update(config, :pushconstants, merge, stage)
   end
 
   bindings = stagesetter(vcat(get(config, :inputs, []), get(config, :outputs)))
@@ -145,7 +145,7 @@ function computepipeline(dev, config)
   layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
 
   pipeline = pipe.computepipeline(
-    dev, get(config, :shader), layout, get(config, :pushconstants)
+    dev, get(config, :shader), layout, [get(config, :pushconstants)]
   )
 
   queue = hw.findcomputequeue(get(config, :qf_properties))
@@ -221,7 +221,7 @@ function runcomputepipeline(system, cp, inputs, pushconstants=[])
     ds.getin(cp, [:pipeline, :layout]),
     ds.getin(cp, [:config, :workgroups]),
     dsets,
-    ds.assoc(ds.getin(cp, [:config, :pushconstants])[1], :value, pushconstants)
+    ds.assoc(ds.getin(cp, [:config, :pushconstants]), :value, pushconstants)
   )
 
   sem = vk.unwrap(vk.create_semaphore(

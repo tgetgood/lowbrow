@@ -2,11 +2,11 @@ import hardware as hw
 import resources as rd
 import framework as fw
 import pipeline as gp
-import uniform
 import commands
 import graphics
 import render
 import window
+import TaskPipelines as tp
 
 import DataStructures as ds
 import DataStructures: hashmap, into, emptyvector
@@ -153,7 +153,9 @@ function main()
 
   ### compute pipeline
 
-  compute = fw.computepipeline(dev, merge(get(config, :compute), hardwaredesc))
+  compute = tp.computepipeline(
+    ds.selectkeys(system, [:device, :queues, :memoryproperties]), get(config, :compute)
+  )
 
   ### render loop
 
@@ -168,15 +170,7 @@ function main()
     dt = Float32(t2 - t1)
     t1 = t2
 
-    # cjoin = hw.thread() do
-    comp_outputs = fw.runcomputepipeline(
-      system,
-      compute,
-      [current_particles],
-      [dt]
-    )
-    #   return comp_outputs
-    # end
+    comp = tp.run(compute, [current_particles], [dt])
 
     gsig = fw.rungraphicspipeline(
       system,
@@ -184,13 +178,15 @@ function main()
                ds.assoc(current_particles, :verticies, nparticles))
     )
 
+    next_particles = take!(comp)[1]
+
     @async begin
-      commands.wait_semaphores(dev, ds.conj(get(comp_outputs[1], :wait), gsig))
+      commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
       # It's safe to free the particle buffer after the above signals.
       current_particles
     end
 
-    current_particles = comp_outputs[1]
+    current_particles = next_particles
 
   end
 
