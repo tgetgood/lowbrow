@@ -2,6 +2,7 @@ module render
 
 import hardware as hw
 import Vulkan as vk
+import dsets as des
 import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, nth
 
@@ -148,6 +149,15 @@ function draw(system, cmd, renderstate)
 
     #  Don't record over unsubmitted buffer
     vk.reset_fences(dev, [fence])
+
+    if ds.containsp(renderstate, :binding)
+      des.binddescriptors(
+        dev,
+        ds.getin(renderstate, [:descriptorsets, :bindings]),
+        ds.getin(renderstate, [:descriptorsets, :sets])[image+1],
+        get(renderstate, :binding)
+      )
+    end
 
     recorder(cmd, image + 1, get(system, :framebuffers), renderstate)
 

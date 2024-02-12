@@ -17,7 +17,6 @@ layout(push_constant) uniform constants {
   float zoom;
 } pcs;
      
-// REVIEW: Why 2D? Does it make any difference in this case? 
 layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 void main() {
@@ -34,6 +33,6 @@ void main() {
     vec2 coords = vec2(float(i)/w, float(j)/h);
     vec2 mu = pcs.zoom * (pcs.offset + coords);
 
-    pixels[n] = Pixel(0, n, mu, vec2(0.0, 0.0));
+    pixels[n] = Pixel(0, 0, mu, vec2(0.0, 0.0));
   }
 }

@@ -99,7 +99,7 @@ prog = hashmap(
       :queues, [:graphics, :compute]
     )],
     # push constants are... constants. Treat them accordingly.
-    :pushconstants, [ds.hashmap(:size, 16)],
+    :pushconstants, ds.hashmap(:size, 16),
     # The workgroup size and shader local size are tightly coupled, so this is,
     # in fact, a property of the pipeline, not of any task on it.
     :workgroups, [Int(floor(nparticles / 256)), 1, 1],

@@ -8,6 +8,7 @@ import pipeline as gp
 import render as draw
 import eventsystem as es
 import mouse
+import dsets as des
 
 import DataStructures as ds
 import Vulkan as vk
@@ -180,8 +181,8 @@ end
 
 function topcs(window, coords)
   offset::Tuple{Float32, Float32} = get(coords, :offset)
-  zoom::Float32 = exp(get(coords, :zoom))
-  pcs = [window[1], window[2], offset[1], offset[2], zoom]
+  zoom::Float32 = normalisezoom(get(coords, :zoom))
+  pcs = [(window[1], window[2], offset[1], offset[2], zoom)]
   @info pcs
   pcs
 end
@@ -226,9 +227,11 @@ function main()
 
   dev = get(system, :device)
 
-  dsets = fw.descriptors(
+  dsets = des.descriptors(
     dev, ds.getin(config, [:render, :descriptorsets, :bindings]), frames
   )
+
+  @info dsets
 
   config = ds.updatein(config, [:render, :descriptorsets], merge, dsets)
 
@@ -249,24 +252,24 @@ function main()
     merge(ds.getin(config, [:compute, :bufferinit]), hardwaredesc)
   )
 
-  # sep = fw.computepipeline(
-  #   dev,
-  #   merge(ds.getin(config, [:compute, :separator]), hardwaredesc)
-  # )
+  sep = fw.computepipeline(
+    dev,
+    merge(ds.getin(config, [:compute, :separator]), hardwaredesc)
+  )
 
   ## Render loop
-  framecounter = 0
-  itercount = 50
+  framecounter::UInt32 = 0
+  itercount::UInt32 = 50
 
   new = true
-  current_frame = ds.emptymap
+  current_frame = []
 
   # FIXME: hardcoded window size
   w::Tuple{UInt32, UInt32} = (1024, 1024)
 
   renderstate = fw.assemblerender(system, config)
 
-  iters = 1
+  iters = 60
   t0 = time()
 
   for i in 1:iters
@@ -276,30 +279,21 @@ function main()
       @info "new"
       framecounter = 1
 
-      initout = fw.runcomputepipeline(system, init, [], topcs(w, coords))
-
-      current_frame = initout[1]
+      current_frame = fw.runcomputepipeline(system, init, [], topcs(w, coords))
 
       new = false
     end
 
-    # o::Tuple{Float32, Float32} = get(coords, :offset)
-    # z::Float32 = get(coords, :zoom)
-    # pcs = [UInt32(1024), UInt32(1024), o, z]
-    # sepouts = fw.runcomputepipeline(system, sep, [current_frame], pcs)
-
-    for i in 1:2
-    fw.binddescriptors(
-      dev,
-      ds.getin(renderstate, [:descriptorsets, :bindings]),
-      ds.getin(renderstate, [:descriptorsets, :sets])[i],
-      [current_frame]
+    next_frame = fw.runcomputepipeline(
+      system, sep, current_frame, [(w[1], w[2], itercount)]
     )
-    end
 
-    fw.rungraphicspipeline(system, ds.assoc(
-      renderstate, :pushconstants, [w[1], w[2], w[1] * w[2]])
-    )
+    fw.rungraphicspipeline(system, ds.assoc(renderstate,
+      :pushconstants, [(w[1], w[2], UInt32(framecounter * itercount))],
+      :binding, current_frame
+    ))
+
+    current_frame = next_frame
 
     # Check for updated inputs.
     #

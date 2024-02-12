@@ -34,9 +34,10 @@ void main() {
 
   if (n < N) {
     Pixel p = pixelsIn[n];
-    bool done = p.done == 1 ? true : false;
 
-    if (!done) {
+    uint done = p.done;
+
+    if (done == 0) {
       uint count = p.count;
       vec2 z = p.z;
       const vec2 mu = p.mu;
@@ -45,8 +46,10 @@ void main() {
         float zrs = z[0]*z[0];
         float zis = z[1]*z[1];
         // This done check lags one step behind the computation.
-        done = zrs + zis < threshold;
-        if (done) break;
+        if (zrs + zis < threshold) {
+          done = 1;
+          break;
+        }
         z = vec2(zrs - zis - mu[0], 2.0*z[0]*z[1] - mu[1]);
         count++;
       }
