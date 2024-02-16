@@ -36,6 +36,7 @@ containsp(s::Set, x) = getindexed(s, x) !== :notfound
 
 set(xs...) = into(emptyset, xs)
 
+# FIXME: Check for repeats!!
 function arrayset(elements)
   if length(elements) === 0
     emptyset

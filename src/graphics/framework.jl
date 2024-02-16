@@ -260,7 +260,7 @@ function rungraphicspipeline(system, renderstate)
 
   cmd = hw.commandbuffers(dev, commandpool, 1)[1]
 
-  co = ds.assoc(render.syncsetup(system, ds.emptymap), :commandbuffer, cmd)
+  co = ds.assoc(render.syncsetup(system), :commandbuffer, cmd)
 
   gsig = render.draw(system, co, renderstate)
 

@@ -74,14 +74,18 @@ function configure(config)
 end
 
 function debugmsgr(system, config)
-  assoc(system, :debugmsgr,
-    vk.unwrap(
-      vk.create_debug_utils_messenger_ext(
-        get(system, :instance),
-        get(config, :debuginfo)
+  if get(config, :dev_tools)
+    assoc(system, :debugmsgr,
+      vk.unwrap(
+        vk.create_debug_utils_messenger_ext(
+          get(system, :instance),
+          get(config, :debuginfo)
+        )
       )
     )
-  )
+  else
+    system
+  end
 end
 
 end

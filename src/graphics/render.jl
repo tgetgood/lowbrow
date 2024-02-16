@@ -6,7 +6,7 @@ import dsets as des
 import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, nth
 
-function syncsetup(system, config)
+function syncsetup(system)
   hashmap(
     :locks,
     (
@@ -30,7 +30,7 @@ function commandbuffers(system, config)
 
   hashmap(
     :commandbuffers,
-    map(x -> merge(syncsetup(system, config), hashmap(:commandbuffer, x)), buffers)
+    map(x -> merge(syncsetup(system), hashmap(:commandbuffer, x)), buffers)
   )
 end
 
@@ -48,7 +48,7 @@ function recorder(cmd, i, framebuffers, config)
 
   graphics_pipeline = get(config, :pipeline)
 
-  vk.unwrap(vk.reset_command_buffer(cmdbuf))
+  # vk.unwrap(vk.reset_command_buffer(cmdbuf))
 
   vk.unwrap(vk.begin_command_buffer(
     cmdbuf,

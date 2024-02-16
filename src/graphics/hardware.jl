@@ -70,8 +70,8 @@ end
 
 function instance(_, config)
   ic = get(config, :instance)
-  validationlayers = get(ic, :validation)
-  extensions::Vector = get(ic, :extensions)
+  validationlayers = get(ic, :validation, [])
+  extensions::Vector = get(ic, :extensions, [])
 
   @assert containsall(
     extensions,
@@ -81,13 +81,15 @@ function instance(_, config)
     )
   ) "unsupported extensions required."
 
-  @assert containsall(
-    validationlayers,
-    map(
-      x -> x.layer_name,
-      vk.unwrap(vk.enumerate_instance_layer_properties())
-    )
-  ) "unsupported validation layers required."
+  if get(config, :dev_tools)
+    @assert containsall(
+      validationlayers,
+      map(
+        x -> x.layer_name,
+        vk.unwrap(vk.enumerate_instance_layer_properties())
+      )
+    ) "unsupported validation layers required."
+  end
 
   appinfo = vk.ApplicationInfo(
     v"0.0.0",
@@ -219,14 +221,14 @@ function checkdevice(system, config)
          ) &&
          swapchainsupport(system) &&
          containsall(
-           getin(config, [:device, :extensions]),
+           getin(config, [:device, :extensions], []),
            map(
              x -> x.extension_name,
              vk.unwrap(vk.enumerate_device_extension_properties(pdev))
            )
          ) &&
          containsall(
-           getin(config, [:device, :validation]),
+           getin(config, [:device, :validation], []),
            map(
              x -> x.layer_name,
              vk.unwrap(vk.enumerate_device_layer_properties(pdev))
@@ -235,15 +237,10 @@ function checkdevice(system, config)
 end
 
 function findformat(system, config)
-  formats = vk.unwrap(vk.get_physical_device_surface_formats_khr(
-    get(system, :physicaldevice);
-    surface=get(system, :surface)
-  ))
-
   filtered = filter(
     x -> x.format == getin(config, [:swapchain, :format]) &&
       x.color_space == getin(config, [:swapchain, :colourspace]),
-    formats
+    get(system, :surface_formats)
   )
 
   if length(filtered) == 0
@@ -254,12 +251,9 @@ function findformat(system, config)
 end
 
 function findextent(system, config)
-  sc = vk.unwrap(vk.get_physical_device_surface_capabilities_khr(
-    get(system, :physicaldevice),
-    get(system, :surface)
-  ))
+  sc = get(system, :surface_capabilities)
 
-  win = window.size(get(system, :window))
+  win = get(system, :window)
 
   vk.Extent2D(
     clamp(win.width, sc.min_image_extent.width, sc.max_image_extent.width),
@@ -268,12 +262,8 @@ function findextent(system, config)
 end
 
 function findpresentmode(system, config)
-  modes = vk.unwrap(
-    vk.get_physical_device_surface_present_modes_khr(
-      get(system, :physicaldevice);
-      surface=get(system, :surface)
-    )
-  )
+  modes = get(system, :surface_present_modes)
+
   if length(modes) == 0
     nothing
   else
@@ -309,6 +299,27 @@ function multisamplemax(device)
   vk.SampleCountFlag(1 << (ndigits((depth&colour).val, base=2) - 1))
 end
 
+function surfaceinfo(system)
+  ds.hashmap(
+    :surface_formats, vk.unwrap(vk.get_physical_device_surface_formats_khr(
+      get(system, :physicaldevice);
+      surface=get(system, :surface)
+    )),
+    :surface_capabilities, vk.unwrap(
+      vk.get_physical_device_surface_capabilities_khr(
+        get(system, :physicaldevice),
+        get(system, :surface)
+      )
+    ),
+    :surface_present_modes, vk.unwrap(
+      vk.get_physical_device_surface_present_modes_khr(
+        get(system, :physicaldevice);
+        surface=get(system, :surface)
+      )
+    )
+  )
+end
+
 function pdevice(system, config)
   potential = into(
     emptyvector,
@@ -318,6 +329,8 @@ function pdevice(system, config)
       :memoryproperties, vk.get_physical_device_memory_properties(x),
       :max_msaa, multisamplemax(x)
     )))
+    ∘
+    map(x -> merge(x, surfaceinfo(x)))
     ∘
     map(x -> assoc(x, :queues, findqueues(x)))
     ∘
@@ -348,11 +361,13 @@ function createdevice(system, config)
   # Create one queue per op type, even if families overlap.
   # FIXME: We need to validate the hardware supports the number of queues we're
   # requesting.
-  rf(acc, e) = ds.containsp(acc, e) ? ds.assoc(acc, e, ds.conj(get(acc, e), 1.0)) : ds.assoc(acc, e, [1.0])
+  # rf(acc, e) = ds.containsp(acc, e) ? ds.assoc(acc, e, ds.conj(get(acc, e), 1.0)) : ds.assoc(acc, e, [1.0])
 
-  qs2c = ds.reduce(rf, ds.emptymap, ds.vals(queues))
+  # qs2c = ds.reduce(rf, ds.emptymap, ds.vals(queues))
+  # qcis = ds.into!([], map(qf -> vk.DeviceQueueCreateInfo(ds.key(qf), ds.val(qf))), qs2c)
 
-  qcis = ds.into!([], map(qf -> vk.DeviceQueueCreateInfo(ds.key(qf), ds.val(qf))), qs2c)
+  qs2c = ds.into(ds.emptyset, ds.vals(queues))
+  qcis = ds.into!([], map(qf -> vk.DeviceQueueCreateInfo(qf, [1.0])), qs2c)
 
   dci = vk.DeviceCreateInfo(
     qcis,
@@ -377,6 +392,12 @@ end
 function createswapchain(system, config)
   format = findformat(system, config)
   extent = findextent(system, config)
+
+  # TODO: Use createinfo structs. Stop relying on Vulkan.jl wrapper functions
+  # since I'm probably going to stop using it.
+  # sci = vk._SwapchainCreateInfoKHR(
+
+  # )
 
   sc = vk.create_swapchain_khr(
     get(system, :device),
@@ -709,7 +730,7 @@ function depthresources(system, config)
     hashmap(
       :tiling, vk.IMAGE_TILING_OPTIMAL,
       :format, format,
-      :samples, get(system, :max_msaa),
+     :samples, get(system, :max_msaa),
       :size, [ex.width, ex.height],
       :usage, :depth_stencil_attachment,
       :queues, [:graphics],

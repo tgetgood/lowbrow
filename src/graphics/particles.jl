@@ -82,11 +82,8 @@ prog = hashmap(
     ),
     :extensions, ds.set("VK_KHR_swapchain")
   ),
+  :dev_tools, true,
   :window, hashmap(:width, 1000, :height, 1000),
-  :swapchain, hashmap(
-    # Triple buffering.
-    :images, 3
-  ),
   :particles, nparticles,
   :compute, ds.hashmap(
     # inputs and outputs are combined to create descriptor sets.
@@ -111,6 +108,10 @@ prog = hashmap(
     )
   ),
   :render, ds.hashmap(
+    :swapchain, hashmap(
+      # Triple buffering.
+      :images, 3
+    ),
     :inputassembly, ds.hashmap(
       :topology, :points,
       :restart, false
@@ -131,21 +132,17 @@ function main()
   system = graphics.staticinit(config)
   dev = get(system, :device)
 
-  # TODO: The data description of hardware should be its own thing. At the very
-  # least a dedicated submap of `system`.
-  hardwaredesc = ds.selectkeys(system, [:qf_properties])
-
   ### rendering
 
-  config = ds.assoc(
+  config = ds.associn(
     config,
-    :vertex_input_state,
+    [:render, :vertex_input_state],
     rd.vertex_input_state(Particle, [:position, :colour])
   )
 
   ### Init graphics pipeline
 
-  system, config = graphics.instantiate(system, config)
+  # system, config = graphics.instantiate(system, config)
 
   ### Initial sim state
 
@@ -153,20 +150,29 @@ function main()
 
   ### pipelines
 
-  psys = ds.selectkeys(system, [:device, :queues, :memoryproperties])
+  q = tp.sharedqueue(vk.get_device_queue(dev, 0, 0))
+
+  # FIXME: I don't like including the physical device in here...
+  pkeys = [:device, :surface, :physicaldevice,
+           :queues, :memoryproperties, :max_msaa,
+           :surface_formats, :surface_capabilities, :surface_present_modes]
+
+  psys = ds.assoc(ds.selectkeys(system, pkeys),
+    :window, (width=1000, height=1000),
+    :queue, q
+  )
 
   compute = tp.computepipeline(psys, get(config, :compute))
 
-  gp = tp.graphicspipeline(psys, get(config, :render))
+  graphicspipeline = tp.graphicspipeline(psys, get(config, :render))
 
   ### render loop
-
-  renderstate = fw.assemblerender(system, config)
 
   t1 = time()
   t0 = t1
 
   iters = 600
+  @info "Starting main loop"
   for i in 1:iters
     t2 = time()
     dt = Float32(t2 - t1)
@@ -174,9 +180,8 @@ function main()
 
     comp = tp.run(compute, [current_particles], [dt])
 
-    gout = tp.run(gp,
-      ds.assoc(renderstate, :vertexbuffer,
-               ds.assoc(current_particles, :verticies, nparticles))
+    gout = tp.run(graphicspipeline,
+      ds.assoc(current_particles, :verticies, nparticles)
     )
 
     next_particles = take!(comp)[1]
@@ -193,6 +198,13 @@ function main()
   end
 
   @info "Average fps: " * string(round(iters / (t1 - t0)))
+
+  # TODO: Cleanup the cleanup code.
+  @async begin
+    tp.teardown(queue)
+    tp.teardown(compute)
+    tp.teardown(graphicspipeline)
+  end
 end
 
 main()

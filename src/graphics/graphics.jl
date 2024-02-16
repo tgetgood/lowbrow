@@ -28,12 +28,14 @@ defaults = hashmap(
     :extensions, ["VK_KHR_swapchain"]
   ),
   :window, hashmap(:width, 1200, :height, 1200),
-  :swapchain, hashmap(
-    # TODO: Fallback formats and init time selection.
-    :format, vk.FORMAT_B8G8R8A8_SRGB,
-    :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
-    :presentmode, vk.PRESENT_MODE_FIFO_KHR,
-    :images, 3
+  :render, hashmap(
+    :swapchain, hashmap(
+      # TODO: Fallback formats and init time selection.
+      :format, vk.FORMAT_B8G8R8A8_SRGB,
+      :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
+      :presentmode, vk.PRESENT_MODE_FIFO_KHR,
+      :images, 3
+    )
   ),
   :concurrent_frames, 3
 )
@@ -53,26 +55,19 @@ const tear_down = Ref{Function}(() -> nothing)
 function configure(prog)
   tear_down[]()
 
-  devcfg = ds.transduce(
-    map(x -> ds.selectkeys(x, [:dev_tools, :debuglevel])),
-    merge,
-    ds.emptymap,
-    [defaults, prog]
-  )
+  config = mergeconfig(defaults, prog)
 
-  devmode = get(devcfg, :dev_tools, false)
-
-  ds.reduce(
-    mergeconfig,
-    defaults,
-    ds.vector(
-      # Only configure logging in dev mode.
-      devmode ? debug.configure(devcfg) : ds.emptymap,
-      devmode ? devtooling : ds.emptymap,
-
-      window.configure(),
-      prog # Input potentially overrides everything. What could go wrong?
+  if get(devcfg, :dev_tools, false)
+    config = mergeconfig(
+      config,
+      merge(
+        debug.configure(ds.selectkeys(config, [:dev_tools, :debuglevel])),
+        devtooling
+      )
     )
+  end
+
+  mergeconfig(config, window.configure())
   )
 end
 

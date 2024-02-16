@@ -76,6 +76,8 @@ end
 ##### Render Pipelines
 
 function renderpass(system, config)
+  samples = get(system, :max_msaa)
+
   hashmap(
     :renderpass,
     vk.unwrap(vk.create_render_pass(
@@ -83,7 +85,7 @@ function renderpass(system, config)
       [
         vk.AttachmentDescription(
           getin(config, [:swapchain, :format]),
-          getin(system, [:colour, :samples]),
+          samples,
           vk.ATTACHMENT_LOAD_OP_CLEAR,
           vk.ATTACHMENT_STORE_OP_STORE,
           vk.ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -93,7 +95,7 @@ function renderpass(system, config)
         ),
         vk.AttachmentDescription(
           hw.optdepthformat(system),
-          getin(system, [:depth, :samples]),
+          samples,
           vk.ATTACHMENT_LOAD_OP_CLEAR,
           vk.ATTACHMENT_STORE_OP_DONT_CARE,
           vk.ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -174,7 +176,7 @@ function creategraphicspipeline(system, config)
 
   # FIXME: It's possible for :window_size and :extent to get out of sync, which
   # crashes the program.
-  ext = get(system, :extent)
+  ext = hw.findextent(system, config)
 
   viewports = [vk.Viewport(0, 0, ext.width, ext.height, 0, 1)]
   scissors = [vk.Rect2D(vk.Offset2D(0, 0), ext)]
@@ -182,7 +184,7 @@ function creategraphicspipeline(system, config)
   viewport_state = vk.PipelineViewportStateCreateInfo(; viewports, scissors)
 
   multisample_state = vk.PipelineMultisampleStateCreateInfo(
-    getin(system, [:colour, :samples]),
+    get(system, :max_msaa),
     false,
     1,
     false,
@@ -232,7 +234,7 @@ function creategraphicspipeline(system, config)
     1
   )
 
-  vertex_input_state = get(config, :vertex_input_state)
+  vertex_input_state = ds.getin(config, [:render, :vertex_input_state])
 
   layout = pipelinelayout(system, config)
 
@@ -273,7 +275,7 @@ function createframebuffers(system, config)
   dev = get(system, :device)
   images = get(system, :imageviews)
   pass = get(system, :renderpass)
-  extent = get(system, :extent)
+  extent = hw.findextent(system, config)
   depthview = ds.getin(system, [:depth, :view])
   colourview = ds.getin(system, [:colour, :view])
 

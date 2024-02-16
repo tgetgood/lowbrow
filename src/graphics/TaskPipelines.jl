@@ -7,6 +7,7 @@ import hardware as hw
 import framework as fw
 import resources as rd
 import commands
+import render
 import pipeline as pipe
 
 abstract type Pipeline end
@@ -35,6 +36,10 @@ struct LeakyAllocator <: PipelineAllocator
   semaphores
 end
 
+function teardown(p::AsyncPipeline)
+  put!(p.sigkill, true)
+end
+
 function passresources(a::LeakyAllocator)
   sem = vk.unwrap(vk.create_semaphore(
     a.dev,
@@ -60,9 +65,8 @@ function passresources(a::LeakyAllocator)
   return (dset, cmd, outputs, post)
 end
 
-function dummyallocator(system, config, layoutci, layout)
+function dummyallocator(system, config, qf, layoutci, layout)
   dev = get(system, :device)
-  qf = ds.getin(system, [:queues, :compute])
 
   dsetpool = vk.unwrap(vk.create_descriptor_pool(
     dev,
@@ -111,10 +115,38 @@ function submit(queue::vk.Queue, submissions)
   vk.queue_submit_2(queue, submissions)
 end
 
+struct SharedQueue
+  ch
+  sigkill
+end
+
+function teardown(p::SharedQueue)
+  put!(p.sigkill, true)
+end
+
+function sharedqueue(queue::vk.Queue)
+  ch = Channel()
+  kill = Channel()
+  hw.thread() do
+    while !isready(kill)
+      (submissions, out) = take!(ch)
+      put!(out, submit(queue, submissions))
+    end
+  end
+
+  SharedQueue(ch, kill)
+end
+
+function submit(queue::SharedQueue, submissions)
+  out = Channel(1)
+  put!(queue.ch, (submissions, out))
+  return out
+end
+
 function computepipeline(system, config)
   dev = get(system, :device)
   qf = ds.getin(system, [:queues, :compute])
-  queue = vk.get_device_queue(dev, qf, 0)
+  queue = get(system, :queue)
 
   stage = ds.hashmap(:stage, :compute)
   stagesetter(sets) = map(set -> merge(stage, set), sets)
@@ -132,7 +164,7 @@ function computepipeline(system, config)
     dev, get(config, :shader), layout, [get(config, :pushconstants)]
   )
 
-  allocator = dummyallocator(system, config, layoutci, layout)
+  allocator = dummyallocator(system, config, qf, layoutci, layout)
 
   ## Coordination
 
@@ -176,7 +208,7 @@ function computepipeline(system, config)
       # No more work will be submitted on this queue, but there might be
       # submitted work waiting on something else.
       #
-      # Is it sufficient to bump all timeline semaphores in this queue to
+
       # "finished" (typemax(UInt32) maybe)? So long as every semaphore in
       # every pipeline runner gets bumped, that should be enough for everything
       # to unblock and flush.
@@ -203,28 +235,62 @@ function run(p::AsyncPipeline, inputs, pcs=[])
   return out
 end
 
-function teardown(p::AsyncPipeline)
-  put!(p.sigkill, true)
+function presentationpipeline(system)
 end
 
 function graphicspipeline(system, config)
   dev = get(system, :device)
   qf = ds.getin(system, [:queues, :graphics])
-  queue = vk.get_device_queue(dev, qf, 0)
+  queue = get(system, :queue)
+
+  bindings = []
+  layoutci = rd. descriptorsetlayout(bindings)
+  layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
+
+  commandpool = hw.commandpool(dev, qf)
 
   # Steps to initialise graphics.
-    # draw.commandbuffers,
-    # hw.createswapchain,
-    # hw.createimageviews,
-    # gp.renderpass,
-    # gp.createframebuffers,
-    # gp.creategraphicspipeline,
+
+  swch = hw.thread() do
+    swapchain = hw.createswapchain(system, config)
+    iviews = hw.createimageviews(merge(system, swapchain), config)
+    return merge(swapchain, iviews)
+  end
+
+  system = merge(system, pipe.renderpass(system, config))
+
+  gpch = hw.thread() do
+    pipe.creategraphicspipeline(system, ds.hashmap(:render, config))
+  end
+
+  system = merge(system, take!(swch))
+
+  system = merge(system, pipe.createframebuffers(system, config))
+
+  system = merge(system, take!(gpch))
+
+  renderstate = fw.assemblerender(system, config)
+
+  inch = Channel()
+  killch = Channel()
 
   Threads.@spawn begin
     try
       while !isready(killch)
+        (vbuff, pcs, outch) = take!(inch)
 
-        gsig = render.draw(system, co, renderstate)
+        cmd = hw.commandbuffers(dev, commandpool, 1)[1]
+        co = ds.assoc(render.syncsetup(system), :commandbuffer, cmd)
+
+        gsig = render.draw(system, co, ds.assoc(renderstate, :vertexbuffer, vbuff))
+
+        @async begin
+          commands.wait_semaphore(dev, gsig)
+          # Don't let GC get the command buffer prematurely.
+          co
+        end
+
+        put!(outch, gsig)
       end
     catch e
       print(stderr, "\n Error in pipeline thread: " *
@@ -232,6 +298,8 @@ function graphicspipeline(system, config)
       ds.handleerror(e)
     end
   end
+
+  return AsyncPipeline(inch, killch)
 end
 
 end
