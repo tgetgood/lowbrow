@@ -151,11 +151,13 @@ function main()
 
   current_particles = init_particle_buffer(system, config)
 
-  ### compute pipeline
+  ### pipelines
 
-  compute = tp.computepipeline(
-    ds.selectkeys(system, [:device, :queues, :memoryproperties]), get(config, :compute)
-  )
+  psys = ds.selectkeys(system, [:device, :queues, :memoryproperties])
+
+  compute = tp.computepipeline(psys, get(config, :compute))
+
+  gp = tp.graphicspipeline(psys, get(config, :render))
 
   ### render loop
 
@@ -172,8 +174,7 @@ function main()
 
     comp = tp.run(compute, [current_particles], [dt])
 
-    gsig = fw.rungraphicspipeline(
-      system,
+    gout = tp.run(gp,
       ds.assoc(renderstate, :vertexbuffer,
                ds.assoc(current_particles, :verticies, nparticles))
     )
@@ -181,6 +182,7 @@ function main()
     next_particles = take!(comp)[1]
 
     @async begin
+      gsig = take!(gout)
       commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
       # It's safe to free the particle buffer after the above signals.
       current_particles
