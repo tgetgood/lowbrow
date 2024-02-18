@@ -1,9 +1,11 @@
 import DataStructures as ds
 import uniform
+import window
 import model
 import textures
 import resources as rd
 import framework as fw
+import TaskPipelines as tp
 import graphics
 
 import Vulkan as vk
@@ -44,10 +46,12 @@ function timerotate(u)
 end
 
 function load(config)
-  merge(
-    ds.update(config, :ubo, ubo),
-    model.load(config),
-    ds.hashmap(:vertex_input_state, rd.vertex_input_state(model.Vertex))
+  ds.update(ds.update(config, :ubo, ubo),
+    :render,
+    merge,
+    ds.assoc(model.load(config),
+      :vertex_input_state, rd.vertex_input_state(model.Vertex)
+    )
   )
 end
 
@@ -117,7 +121,9 @@ prog = ds.hashmap(
 )
 
 function main()
-  config = graphics.configure(load(prog)); nothing
+  window.shutdown()
+
+  config = graphics.configure(load(prog))
   frames = get(config, :concurrent_frames)
 
   system = graphics.staticinit(config)
@@ -135,26 +141,34 @@ function main()
 
   config = ds.updatein(config, [:render, :descriptorsets], merge, dsets)
 
-  system, config = graphics.instantiate(system, config)
-
   fw.binddescriptors(
     dev,
     ds.getin(config, [:render, :descriptorsets]),
     ds.into([], map(i -> [ubos[i], texture]), 1:frames)
   )
 
-  config = fw.buffers(system, config)
+  gconfig = fw.buffers(system, get(config, :render))
 
-  config = merge(config, get(config, :render))
+  gp = tp.graphicspipeline(system, gconfig)
 
-  graphics.renderloop(system, config) do i, renderstate
+  i = 0
+  while true
+    window.poll()
 
     # TODO: Some sort of framestate abstraction so that we don't have to
     # manually juggle this index.
+    i = (i % frames) + 1
     uniform.setubo!(ubos[i], timerotate(get(config, :ubo)))
 
-    return renderstate
+    sig = take!(tp.run(gp, []))
+
+    if sig === :closed
+      break
+    elseif sig === :skip
+      sleep(0.08)
+    end
   end
+  @async tp.teardown(gp)
 end
 
 main()

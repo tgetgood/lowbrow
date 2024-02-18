@@ -97,7 +97,6 @@ end
 function binddescriptors(dev, config, bindings)
   dsets = get(config, :sets)
 
-  @info config
   dtypes = ds.into!(
     [],
     map(x -> get(x, :type))

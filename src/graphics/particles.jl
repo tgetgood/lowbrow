@@ -139,10 +139,6 @@ function main()
     rd.vertex_input_state(Particle, [:position, :colour])
   )
 
-  ### Init graphics pipeline
-
-  # system, config = graphics.instantiate(system, config)
-
   ### Initial sim state
 
   current_particles = init_particle_buffer(system, config)
@@ -161,7 +157,6 @@ function main()
   iters = 10
   terminate() = begin iters -= 1; iters < 0 end
 
-  # fw.renderloop(get(system, :window), terminate, () -> nothing) do
   while true
     window.poll()
 
