@@ -150,21 +150,21 @@ function main()
 
   ### pipelines
 
-  q = tp.sharedqueue(vk.get_device_queue(dev, 0, 0))
+  cq = hw.getqueue(system, :compute)
+  gq = hw.getqueue(system, :graphics)
 
   # FIXME: I don't like including the physical device in here...
-  pkeys = [:device, :surface, :physicaldevice,
+  pkeys = [:device, :surface, :physicaldevice, :window,
            :queues, :memoryproperties, :max_msaa,
            :surface_formats, :surface_capabilities, :surface_present_modes]
 
-  psys = ds.assoc(ds.selectkeys(system, pkeys),
-    :window, (width=1000, height=1000),
-    :queue, q
+  psys = ds.selectkeys(system, pkeys)
+
+  compute = tp.computepipeline(ds.assoc(psys, :queue, cq), get(config, :compute))
+
+  graphicspipeline = tp.graphicspipeline(
+    ds.assoc(psys, :queue, gq), get(config, :render)
   )
-
-  compute = tp.computepipeline(psys, get(config, :compute))
-
-  graphicspipeline = tp.graphicspipeline(psys, get(config, :render))
 
   ### render loop
 
@@ -201,7 +201,7 @@ function main()
 
   # TODO: Cleanup the cleanup code.
   @async begin
-    tp.teardown(queue)
+    # tp.teardown(queue)
     tp.teardown(compute)
     tp.teardown(graphicspipeline)
   end

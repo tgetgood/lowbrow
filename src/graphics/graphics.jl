@@ -57,7 +57,7 @@ function configure(prog)
 
   config = mergeconfig(defaults, prog)
 
-  if get(devcfg, :dev_tools, false)
+  if get(config, :dev_tools, false)
     config = mergeconfig(
       config,
       merge(
@@ -68,7 +68,6 @@ function configure(prog)
   end
 
   mergeconfig(config, window.configure())
-  )
 end
 
 function staticinit(config)
@@ -170,10 +169,6 @@ function renderloop(framefn, system, config)
              get(system, :resizecb)()
 
             @info "resized"
-
-            system = ds.assoc(system,
-              :window_size, window.size(get(system, :window))
-            )
 
             system = dynamicinit(system, config)
           end

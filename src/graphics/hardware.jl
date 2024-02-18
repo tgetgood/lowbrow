@@ -253,7 +253,7 @@ end
 function findextent(system, config)
   sc = get(system, :surface_capabilities)
 
-  win = get(system, :window)
+  win = window.size(get(system, :window))
 
   vk.Extent2D(
     clamp(win.width, sc.min_image_extent.width, sc.max_image_extent.width),

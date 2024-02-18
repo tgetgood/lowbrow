@@ -174,8 +174,6 @@ function creategraphicspipeline(system, config)
     get(ias, :restart, false)
   )
 
-  # FIXME: It's possible for :window_size and :extent to get out of sync, which
-  # crashes the program.
   ext = hw.findextent(system, config)
 
   viewports = [vk.Viewport(0, 0, ext.width, ext.height, 0, 1)]

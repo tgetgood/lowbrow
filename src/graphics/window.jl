@@ -116,7 +116,7 @@ function createwindow(system, config)
   glfw.SetCursorPosCallback(window, mouseposcb)
   glfw.SetScrollCallback(window, scrollcb)
 
-  ds.hashmap(:window, window, :resizecb, resized(ch), :window_size, (;width, height))
+  ds.hashmap(:window, window, :resizecb, resized(ch))
 end
 
 function createsurface(system, config)
