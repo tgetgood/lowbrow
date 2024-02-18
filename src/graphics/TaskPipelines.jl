@@ -8,6 +8,7 @@ import framework as fw
 import resources as rd
 import commands
 import render
+import window
 import pipeline as pipe
 
 abstract type Pipeline end
@@ -146,7 +147,7 @@ end
 function computepipeline(system, config)
   dev = get(system, :device)
   qf = ds.getin(system, [:queues, :compute])
-  queue = get(system, :queue)
+  queue = hw.getqueue(system, :compute)
 
   stage = ds.hashmap(:stage, :compute)
   stagesetter(sets) = map(set -> merge(stage, set), sets)
@@ -239,9 +240,28 @@ function presentationpipeline(system)
 end
 
 function graphicspipeline(system, config)
+  # REVIEW: As of yet, these are the keys required to create a graphics pipeline.
+  #
+  # There's a beautiful simplicity in just passing around the system map,
+  # building it up incrementally and using it everywhere. But it gets bloated
+  # and makes refactoring difficult because there's no explicit way to say what
+  # is and isn't needed where.
+  #
+  # Maybe what I need is a barrier between the super dynamic (and somewhat slow)
+  # world hashmap and structs or locals.
+  #
+  # I've mostly built things so that maps are read into locals at infrequent
+  # stages and everything is fast enough in the render loop, but there's
+  # overhead there in keeping track.
+  gkeys = [:device, :surface, :physicaldevice, :window,
+           :queues, :memoryproperties, :max_msaa,
+           :surface_formats, :surface_capabilities, :surface_present_modes]
+
   dev = get(system, :device)
+  win = get(system, :window)
+
   qf = ds.getin(system, [:queues, :graphics])
-  queue = get(system, :queue)
+  queue = hw.getqueue(system, :graphics)
 
   bindings = []
   layoutci = rd. descriptorsetlayout(bindings)
@@ -279,18 +299,31 @@ function graphicspipeline(system, config)
       while !isready(killch)
         (vbuff, pcs, outch) = take!(inch)
 
-        cmd = hw.commandbuffers(dev, commandpool, 1)[1]
-        co = ds.assoc(render.syncsetup(system), :commandbuffer, cmd)
-
-        gsig = render.draw(system, co, ds.assoc(renderstate, :vertexbuffer, vbuff))
-
-        @async begin
-          commands.wait_semaphore(dev, gsig)
-          # Don't let GC get the command buffer prematurely.
-          co
+        if window.closep(win)
+          put!(outch, :closed)
+          break
         end
 
-        put!(outch, gsig)
+        if window.minimised(win)
+          put!(outch, :skip)
+        else
+          cmd = hw.commandbuffers(dev, commandpool, 1)[1]
+          co = ds.assoc(render.syncsetup(system), :commandbuffer, cmd)
+
+          if vbuff != []
+            renderstate = ds.assoc(renderstate, :vertexbuffer, vbuff)
+          end
+
+          gsig = render.draw(system, co, renderstate)
+
+          @async begin
+            commands.wait_semaphore(dev, gsig)
+            # Don't let GC get the command buffer prematurely.
+            co
+          end
+
+          put!(outch, gsig)
+        end
       end
     catch e
       print(stderr, "\n Error in pipeline thread: " *

@@ -13,7 +13,7 @@ import vertex
 import pipeline as pipe
 import hardware as hw
 import render
-import dsets as des
+import window
 
 ##### Descriptors
 
@@ -163,39 +163,6 @@ function assemblerender(system, config)
       :bindings
     ])
   )
-end
-
-function renderloop(body, teminate, resize)
-  t = time()
-  framecounter = 0
-  while !terminate()
-
-    window.poll()
-
-    if window.closep(get(system, :window))
-      break
-    end
-
-    if !window.minimised(get(system, :window))
-
-
-      renderstate = framefn(i, renderstate)
-      res = draw.draw(system, buffers[i], renderstate)
-
-      if res == vk.ERROR_OUT_OF_DATE_KHR ||
-         res == vk.SUBOPTIMAL_KHR ||
-         get(system, :resizecb)()
-
-        @info "resized"
-
-        resize()
-      end
-    end
-
-    framecounter += 1
-  end
-  @info "finished main loop; cleaning up"
-  @info "Average fps: " * string(round(framecounter / (time() - t)))
 end
 
 end

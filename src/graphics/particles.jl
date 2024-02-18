@@ -1,7 +1,6 @@
 import hardware as hw
 import resources as rd
 import framework as fw
-import pipeline as gp
 import commands
 import graphics
 import render
@@ -150,60 +149,53 @@ function main()
 
   ### pipelines
 
-  cq = hw.getqueue(system, :compute)
-  gq = hw.getqueue(system, :graphics)
+  compute = tp.computepipeline(system, get(config, :compute))
 
-  # FIXME: I don't like including the physical device in here...
-  pkeys = [:device, :surface, :physicaldevice, :window,
-           :queues, :memoryproperties, :max_msaa,
-           :surface_formats, :surface_capabilities, :surface_present_modes]
-
-  psys = ds.selectkeys(system, pkeys)
-
-  compute = tp.computepipeline(ds.assoc(psys, :queue, cq), get(config, :compute))
-
-  graphicspipeline = tp.graphicspipeline(
-    ds.assoc(psys, :queue, gq), get(config, :render)
-  )
+  gp = tp.graphicspipeline(system, get(config, :render))
 
   ### render loop
 
   t1 = time()
   t0 = t1
 
-  iters = 600
-  @info "Starting main loop"
-  for i in 1:iters
+  iters = 10
+  terminate() = begin iters -= 1; iters < 0 end
+
+  # fw.renderloop(get(system, :window), terminate, () -> nothing) do
+  while true
+    window.poll()
+
     t2 = time()
     dt = Float32(t2 - t1)
     t1 = t2
 
     comp = tp.run(compute, [current_particles], [dt])
 
-    gout = tp.run(graphicspipeline,
-      ds.assoc(current_particles, :verticies, nparticles)
-    )
+    gout = tp.run(gp, ds.assoc(current_particles, :verticies, nparticles))
 
     next_particles = take!(comp)[1]
-
-    @async begin
-      gsig = take!(gout)
-      commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
-      # It's safe to free the particle buffer after the above signals.
-      current_particles
-    end
-
     current_particles = next_particles
 
-  end
+    gsig = take!(gout)
 
-  @info "Average fps: " * string(round(iters / (t1 - t0)))
+    if gsig === :closed
+      break
+    elseif gsig === :skip
+      sleep(0.08)
+    else
+      @async begin
+        commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
+        # It's safe to free the particle buffer after the above signals.
+        current_particles
+      end
+    end
+  end
 
   # TODO: Cleanup the cleanup code.
   @async begin
     # tp.teardown(queue)
     tp.teardown(compute)
-    tp.teardown(graphicspipeline)
+    tp.teardown(gp)
   end
 end
 

@@ -5,7 +5,6 @@ import textures
 import resources as rd
 import framework as fw
 import graphics
-import dsets as des
 
 import Vulkan as vk
 
@@ -128,7 +127,7 @@ function main()
 
   ubos = uniform.allocatebuffers(system, MVP, frames)
 
-  dsets = des.descriptors(
+  dsets = fw.descriptors(
     dev,
     ds.getin(config, [:render, :descriptorsets, :bindings]),
     frames
@@ -138,7 +137,7 @@ function main()
 
   system, config = graphics.instantiate(system, config)
 
-  des.binddescriptors(
+  fw.binddescriptors(
     dev,
     ds.getin(config, [:render, :descriptorsets]),
     ds.into([], map(i -> [ubos[i], texture]), 1:frames)
