@@ -129,148 +129,6 @@ function binddescriptors(dev, config, bindings)
     vk.update_descriptor_sets(dev, write, [])
   end
 end
-##### Pipeline wrappers
-
-function computepipeline(dev, config)
-  stage = ds.hashmap(:stage, :compute)
-  stagesetter = sets -> map(set -> merge(stage, set), sets)
-
-  if ds.containsp(config, :pushconstants)
-    config = ds.update(config, :pushconstants, merge, stage)
-  end
-
-  bindings = stagesetter(vcat(get(config, :inputs, []), get(config, :outputs)))
-
-  layoutci = rd. descriptorsetlayout(bindings)
-  layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
-
-  pipeline = pipe.computepipeline(
-    dev, get(config, :shader), layout, [get(config, :pushconstants)]
-  )
-
-  queue = hw.findcomputequeue(get(config, :qf_properties))
-
-  ds.hashmap(
-    :config, config,
-    :descriptorsetlayout, layout,
-    :descriptorsetlayoutci, layoutci,
-    :bindings, bindings,
-    :pipeline, pipeline,
-    :queuefamily, queue,
-  )
-end
-
-function allocout(system, config)
-  type = get(config, :type)
-  if type === :ssbo
-    out = hw.buffer(system, config)
-  elseif type === :image
-    out = hw.createimage(system, config)
-  else
-    throw("not implemented")
-  end
-
-  ds.assoc(out, :config, config)
-end
-
-function runcomputepipeline(system, cp, inputs, pushconstants=[])
-
-  # # Need
-  # # 1) pool for descriptor sets
-  # # 2) pool for commanpools
-  # # 3) pool for ssbos (output)
-  # #
-  # # OR, just create a new one each time and throw it away. Good enough for a
-  # # proof of concept.
-
-  layout = get(cp, :descriptorsetlayout)
-  layoutci = get(cp, :descriptorsetlayoutci)
-
-  dev = get(system, :device)
-
-  dsetpoolr = vk.create_descriptor_pool(
-    dev,
-    rd.descriptorpool(layoutci, 1)
-  )
-
-  dsetpool = vk.unwrap(dsetpoolr)
-
-  dsets = vk.unwrap(vk.allocate_descriptor_sets(
-    dev,
-    vk.DescriptorSetAllocateInfo(dsetpool, [layout])
-  ))
-
-  commandpool = hw.commandpool(dev, get(cp, :queuefamily))
-  cmd = hw.commandbuffers(dev, commandpool, 1)[1]
-
-  outputs = ds.into!(
-    [],
-    map(x -> allocout(system, x)),
-    ds.getin(cp, [:config, :outputs])
-  )
-
-  binddescriptors(dev, get(cp, :bindings), dsets[1], vcat(inputs, outputs))
-
-  ### record compute commands once since they never change.
-
-  cqueue = vk.get_device_queue(dev, get(cp, :queuefamily), 0)
-
-  commands.recordcomputation(
-    cmd,
-    ds.getin(cp, [:pipeline, :pipeline]),
-    ds.getin(cp, [:pipeline, :layout]),
-    ds.getin(cp, [:config, :workgroups]),
-    dsets,
-    ds.assoc(ds.getin(cp, [:config, :pushconstants]), :value, pushconstants)
-  )
-
-  sem = vk.unwrap(vk.create_semaphore(
-    dev,
-    vk.SemaphoreCreateInfo(
-      next=vk.SemaphoreTypeCreateInfo(vk.SEMAPHORE_TYPE_TIMELINE, UInt(1))
-    )))
-
-  wait = ds.into!([],  map(x -> get(x, :wait)) ∘ ds.cat(), inputs)
-
-  post = vk.SemaphoreSubmitInfo(sem, UInt(2), 0)
-
-  cmdsub = vk.CommandBufferSubmitInfo(cmd, 0)
-
-  submit = vk.SubmitInfo2(wait, [cmdsub], [post])
-
-  vk.queue_submit_2(cqueue, [submit])
-
-  hw.thread() do
-    commands.wait_semaphore(dev, post)
-    # withhold refs from gc until gpu is done with them.
-    (dsetpool, dsets, commandpool, cmd)
-  end
-
-  ds.into!([], map(x -> ds.assoc(x, :wait, [post])), outputs)
-end
-
-function rungraphicspipeline(system, renderstate)
-  dev = get(system, :device)
-
-  commandpool = hw.commandpool(
-    dev,
-    ds.getin(system, [:queues, :graphics]),
-    vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-  )
-
-  cmd = hw.commandbuffers(dev, commandpool, 1)[1]
-
-  co = ds.assoc(render.syncsetup(system), :commandbuffer, cmd)
-
-  gsig = render.draw(system, co, renderstate)
-
-  @async begin
-    commands.wait_semaphore(dev, gsig)
-    co, commandpool
-  end
-
-  return gsig
-end
 
 function indexbuffer(system, config)
   if ds.containsp(config, :indicies)
@@ -305,6 +163,39 @@ function assemblerender(system, config)
       :bindings
     ])
   )
+end
+
+function renderloop(body, teminate, resize)
+  t = time()
+  framecounter = 0
+  while !terminate()
+
+    window.poll()
+
+    if window.closep(get(system, :window))
+      break
+    end
+
+    if !window.minimised(get(system, :window))
+
+
+      renderstate = framefn(i, renderstate)
+      res = draw.draw(system, buffers[i], renderstate)
+
+      if res == vk.ERROR_OUT_OF_DATE_KHR ||
+         res == vk.SUBOPTIMAL_KHR ||
+         get(system, :resizecb)()
+
+        @info "resized"
+
+        resize()
+      end
+    end
+
+    framecounter += 1
+  end
+  @info "finished main loop; cleaning up"
+  @info "Average fps: " * string(round(framecounter / (time() - t)))
 end
 
 end
