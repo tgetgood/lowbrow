@@ -3,11 +3,9 @@ module hardware
 import window
 import GLFW
 
-import Base: get
-
 import Vulkan as vk
 import DataStructures as ds
-import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
+import DataStructures: get, getin, assoc, hashmap, into, emptyvector, emptymap, emptyset
 
 import resources: bufferusagebits, memorypropertybits, sharingmodes, imageusagebits
 
@@ -24,60 +22,77 @@ function srecord(s::T) where T
   into(emptymap, map(k -> (k, getproperty(s, k))), fieldnames(T))
 end
 
-function probeapi()
+function instanceinfo()
   hashmap(
     :version, vk.unwrap(vk.enumerate_instance_version()),
-    :extensions, vk.unwrap(vk.enumerate_instance_extension_properties()),
-    :layers, vk.unwrap(vk.enumerate_instance_layer_properties())
+    :extensions, into(
+      emptyset,
+      map(srecord),
+      vk.unwrap(vk.enumerate_instance_extension_properties())
+    ),
+    :layers, into(
+      emptyset,
+      map(srecord),
+      vk.unwrap(vk.enumerate_instance_layer_properties())
+    )
   )
-end
-
-function probedevices(instance, query)
-end
-
-function probe(requirements)
-  vk.unwrap(vk.enumerate_instance_extension_properties())
 end
 
 function instance(_, config)
+  info = instanceinfo()
   ic = get(config, :instance)
-  validationlayers = get(ic, :validation, [])
-  extensions::Vector = get(ic, :extensions, [])
+  api_version = get(ic, :vulkan_version)
 
-  @assert containsall(
-    extensions,
-    map(
-      x -> x.extension_name,
-      vk.unwrap(vk.enumerate_instance_extension_properties())
-    )
-  ) "unsupported extensions required."
+  layers = into(
+    ds.emptyset,
+    map(x -> hashmap(:layer_name, x)),
+    get(ic, :validation, [])
+  )
 
-  if get(config, :dev_tools)
-    @assert containsall(
-      validationlayers,
-      map(
-        x -> x.layer_name,
-        vk.unwrap(vk.enumerate_instance_layer_properties())
-      )
-    ) "unsupported validation layers required."
+  extensions = into(
+    ds.emptyset,
+    map(x -> hashmap(:extension_name, x)),
+    get(ic, :extensions, [])
+  )
+
+  supported_layers = ds.join(layers, get(info, :layers))
+  supported_extensions = ds.join(extensions, get(info, :extensions))
+
+  if ds.count(layers) !== ds.count(supported_layers)
+    @warn "The following requested layers are not supported: " *
+      throw("not implemented")
   end
 
+  if ds.count(extensions) !== ds.count(supported_extensions)
+    @warn "The following requested extensions are not supported: " *
+      throw("not implemented")
+  end
+
+  @assert get(info, :version) >= api_version "Unsupported driver version"
+
   appinfo = vk.ApplicationInfo(
-    v"0.0.0",
-    v"0.0.0",
-    v"1.3";
-    application_name=get(config, :name, "dev"),
-    engine_name="TBD"
+    get(config, :version),
+    getin(config, [:engine, :version]),
+    api_version;
+    application_name=get(config, :name, ""),
+    engine_name=getin(config, [:engine, :name], "")
   )
 
   inst = vk.unwrap(vk.create_instance(
-    validationlayers,
-    extensions;
+    ds.into!([], map(x -> get(x, :layer_name)), supported_layers),
+    ds.into!([], map(x -> get(x, :extension_name)), supported_extensions);
     next=get(config, :debuginfo, C_NULL),
     application_info=appinfo
   ))
 
-  return hashmap(:instance, inst)
+  return hashmap(
+    :instance, inst,
+    :info, hashmap(:instance, hashmap(
+      :version, api_version,
+      :extensions, supported_extensions,
+      :layers, supported_layers
+    ))
+  )
 end
 
 function findgraphicsqueue(device)

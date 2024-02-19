@@ -34,6 +34,7 @@ prog = ds.hashmap(
       :vertex, *(@__DIR__, "/../shaders/quad.vert"),
       :fragment, *(@__DIR__, "/../shaders/quad.frag")
     ),
+    :msaa, 4,
     :inputassembly, ds.hashmap(
       :topology, :triangles
     ),

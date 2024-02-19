@@ -20,15 +20,27 @@ mergeconfig(x::VS, y::VS) = ds.into(y, x)
 defaults = hashmap(
   :dev_tools, true,
   :debuglevel, vk.DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
+  :name, "",
+  :version, v"0.0.0",
+  :engine, hashmap(
+    :version, v"0.0.1",
+    :name, "unnamed",
+  ),
+  :instance, hashmap(
+    :vulkan_version, v"1.3"
+  ),
   :device, hashmap(
-    :features, [:sampler_anisotropy],
-    :vk12features, [:timeline_semaphore],
-    :vk13features, [:synchronization2],
+    :features, hashmap(
+      # v"1.0", [:sampler_anisotropy],
+      v"1.2", [:timeline_semaphore],
+      v"1.3", [:synchronization2],
+    ),
     # FIXME: logically these are sets. How does vk handle repeats?
     :extensions, ["VK_KHR_swapchain"]
   ),
   :window, hashmap(:width, 1200, :height, 1200),
   :render, hashmap(
+    :msaa, 1, # Disabled
     :swapchain, hashmap(
       # TODO: Fallback formats and init time selection.
       :format, vk.FORMAT_B8G8R8A8_SRGB,

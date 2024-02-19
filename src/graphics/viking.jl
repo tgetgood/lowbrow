@@ -65,7 +65,7 @@ Static description of the program to be run. Pure data. Shouldn't invoke
 anything.
 """
 prog = ds.hashmap(
-  :device_req, ds.hashmap(
+  :device, ds.hashmap(
     :features, ds.hashmap(
       v"1.0", ds.set(:sampler_anisotropy),
       v"1.2", ds.set(:timeline_semaphore),
