@@ -2,6 +2,7 @@
 
 import graphics
 
+import window
 import resources as rd
 import framework as fw
 import TaskPipelines as tp
@@ -70,7 +71,7 @@ function main()
       sleep(0.08)
     end
   end
-  @async tp.teardown(gp)
+  tp.teardown(gp)
 end
 
 main()

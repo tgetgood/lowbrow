@@ -98,6 +98,14 @@ prog = ds.hashmap(
       ]
     )
   ),
+  # REVIEW: Is it really effective to multiply these matricies over for each
+  # vertex on the GPU? It seems like multiplying once per frame on the cpu side
+  # before pushing would be smarter. We could also use push constants that way,
+  # but I'm mainly worried about multiplying the same three matricies 10 000+
+  # times...
+  #
+  # The only reason I can think not to is latency. But we're talking
+  # microseconds here, aren't we?
   :ubo, ds.hashmap(
     :model, [
       1 0 0 0
@@ -168,7 +176,7 @@ function main()
       sleep(0.08)
     end
   end
-  @async tp.teardown(gp)
+  tp.teardown(gp)
 end
 
 main()

@@ -186,12 +186,8 @@ function main()
     end
   end
 
-  # TODO: Cleanup the cleanup code.
-  @async begin
-    # tp.teardown(queue)
-    tp.teardown(compute)
-    tp.teardown(gp)
-  end
+  tp.teardown(compute)
+  tp.teardown(gp)
 end
 
 main()

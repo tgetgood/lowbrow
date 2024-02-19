@@ -38,7 +38,13 @@ struct LeakyAllocator <: PipelineAllocator
 end
 
 function teardown(p::AsyncPipeline)
-  put!(p.sigkill, true)
+  @async begin
+    try
+      put!(p.sigkill, true)
+    catch e
+      ds.handleerror(e)
+    end
+  end
 end
 
 function passresources(a::LeakyAllocator)
@@ -295,8 +301,11 @@ function graphicspipeline(system, config)
   killch = Channel()
 
   Threads.@spawn begin
+    framecounter = 0
+    t = time()
     try
       while !isready(killch)
+        framecounter += 1
         (vbuff, pcs, outch) = take!(inch)
 
         if window.closep(win)
@@ -325,6 +334,7 @@ function graphicspipeline(system, config)
           put!(outch, gsig)
         end
       end
+      @info "Average fps: " * string(round(framecounter / (time() - t)))
     catch e
       print(stderr, "\n Error in pipeline thread: " *
                     string(get(config, :name)) * "\n")
