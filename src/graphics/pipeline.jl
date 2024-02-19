@@ -87,7 +87,7 @@ function renderpass(system, config)
           getin(config, [:swapchain, :format]),
           samples,
           vk.ATTACHMENT_LOAD_OP_CLEAR,
-          vk.ATTACHMENT_STORE_OP_STORE,
+          vk.ATTACHMENT_STORE_OP_DONT_CARE,
           vk.ATTACHMENT_LOAD_OP_DONT_CARE,
           vk.ATTACHMENT_STORE_OP_DONT_CARE,
           vk.IMAGE_LAYOUT_UNDEFINED,
