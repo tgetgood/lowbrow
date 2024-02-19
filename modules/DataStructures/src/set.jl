@@ -1,6 +1,8 @@
 abstract type Set <: Sequential end
 
-const arraysetthreashold = 8
+# FIXME: Basically don't use hashsets because they're not implemented. This will
+# scale *very* poorly.
+const arraysetthreashold = typemax(Int)
 
 struct EmptySet <: Set end
 
@@ -41,7 +43,7 @@ function arrayset(elements)
   if length(elements) === 0
     emptyset
   else
-    PersistentArraySet(elements)
+    PersistentArraySet(unique(elements))
   end
 end
 
