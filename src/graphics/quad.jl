@@ -56,7 +56,7 @@ function main()
 
   system = graphics.staticinit(state)
 
-  state = fw.buffers(system, get(state, :render))
+  state = fw.staticbuffers(system, get(state, :render))
 
   gp = tp.graphicspipeline(system, state)
 

@@ -236,7 +236,7 @@ function main()
 
   system, config = graphics.instantiate(system, config)
 
-  config = fw.buffers(system, config)
+  config = fw.staticbuffers(system, config)
 
   # FIXME: This is a trap I'm going to fall into over and over.
   # REVIEW: I need to encapsulate pipelines as wholes. graphics and compute.

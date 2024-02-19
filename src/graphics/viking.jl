@@ -147,7 +147,7 @@ function main()
     ds.into([], map(i -> [ubos[i], texture]), 1:frames)
   )
 
-  gconfig = fw.buffers(system, get(config, :render))
+  gconfig = fw.staticbuffers(system, get(config, :render))
 
   gp = tp.graphicspipeline(system, gconfig)
 
