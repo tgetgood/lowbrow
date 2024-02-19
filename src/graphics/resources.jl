@@ -23,7 +23,8 @@ const bufferusagebits = hashmap(
 const memorypropertybits = hashmap(
   :device_local, vk.MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
   :host_coherent, vk.MEMORY_PROPERTY_HOST_COHERENT_BIT,
-  :host_visible, vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT
+  :host_visible, vk.MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+  :lazy, vk.MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT
 )
 
 const sharingmodes = hashmap(
@@ -32,14 +33,14 @@ const sharingmodes = hashmap(
 )
 
 const imageusagebits = hashmap(
-  :colour_attachment, vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-  :depth_stencil_attachment, vk.IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-  :input_attachment, vk.IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
+  :colour, vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+  :depth_stencil, vk.IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+  :input, vk.IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
   :sampled, vk.IMAGE_USAGE_SAMPLED_BIT,
   :storage, vk.IMAGE_USAGE_STORAGE_BIT,
   :transfer_dst, vk.IMAGE_USAGE_TRANSFER_DST_BIT,
   :transfer_src, vk.IMAGE_USAGE_TRANSFER_SRC_BIT,
-  :transient_attachment, vk.IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT
+  :transient, vk.IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT
 )
 
 const imagelayouts = hashmap()

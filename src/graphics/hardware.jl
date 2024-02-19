@@ -320,15 +320,23 @@ function surfaceinfo(system)
   )
 end
 
+function physicaldeviceinfo(pdev)
+  ds.hashmap(
+    :qf_properties, vk.get_physical_device_queue_family_properties(pdev),
+    :memoryproperties, vk.get_physical_device_memory_properties(pdev),
+    :properties, vk.get_physical_device_properties(pdev)
+  )
+end
+
 function pdevice(system, config)
   potential = into(
     emptyvector,
     map(x -> merge(system, hashmap(
       :physicaldevice, x,
-      :qf_properties, vk.get_physical_device_queue_family_properties(x),
-      :memoryproperties, vk.get_physical_device_memory_properties(x),
       :max_msaa, multisamplemax(x)
     )))
+    ∘
+    map(x -> merge(x, physicaldeviceinfo(get(x, :physicaldevice))))
     ∘
     map(x -> merge(x, surfaceinfo(x)))
     ∘
@@ -650,8 +658,12 @@ function colourresources(system, config)
     :format, format,
     :samples, get(system, :max_msaa),
     :memoryflags, :device_local,
+    # FIXME: Negotiate with host and allow optional flags. Lazy allocation is an
+    # optimisation which might or might not be supported. We want to use it if
+    # it's available.
+    # :memoryflags, [:device_local, :lazy],
     :queues, [:graphics],
-    :usage, [:transient_attachment, :colour_attachment]
+    :usage, [:transient, :colour]
   ))
 
   view = imageview(system, hashmap(:format, format), image)
@@ -732,7 +744,7 @@ function depthresources(system, config)
       :format, format,
      :samples, get(system, :max_msaa),
       :size, [ex.width, ex.height],
-      :usage, :depth_stencil_attachment,
+      :usage, [:depth_stencil, :transient],
       :queues, [:graphics],
       :memoryflags, :device_local
     )
