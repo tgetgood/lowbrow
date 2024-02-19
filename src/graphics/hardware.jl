@@ -11,35 +11,6 @@ import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
 
 import resources: bufferusagebits, memorypropertybits, sharingmodes, imageusagebits
 
-abstract type VKSystem end
-
-struct VKRender <: VKSystem
-  instance::vk.Instance
-  physical_device::vk.PhysicalDevice
-  device::vk.Device
-  window::GLFW.Window
-  surface::vk.SurfaceKHR
-  queues::ds.Map
-  commandpools::ds.Map
-end
-
-##### Seems I'll want these eventually, but they're just reminders at present.
-struct VKHeadlessRender <: VKSystem
-end
-
-struct VKComputeOnly <: VKSystem
-end
-
-function get(x::VKSystem, k::Symbol, default)
-  if hasproperty(x, k)
-    getproperty(x, k)
-  else
-    default
-  end
-end
-
-get(x::VKSystem, k::Symbol) = get(x, k, nothing)
-
 function containsall(needles, hay)::Bool
   return [nothing] == indexin([nothing], indexin(needles, hay))
 end
@@ -342,7 +313,7 @@ function pdevice(system, config)
     ∘
     map(x -> assoc(x, :queues, findqueues(x)))
     ∘
-    filter(system -> checkdevice(system, config)),
+    filter(potential -> checkdevice(potential, config)),
     vk.unwrap(vk.enumerate_physical_devices(get(system, :instance)))
   )
 
