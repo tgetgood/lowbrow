@@ -23,6 +23,10 @@ struct EmptyMap <: Map end
 
 const emptymap = EmptyMap()
 
+function Base.:(==)(x::EmptyMap, y::EmptyMap)
+  true
+end
+
 # Clojure uses 8 and I don't want to dig into it just yet.
 const arraymapsizethreashold = 8
 

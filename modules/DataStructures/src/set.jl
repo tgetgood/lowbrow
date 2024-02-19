@@ -81,6 +81,83 @@ function disj(s::PersistentArraySet, x)
   end
 end
 
+function Base.:(==)(x::EmptySet, y::EmptySet)
+  true
+end
+
+function Base.:(==)(x::PersistentArraySet, y::PersistentArraySet)
+  if x === y
+    true
+  elseif count(x) !== count(y)
+    false
+  else
+    every(xel -> containsp(y, xel), x)
+  end
+end
+
+### These are stolen, basically verbatim from clojure's set.clj
+
+function union(x::PersistentArraySet, y::PersistentArraySet)
+  if count(x) < count(y)
+    into(y, x)
+  else
+    into(x, y)
+  end
+end
+
+function difference(x::PersistentArraySet, y::PersistentArraySet)
+  if count(x) < count(y)
+    difference(y, x)
+  else
+    reduce(disj, x, y)
+  end
+end
+
+function intersection(x::PersistentArraySet, y::PersistentArraySet)
+  if count(y) < count(x)
+    intersection(y, x)
+  else
+    reduce((acc, e) -> ifelse(containsp(y, e), acc, disj(acc, e)), x, x)
+  end
+end
+
+function index(rel, ks)
+  reduce((m, x) -> begin
+         ik = selectkeys(x, ks)
+         return assoc(m, ik, conj(get(m, ik, emptyset), x))
+         end,
+    emptymap, rel
+  )
+end
+
+"""
+Only natural join is implemented.
+"""
+function join(x::PersistentArraySet, y::PersistentArraySet)
+  if emptyp(x) || emptyp(y)
+    emptyset
+  else
+    ks = intersection(
+      into(emptyset, keys(first(x))),
+      into(emptyset, keys(first(y)))
+    )
+
+    (r, s) = ifelse(count(x) < count(y), (x, y), (y, x))
+
+    idx = index(r, ks)
+
+    reduce((acc, x) ->
+      reduce((acc, y) ->
+          conj(acc, merge(y, x)), acc, get(idx, selectkeys(x, ks))
+      ), emptyset, s
+    )
+  end
+end
+
+function iterate(s::PersistentArraySet)
+  iterate(s.elements)
+end
+
 ## FIXME: Not finished.
 ##### Hash Sets
 
