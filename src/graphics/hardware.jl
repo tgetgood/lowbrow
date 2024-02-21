@@ -40,62 +40,6 @@ function instanceinfo()
   )
 end
 
-function instance(_, config)
-  info = instanceinfo()
-  ic = get(config, :instance)
-  api_version = get(ic, :vulkan_version)
-
-  layers = into(
-    ds.emptyset,
-    map(x -> hashmap(:layer_name, x)),
-    get(ic, :validation, [])
-  )
-
-  extensions = into(
-    ds.emptyset,
-    map(x -> hashmap(:extension_name, x)),
-    get(ic, :extensions, [])
-  )
-
-  supported_layers = ds.join(layers, get(info, :layers))
-  supported_extensions = ds.join(extensions, get(info, :extensions))
-
-  if ds.count(layers) !== ds.count(supported_layers)
-    @warn "The following requested layers are not supported: " *
-      throw("not implemented")
-  end
-
-  if ds.count(extensions) !== ds.count(supported_extensions)
-    @warn "The following requested extensions are not supported: " *
-      throw("not implemented")
-  end
-
-  @assert get(info, :version) >= api_version "Unsupported driver version"
-
-  appinfo = vk.ApplicationInfo(
-    get(config, :version),
-    getin(config, [:engine, :version]),
-    api_version;
-    application_name=get(config, :name, ""),
-    engine_name=getin(config, [:engine, :name], "")
-  )
-
-  inst = vk.unwrap(vk.create_instance(
-    ds.into!([], map(x -> get(x, :layer_name)), supported_layers),
-    ds.into!([], map(x -> get(x, :extension_name)), supported_extensions);
-    next=get(config, :debuginfo, C_NULL),
-    application_info=appinfo
-  ))
-
-  return hashmap(
-    :instance, inst,
-    :info, hashmap(:instance, hashmap(
-      :version, api_version,
-      :extensions, supported_extensions,
-      :layers, supported_layers
-    ))
-  )
-end
 
 function findgraphicsqueue(device)
   try
@@ -177,7 +121,6 @@ function findcomputequeue(qfproperties)
     first(computeqs)[2]
   else
     first(dedicated)[2]
-
   end
 end
 
@@ -287,23 +230,16 @@ function multisamplemax(device)
   vk.SampleCountFlag(1 << (ndigits((depth&colour).val, base=2) - 1))
 end
 
-function surfaceinfo(system)
+function surfaceinfo(pdev, surface)
   ds.hashmap(
-    :surface_formats, vk.unwrap(vk.get_physical_device_surface_formats_khr(
-      get(system, :physicaldevice);
-      surface=get(system, :surface)
-    )),
-    :surface_capabilities, vk.unwrap(
-      vk.get_physical_device_surface_capabilities_khr(
-        get(system, :physicaldevice),
-        get(system, :surface)
-      )
+    :formats, vk.unwrap(
+      vk.get_physical_device_surface_formats_khr(pdev; surface)
     ),
-    :surface_present_modes, vk.unwrap(
-      vk.get_physical_device_surface_present_modes_khr(
-        get(system, :physicaldevice);
-        surface=get(system, :surface)
-      )
+    :capabilities, vk.unwrap(
+      vk.get_physical_device_surface_capabilities_khr(pdev; surface)
+    ),
+    :present_modes, vk.unwrap(
+      vk.get_physical_device_surface_present_modes_khr(pdev; surface)
     )
   )
 end

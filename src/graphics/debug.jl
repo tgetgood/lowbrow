@@ -51,11 +51,8 @@ function debugcb(severity, type, datap::Ptr{dumcd}, userData::Ptr{Cvoid})
   return false
 end
 
-function debuginfo(config)
-  data = Base.cconvert(
-    Int64,
-    get(config, :debuglevel, vk.DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT).val
-  )
+function debuginfo(level)
+  data = Base.cconvert(Int64, level)
   user_data = Ptr{Cvoid}(data)
 
   vk.DebugUtilsMessengerCreateInfoEXT(
@@ -69,22 +66,9 @@ function debuginfo(config)
   )
 end
 
-function configure(config)
-  hashmap(:debuginfo, debuginfo(config))
-end
-
-function debugmsgr(system, config)
-  if get(config, :dev_tools)
-    assoc(system, :debugmsgr,
-      vk.unwrap(
-        vk.create_debug_utils_messenger_ext(
-          get(system, :instance),
-          get(config, :debuginfo)
-        )
-      )
-    )
-  else
-    system
+function debugmsgr(instance, debuginfo)
+  if debuginfo !== nothing
+    vk.unwrap(vk.create_debug_utils_messenger_ext(instance, debuginfo))
   end
 end
 

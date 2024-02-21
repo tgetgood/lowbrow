@@ -11,6 +11,13 @@ import DataStructures: into, hashmap
 
 ##### Enumerations
 
+const debugutilsseveritybits = hashmap(
+  :verbose, vk.DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
+  :info, vk.DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT,
+  :warning, vk.DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT,
+  :error, vk.DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT
+)
+
 const bufferusagebits = hashmap(
   :vertex_buffer, vk.BUFFER_USAGE_VERTEX_BUFFER_BIT,
   :index_buffer, vk.BUFFER_USAGE_INDEX_BUFFER_BIT,

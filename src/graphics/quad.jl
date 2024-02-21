@@ -1,8 +1,9 @@
 ##### Simple rendered quadrilateral example.
 
 import graphics
+import init
 
-import window
+import Glfw as window
 import resources as rd
 import framework as fw
 import TaskPipelines as tp
@@ -54,13 +55,14 @@ prog = ds.hashmap(
 function main()
   window.shutdown()
 
-  state = graphics.configure(load(prog))
+  # config = graphics.configure(load(prog))
 
-  system = graphics.staticinit(state)
+  system = init.setup(prog, window)
 
-  state = fw.staticbuffers(system, get(state, :render))
+  # FIXME: config should be static.
+  config = fw.staticbuffers(system, get(prog, :render))
 
-  gp = tp.graphicspipeline(system, state)
+  gp = tp.graphicspipeline(system, config)
 
   while true
     window.poll()
