@@ -1,4 +1,4 @@
-module window
+module Glfw
 
 import Vulkan as vk
 import GLFW.GLFW as glfw
@@ -100,15 +100,12 @@ function scrollcb(_, x, y)
   end
 end
 
-function createwindow(system, config)
+function window(size, name)
   glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
   glfw.WindowHint(glfw.RESIZABLE, true)
-  glfw.WindowHint(glfw.REFRESH_RATE, glfw.DONT_CARE)
+  glfw.WindowHint(glfw.REFRESH_RATE, 100) #glfw.DONT_CARE)
 
-  width = ds.getin(config, [:window, :width])
-  height = ds.getin(config, [:window, :height])
-
-  window = glfw.CreateWindow(width, height, get(config, :name, "dev"))
+  window = glfw.CreateWindow(size.width, size.height, name)
 
   ch = Channel()
 
@@ -118,16 +115,10 @@ function createwindow(system, config)
   glfw.SetCursorPosCallback(window, mouseposcb)
   glfw.SetScrollCallback(window, scrollcb)
 
-  ds.hashmap(:window, window, :resizecb, resized(ch))
+   window, resized(ch)
 end
 
-function createsurface(system, config)
-  instance = get(system, :instance)
-  surface = glfw.CreateWindowSurface(
-    instance,
-    get(system, :window)
-  )
-
+function surface(instance, window)
   # REVIEW: GLFW creates a valid VK_KHR_Surface and returns a raw C pointer to it.
   # The jl vulkan wrapper I'm using needs a managed object, so I need to create
   # that myself.
@@ -135,25 +126,16 @@ function createsurface(system, config)
   # The problem is: to what do I set the initial refcount?
   #
   # Reloading over and over will eventually segfault. Is this the source?
-  surface = vk.SurfaceKHR(
-    surface,
+  vk.SurfaceKHR(
+    glfw.CreateWindowSurface(instance, window),
     instance,
     Base.Threads.Atomic{UInt64}(0)
   )
-
-  ds.hashmap(:surface, surface)
 end
 
 function configure()
   # FIXME: This is an odd place to do side effects, but I don't see anywhere
   # better to do this. Explicit window.init() is not a good alternative.
-  #
-  # What if the window is a system thing like stdout (stdwin?). I'm trying to
-  # get away from syscalls and globals, so that's the wrong direction.
-  #
-  # I do like the idea of treating the window as something "out
-  # there". Conceptually you just send off frames to have rendered. That way
-  # something running inside a compositor doesn't even need to know it.
   glfw.Init()
 
   ds.associn(

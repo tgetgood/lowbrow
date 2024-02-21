@@ -4,7 +4,7 @@ import framework as fw
 import commands
 import graphics
 import render
-import window
+import Glfw as window
 import TaskPipelines as tp
 
 import DataStructures as ds

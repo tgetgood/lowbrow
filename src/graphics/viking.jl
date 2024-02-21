@@ -1,6 +1,6 @@
 import DataStructures as ds
 import uniform
-import window
+import Glfw as window
 import model
 import textures
 import resources as rd

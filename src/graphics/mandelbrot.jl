@@ -1,5 +1,5 @@
 import graphics
-import window
+import Glfw as window
 import hardware as hw
 import resources as rd
 import commands

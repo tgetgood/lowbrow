@@ -1,7 +1,9 @@
+"""
+Wrappers for querying hardware.
+"""
 module hardware
 
-import window
-import GLFW
+import Glfw as window
 
 import Vulkan as vk
 import DataStructures as ds

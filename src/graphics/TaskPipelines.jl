@@ -8,7 +8,7 @@ import framework as fw
 import resources as rd
 import commands
 import render
-import window
+import Glfw as window
 import pipeline as pipe
 
 abstract type Pipeline end

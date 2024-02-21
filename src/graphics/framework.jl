@@ -13,7 +13,7 @@ import vertex
 import pipeline as pipe
 import hardware as hw
 import render
-import window
+import Glfw as window
 
 ##### Descriptors
 
