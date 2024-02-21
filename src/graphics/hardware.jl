@@ -24,22 +24,17 @@ function srecord(s::T) where T
   into(emptymap, map(k -> (k, getproperty(s, k))), fieldnames(T))
 end
 
+function xrel(s::Vector{T}) where T
+  into(emptyset, map(srecord), s)
+end
+
 function instanceinfo()
   hashmap(
     :version, vk.unwrap(vk.enumerate_instance_version()),
-    :extensions, into(
-      emptyset,
-      map(srecord),
-      vk.unwrap(vk.enumerate_instance_extension_properties())
-    ),
-    :layers, into(
-      emptyset,
-      map(srecord),
-      vk.unwrap(vk.enumerate_instance_layer_properties())
-    )
+    :extensions, xrel(vk.unwrap(vk.enumerate_instance_extension_properties())),
+    :layers, xrel(vk.unwrap(vk.enumerate_instance_layer_properties()))
   )
 end
-
 
 function findgraphicsqueue(device)
   try
@@ -124,16 +119,9 @@ function findcomputequeue(qfproperties)
   end
 end
 
-function swapchainsupport(system)
-  dev = get(system, :physicaldevice)
-  surface = get(system, :surface)
-
-  # capabilities = vk.get_physical_device_surface_capabilities_khr(dev, surface)
-  formats = vk.unwrap(vk.get_physical_device_surface_formats_khr(dev; surface))
-  modes = vk.unwrap(
-    vk.get_physical_device_surface_present_modes_khr(dev; surface)
-  )
-
+function swapchainsupport(surfaceinfo)
+  formats = get(surfaceinfo, :formats)
+  modes = get(surfaceinfo, :present_modes)
   return length(formats) > 0 && length(modes) > 0
 end
 
@@ -236,7 +224,7 @@ function surfaceinfo(pdev, surface)
       vk.get_physical_device_surface_formats_khr(pdev; surface)
     ),
     :capabilities, vk.unwrap(
-      vk.get_physical_device_surface_capabilities_khr(pdev; surface)
+      vk.get_physical_device_surface_capabilities_khr(pdev, surface)
     ),
     :present_modes, vk.unwrap(
       vk.get_physical_device_surface_present_modes_khr(pdev; surface)
@@ -248,7 +236,38 @@ function physicaldeviceinfo(pdev)
   ds.hashmap(
     :qf_properties, vk.get_physical_device_queue_family_properties(pdev),
     :memoryproperties, vk.get_physical_device_memory_properties(pdev),
-    :properties, vk.get_physical_device_properties(pdev)
+    :properties, vk.get_physical_device_properties(pdev),
+    :extensions, xrel(vk.unwrap(vk.enumerate_device_extension_properties(pdev))),
+    :layers, xrel(vk.unwrap(vk.enumerate_device_layer_properties(pdev))),
+  )
+end
+
+const featuretypes = hashmap(
+  v"1.3", vk.PhysicalDeviceVulkan13Features,
+  v"1.2", vk.PhysicalDeviceVulkan12Features,
+  v"1.1", vk.PhysicalDeviceVulkan11Features,
+  v"1.0", vk.PhysicalDeviceFeatures2
+)
+
+function devicefeatures(pdev)
+  map(
+    x -> [ds.key(x), vk.get_physical_device_features_2(pdev, ds.val(x)).next],
+    featuretypes
+  )
+end
+
+function physicaldevices(instance, surface)
+  into(
+    emptymap,
+    map(x -> [
+      x,
+      hashmap(
+        :surface, surfaceinfo(x, surface),
+        :physicaldevice, physicaldeviceinfo(x),
+        :features, devicefeatures(x)
+      )
+    ]),
+    vk.unwrap(vk.enumerate_physical_devices(instance))
   )
 end
 

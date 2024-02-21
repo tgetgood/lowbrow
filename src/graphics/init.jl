@@ -28,7 +28,7 @@ defaults = ds.hashmap(
     :name, "unnamed",
   ),
   :instance, ds.hashmap(
-    :vulkan_version, v"1.3"
+    :vulkan_version, v"1.3.276"
   ),
   :device, ds.hashmap(
     :features, ds.hashmap(
@@ -193,12 +193,15 @@ function setup(baseconfig, wm)
 
   surface = wm.surface(inst, window)
 
+  pdevs = hw.physicaldevices(inst, surface)
+
   system = ds.hashmap(
     :instance, inst,
     :window, window,
     # REVIEW: Include the windowmanager here? Or wrap the window object in a
     # struct that can query its size and whatnot?
-    :surface, surface
+    :surface, surface,
+    :pdevs, pdevs
   )
 end
 
