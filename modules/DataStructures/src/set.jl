@@ -95,65 +95,6 @@ function Base.:(==)(x::PersistentArraySet, y::PersistentArraySet)
   end
 end
 
-### These are stolen, basically verbatim from clojure's set.clj
-
-function union(x::PersistentArraySet, y::PersistentArraySet)
-  if count(x) < count(y)
-    into(y, x)
-  else
-    into(x, y)
-  end
-end
-
-function difference(x::PersistentArraySet, y::PersistentArraySet)
-  if count(x) < count(y)
-    difference(y, x)
-  else
-    reduce(disj, x, y)
-  end
-end
-
-function intersection(x::PersistentArraySet, y::PersistentArraySet)
-  if count(y) < count(x)
-    intersection(y, x)
-  else
-    reduce((acc, e) -> ifelse(containsp(y, e), acc, disj(acc, e)), x, x)
-  end
-end
-
-function index(rel, ks)
-  reduce((m, x) -> begin
-         ik = selectkeys(x, ks)
-         return assoc(m, ik, conj(get(m, ik, emptyset), x))
-         end,
-    emptymap, rel
-  )
-end
-
-"""
-Only natural join is implemented.
-"""
-function join(x::PersistentArraySet, y::PersistentArraySet)
-  if emptyp(x) || emptyp(y)
-    emptyset
-  else
-    ks = intersection(
-      into(emptyset, keys(first(x))),
-      into(emptyset, keys(first(y)))
-    )
-
-    (r, s) = ifelse(count(x) < count(y), (x, y), (y, x))
-
-    idx = index(r, ks)
-
-    reduce((acc, x) ->
-      reduce((acc, y) ->
-          conj(acc, merge(y, x)), acc, get(idx, selectkeys(x, ks))
-      ), emptyset, s
-    )
-  end
-end
-
 function iterate(s::PersistentArraySet)
   iterate(s.elements)
 end
@@ -228,4 +169,87 @@ end
 
 function string(s::Set)
   "#{" * transduce(map(string) ∘ interpose(", "), *, "", seq(s)) * "}"
+end
+
+################################################################################
+##### Relational Algebra
+################################################################################
+
+### These are stolen, mutatis mutandis, from clojure's set.clj
+
+# REVIEW: There are more efficient ways to do some of these by taking into
+# account the underlying set implementation. If performance ever becomes a
+# problem, remember that.
+
+union(x::EmptySet, y::EmptySet) = emptyset
+union(x::EmptySet, y::Set) = y
+union(x::Set, y::EmptySet) = x
+
+function union(x::Set, y::Set)
+  if count(x) < count(y)
+    into(y, x)
+  else
+    into(x, y)
+  end
+end
+
+difference(x::EmptySet, y::EmptySet) = emptyset
+difference(x::EmptySet, y::Set) = emptyset
+difference(x::Set, y::EmptySet) = x
+
+function difference(x::Set, y::Set)
+  if count(x) < count(y)
+    difference(y, x)
+  else
+    reduce(disj, x, y)
+  end
+end
+
+intersection(x::EmptySet, y::EmptySet) = emptyset
+intersection(x::EmptySet, y::Set) = emptyset
+intersection(x::Set, y::EmptySet) = emptyset
+
+function intersection(x::Set, y::Set)
+  if count(y) < count(x)
+    intersection(y, x)
+  else
+    reduce((acc, e) -> ifelse(containsp(y, e), acc, disj(acc, e)), x, x)
+  end
+end
+
+function index(rel, ks)
+  reduce((m, x) -> begin
+         ik = selectkeys(x, ks)
+         return assoc(m, ik, conj(get(m, ik, emptyset), x))
+         end,
+    emptymap, rel
+  )
+end
+
+join(x::EmptySet, y::EmptySet) = emptyset
+join(x::EmptySet, y::Set) = emptyset
+join(x::Set, y::EmptySet) = emptyset
+
+"""
+Only natural join is implemented.
+"""
+function join(x::Set, y::Set)
+  ks = intersection(
+    into(emptyset, keys(first(x))),
+    into(emptyset, keys(first(y)))
+  )
+
+  (r, s) = ifelse(count(x) < count(y), (x, y), (y, x))
+
+  idx = index(r, ks)
+
+  reduce((acc, x) ->
+      reduce((acc, y) ->
+          conj(acc, merge(y, x)), acc, get(idx, selectkeys(x, ks))
+      ), emptyset, s
+  )
+end
+
+function project(rel::Set, ks)
+  into(emptyset, map(m -> selectkeys(m, ks)) ∘ remove(emptyp), rel)
 end

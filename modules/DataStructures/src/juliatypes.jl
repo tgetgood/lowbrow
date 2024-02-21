@@ -113,3 +113,7 @@ function into!(to::Base.Vector, from; infertype=true)
     reduce(push!, to, from)
   end
 end
+
+function conj(s1::String, s2::String)
+  s1 * s2
+end
