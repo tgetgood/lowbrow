@@ -4,6 +4,7 @@ authors = ["Thomas Getgood <thomas@macroexpanse.com>"]
 version = "0.0.0"
 
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 BitMasks = "a3e06817-fd65-4797-8291-16f435bc2529"
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 ColorTypes = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
