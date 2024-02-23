@@ -34,6 +34,7 @@ seq(s::PersistentArraySet) = s.elements
 
 count(s::PersistentArraySet) = length(s.elements)
 
+containsp(s::EmptySet, x) = false
 containsp(s::Set, x) = getindexed(s, x) !== :notfound
 
 set(xs...) = into(emptyset, xs)

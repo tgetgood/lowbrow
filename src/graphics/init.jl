@@ -32,7 +32,8 @@ defaults = ds.hashmap(
   ),
   :device, ds.hashmap(
     :features, ds.hashmap(
-      # v"1.0", [:sampler_anisotropy],
+      v"1.0", [],
+      v"1.1", [],
       v"1.2", [:timeline_semaphore],
       v"1.3", [:synchronization2],
     ),
@@ -71,8 +72,9 @@ devtooling = ds.hashmap(
 Returns true if every element in requested is also in available.
 Returns false and logs a warning if there are missing dependencies.
 
-N.B.: it fails soft because it's up to downstream components to decide if they
-can or cannot continue without the requested features/layers/extensions.
+N.B.: it fails soft by default because it's often up to downstream components to
+decide if they can or cannot continue without the requested
+features/layers/extensions.
 """
 function checkavailability(requested, available, k, name)
   # Unrequested features shouldn't be activated, but that's not an error by
@@ -83,7 +85,7 @@ function checkavailability(requested, available, k, name)
     true
   else
     msg = ds.into("", map(x -> get(x, k)) ∘ map(string) ∘ ds.interpose(", "), diff)
-    @warn "The following requested "* name * " are not supported:\n" * msg
+    @warn "The following requested " * name * " are not supported:\n" * msg
     return false
   end
 end
@@ -144,9 +146,86 @@ function instancerequirements(config)
   end
 end
 
+function featuresupported(feature, supported)
+  try
+    getproperty(supported, feature)
+  catch e
+    @warn e
+    false
+  end
+end
+
+function featuressupported(required, supported)
+  filter(f -> featuresupported(f, supported), required)
+end
+
+function featurediff(requested, supported)
+  function rf(m, fe)
+    s = ds.into(ds.emptyset, get(supported, ds.key(fe)))
+    fs = ds.remove(f -> ds.containsp(s, f), ds.val(fe))
+    if ds.count(fs) == 0
+      m
+    else
+      ds.assoc(m, ds.key(fe), fs)
+    end
+  end
+  ds.reduce(rf, ds.emptymap, requested)
+end
+
+function checkfeatures(requested, supported)
+  if requested == supported
+    true
+  else
+    msg = "The following requested Vulkan features are not supported by available hardware: "
+    msg *= string(featurediff(requested, supported))
+    @debug msg
+    false
+  end
+end
+
+function devicerequirements(config, info)
+  layers = torel(:layer_name, ds.getin(config, [:device, :layers], []))
+  supported_layers = ds.join(layers, ds.getin(info, [:device, :layers]))
+  lcheck = checkavailability(layers, supported_layers, :layer_name, "layers")
+
+  extensions = torel(:extension_name, ds.getin(config, [:device, :extensions], []))
+  supported_extensions = ds.join(extensions, ds.getin(info, [:device, :extensions]))
+  echeck = checkavailability(
+    extensions, supported_extensions, :extension_name, "extensions"
+  )
+
+  devicefeatures = ds.getin(info, [:device, :features])
+  features = ds.getin(config, [:device, :features])
+
+  supported_features = ds.map(
+    x -> [ds.key(x), featuressupported(ds.val(x), get(devicefeatures, ds.key(x)))],
+    features
+  )
+
+  fcheck = checkfeatures(features, supported_features)
+
+  if !lcheck || !echeck || !fcheck
+    return :device_unsuitable
+  else
+    return ds.hashmap(
+      :layers, supported_layers,
+      :extensions, supported_extensions,
+      :features, supported_features
+    )
+  end
+end
+
 ################################################################################
 ##### Resource creation
 ################################################################################
+
+function extensions(config)
+  ds.into!([], map(x -> get(x, :extension_name)), get(config, :extensions))
+end
+
+function layers(config)
+  ds.into!([], map(x -> get(x, :layer_name)), get(config, :layers))
+end
 
 function instance(config)
   appinfo = vk.ApplicationInfo(
@@ -158,11 +237,43 @@ function instance(config)
   )
 
   vk.unwrap(vk.create_instance(
-    ds.into!([], map(x -> get(x, :layer_name)), get(config, :layers)),
-    ds.into!([], map(x -> get(x, :extension_name)), get(config, :extensions));
+    layers(config),
+    extensions(config);
     next=get(config, :debuginfo, C_NULL),
     application_info=appinfo
   ))
+end
+
+function choosedevice(devs)
+  suitable = ds.remove(x -> ds.val(x) === :device_unsuitable, devs)
+  @assert length(suitable) > 0 "No suitable GPUs found. Cannot continue."
+
+  # FIXME: unlikely to be true in general
+  best = first(suitable)
+
+  return ds.key(best), ds.val(best)
+end
+
+function queuecreateinfos(spec)
+  [vk.DeviceQueueCreateInfo(0, [1.0])]
+end
+
+function device(pdev, info)
+  features = get(info, :features)
+
+  dci = vk.DeviceCreateInfo(
+    queuecreateinfos(get(info, :queues)),
+    layers(info),
+    extensions(info);
+    enabled_features=vk.PhysicalDeviceFeatures(get(features, v"1.0")...),
+    next=ds.reduce(
+      (s, v) -> get(hw.featuretypes, v)(get(features, v)...; next=s),
+      C_NULL,
+      [v"1.3", v"1.2", v"1.1"]
+    )
+  )
+
+  vk.unwrap(vk.create_device(pdev, dci))
 end
 
 ################################################################################
@@ -171,11 +282,14 @@ end
 
 # REVIEW: Takes in a module which provides an OS window. The idea is to be able
 # to swap glfw for sdl when required, but I need to standardise the api before
-# that's realistic.
+# that's realistic. I want the end user to be able to extend this library with
+# their own windowing solution.
 function setup(baseconfig, wm)
   windowconfig = wm.configure()
 
-  config = mergeconfig(defaults, baseconfig, windowconfig)
+  devcfg = get(baseconfig, :dev_tooling, false) ? devtooling : ds.emptymap
+
+  config = mergeconfig(defaults, devtooling, baseconfig, windowconfig)
 
   # The general flow is that you specify what you want in config, call a
   # negotiator which returns the best you can get, and if that's good enough,
@@ -193,7 +307,14 @@ function setup(baseconfig, wm)
 
   surface = wm.surface(inst, window)
 
-  pdevs = hw.physicaldevices(inst, surface)
+  pdevs = map(
+    x -> [ds.key(x), devicerequirements(config, ds.val(x))],
+    hw.physicaldevices(inst, surface)
+  )
+
+  pdev, deviceinfo = choosedevice(pdevs)
+
+  dev = device(pdev, deviceinfo)
 
   system = ds.hashmap(
     :instance, inst,
@@ -201,7 +322,8 @@ function setup(baseconfig, wm)
     # REVIEW: Include the windowmanager here? Or wrap the window object in a
     # struct that can query its size and whatnot?
     :surface, surface,
-    :pdevs, pdevs
+    :pdevs, pdevs,
+    :device, dev
   )
 end
 

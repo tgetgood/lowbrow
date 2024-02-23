@@ -53,10 +53,9 @@ prog = ds.hashmap(
 )
 
 function main()
-  window.shutdown()
-
   # config = graphics.configure(load(prog))
 
+  window.shutdown()
   system = init.setup(prog, window)
 
   # FIXME: config should be static.
@@ -74,7 +73,8 @@ function main()
       sleep(0.08)
     end
   end
+  window.shutdown()
   tp.teardown(gp)
 end
 
-main()
+# main()

@@ -138,21 +138,7 @@ function checkdevice(system, config)
            map(x -> getproperty(features, x),
              ds.getin(config, [:device, :features]))
          ) &&
-         swapchainsupport(system) &&
-         containsall(
-           getin(config, [:device, :extensions], []),
-           map(
-             x -> x.extension_name,
-             vk.unwrap(vk.enumerate_device_extension_properties(pdev))
-           )
-         ) &&
-         containsall(
-           getin(config, [:device, :validation], []),
-           map(
-             x -> x.layer_name,
-             vk.unwrap(vk.enumerate_device_layer_properties(pdev))
-           )
-         )
+         swapchainsupport(system)
 end
 
 function findformat(system, config)
@@ -218,6 +204,17 @@ function multisamplemax(device)
   vk.SampleCountFlag(1 << (ndigits((depth&colour).val, base=2) - 1))
 end
 
+const featuretypes = hashmap(
+  v"1.3", vk.PhysicalDeviceVulkan13Features,
+  v"1.2", vk.PhysicalDeviceVulkan12Features,
+  v"1.1", vk.PhysicalDeviceVulkan11Features,
+  v"1.0", vk.PhysicalDeviceFeatures2
+)
+
+function devicefeatures(pdev)
+  ds.mapvals(x -> vk.get_physical_device_features_2(pdev, x).next, featuretypes)
+end
+
 function surfaceinfo(pdev, surface)
   ds.hashmap(
     :formats, vk.unwrap(
@@ -239,20 +236,7 @@ function physicaldeviceinfo(pdev)
     :properties, vk.get_physical_device_properties(pdev),
     :extensions, xrel(vk.unwrap(vk.enumerate_device_extension_properties(pdev))),
     :layers, xrel(vk.unwrap(vk.enumerate_device_layer_properties(pdev))),
-  )
-end
-
-const featuretypes = hashmap(
-  v"1.3", vk.PhysicalDeviceVulkan13Features,
-  v"1.2", vk.PhysicalDeviceVulkan12Features,
-  v"1.1", vk.PhysicalDeviceVulkan11Features,
-  v"1.0", vk.PhysicalDeviceFeatures2
-)
-
-function devicefeatures(pdev)
-  map(
-    x -> [ds.key(x), vk.get_physical_device_features_2(pdev, ds.val(x)).next],
-    featuretypes
+    :features, devicefeatures(pdev)
   )
 end
 
@@ -263,8 +247,8 @@ function physicaldevices(instance, surface)
       x,
       hashmap(
         :surface, surfaceinfo(x, surface),
-        :physicaldevice, physicaldeviceinfo(x),
-        :features, devicefeatures(x)
+        :device, physicaldeviceinfo(x),
+
       )
     ]),
     vk.unwrap(vk.enumerate_physical_devices(instance))
@@ -302,42 +286,6 @@ function getqueue(system, queue, nth=1)
     getin(system, [:queues, queue]),
     nth-1
   )
-end
-
-function createdevice(system, config)
-  system = pdevice(system, config)
-  queues = get(system, :queues)
-  pdev = get(system, :physicaldevice)
-
-  # Create one queue per op type, even if families overlap.
-  # FIXME: We need to validate the hardware supports the number of queues we're
-  # requesting.
-  # rf(acc, e) = ds.containsp(acc, e) ? ds.assoc(acc, e, ds.conj(get(acc, e), 1.0)) : ds.assoc(acc, e, [1.0])
-
-  # qs2c = ds.reduce(rf, ds.emptymap, ds.vals(queues))
-  # qcis = ds.into!([], map(qf -> vk.DeviceQueueCreateInfo(ds.key(qf), ds.val(qf))), qs2c)
-
-  qs2c = ds.into(ds.emptyset, ds.vals(queues))
-  qcis = ds.into!([], map(qf -> vk.DeviceQueueCreateInfo(qf, [1.0])), qs2c)
-
-  dci = vk.DeviceCreateInfo(
-    qcis,
-    getin(config, [:device, :validation], []),
-    getin(config, [:device, :extensions], []);
-    enabled_features=
-    vk.PhysicalDeviceFeatures(ds.getin(config, [:device, :features])...),
-    # FIXME: Confirm that these features are available before enabling.
-    # How do I do that?
-    # Not urgent since vulkan 1.2+ requires :timeline_semaphore.
-    next=vk.PhysicalDeviceVulkan12Features(
-      ds.getin(config, [:device, :vk12features])...;
-      next=vk.PhysicalDeviceVulkan13Features(
-        ds.getin(config, [:device, :vk13features])...
-      )
-    )
-  )
-
-  assoc(system, :device, vk.unwrap(vk.create_device(pdev, dci)))
 end
 
 function createswapchain(system, config)
