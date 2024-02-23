@@ -105,7 +105,7 @@ function window(name, config)
   glfw.WindowHint(glfw.RESIZABLE, get(config, :resizable))
   glfw.WindowHint(glfw.REFRESH_RATE, get(config, :refresh, glfw.DONT_CARE))
 
-  window = glfw.CreateWindow(get(config, :width), get(config, :height))
+  window = glfw.CreateWindow(get(config, :width), get(config, :height), name)
 
   ch = Channel()
 
