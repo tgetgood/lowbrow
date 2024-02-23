@@ -412,21 +412,10 @@ function showrecur(io::IO, depth, _::EmptyVector)
 end
 
 function showrecur(io::IO, depth, v::Vector)
-  print(io, string(count(v)) * "-element PersistentVector{" * string(eltype(v)) * "}: [\n")
-  indent(io, depth)
-
-  # Why 33? Because it had to be something...
-  if count(v) > 33
-    showseq(io, depth, take(16, v))
-    print(io, "\n ...\n")
-    indent(io, depth)
-    showseq(io, depth, takelast(16, v))
-  else
-    showseq(io, depth, v)
-  end
-
-  print(io, "\n")
-  indent(io, depth-1)
+  print(io, string(
+    count(v)) * "-element PersistentVector{" * string(eltype(v)) * "}: [\n"
+  )
+  showseq(io, depth, v)
   print(io, "]")
 end
 

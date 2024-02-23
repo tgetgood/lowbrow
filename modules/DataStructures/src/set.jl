@@ -263,3 +263,19 @@ end
 function project(rel::Set, ks)
   into(emptyset, map(m -> selectkeys(m, ks)) ∘ remove(emptyp), rel)
 end
+
+#### Set display
+
+function show(io::IO, mime::MIME"text/plain", s::SetMap)
+  showrecur(io, 1, s)
+end
+
+function showrecur(io::IO, _, _::EmptySet)
+  print(io, "#{}")
+end
+
+function showrecur(io, depth, x::Set)
+  print(io, string(count(x)) * "-element PersistentSet: {\n")
+  showseq(io, depth, seq(x))
+  print(io, "}")
+end

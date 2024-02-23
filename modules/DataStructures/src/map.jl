@@ -192,19 +192,7 @@ end
 
 function showrecur(io::IO, depth, m::Map)
   print(io, string(count(m)) * "-element PersistentMap: {\n")
-  indent(io, depth)
-
-  s = seq(m)
-  if count(m) > 33
-    showseq(io, depth, take(16, s))
-    print(io, "\n ...\n")
-    indent(io, depth)
-    showseq(io, depth, drop(count(m) - 16, s))
-  else
-    showseq(io, depth, s)
-  end
-  print(io, "\n")
-  indent(io, depth-1)
+  showseq(io, depth, seq(m))
   print(io, "}")
 end
 

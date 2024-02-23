@@ -623,3 +623,18 @@ function showrecur(io::IO, depth, x::Base.Vector)
   indent(io, depth-1)
   print(io, "]")
 end
+
+function showseq(io::IO, depth, x)
+  indent(io, depth)
+  # REVIEW: Why 33?
+  if count(x) > 33
+    showseq(io, depth, take(16, s))
+    print(io, "\n ...\n")
+    indent(io, depth)
+    showseq(io, depth, drop(count(x) - 16, s))
+  else
+    showseq(io, depth, s)
+  end
+  print(io, "\n")
+  indent(io, depth-1)
+end
