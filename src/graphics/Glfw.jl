@@ -100,22 +100,27 @@ function scrollcb(_, x, y)
   end
 end
 
-function window(size, name)
+function window(name, config)
   glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
-  glfw.WindowHint(glfw.RESIZABLE, true)
-  glfw.WindowHint(glfw.REFRESH_RATE, 100) #glfw.DONT_CARE)
+  glfw.WindowHint(glfw.RESIZABLE, get(config, :resizable))
+  glfw.WindowHint(glfw.REFRESH_RATE, get(config, :refresh, glfw.DONT_CARE))
 
-  window = glfw.CreateWindow(size.width, size.height, name)
+  window = glfw.CreateWindow(get(config, :width), get(config, :height))
 
   ch = Channel()
 
-  glfw.SetFramebufferSizeCallback(window, resizecb(ch))
+  if get(config, :resizable, false)
+      glfw.SetFramebufferSizeCallback(window, resizecb(ch))
+  end
 
-  glfw.SetMouseButtonCallback(window, mousebuttoncb)
-  glfw.SetCursorPosCallback(window, mouseposcb)
-  glfw.SetScrollCallback(window, scrollcb)
+  if get(config, :interactive, false)
+    # TODO: Make this event registration configurable
+    glfw.SetMouseButtonCallback(window, mousebuttoncb)
+    glfw.SetCursorPosCallback(window, mouseposcb)
+    glfw.SetScrollCallback(window, scrollcb)
+  end
 
-   window, resized(ch)
+  window, resized(ch)
 end
 
 function surface(instance, window)
