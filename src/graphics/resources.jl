@@ -74,6 +74,16 @@ const descriptortypes = hashmap(
   :image, vk.DESCRIPTOR_TYPE_STORAGE_IMAGE
 )
 
+const queuebits = hashmap(
+  :graphics, vk.QUEUE_GRAPHICS_BIT,
+  :compute, vk.QUEUE_COMPUTE_BIT,
+  :transfer, vk.QUEUE_TRANSFER_BIT,
+  :sparse_binding, vk.QUEUE_SPARSE_BINDING_BIT,
+  :protected, vk.QUEUE_PROTECTED_BIT,
+  :video_encode, vk.QUEUE_VIDEO_ENCODE_BIT_KHR,
+  :video_decode, vk.QUEUE_VIDEO_DECODE_BIT_KHR
+)
+
 ##### Resource Creation
 
 """
