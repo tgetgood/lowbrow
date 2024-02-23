@@ -601,7 +601,7 @@ end
 
 indent(io, depth) = print(io, repeat("  ", depth))
 
-function showseq(io, depth, seq)
+function showseqinner(io, depth, seq)
   start = false
   for x in seq
     if start
@@ -613,28 +613,23 @@ function showseq(io, depth, seq)
   end
 end
 
-function showrecur(io::IO, depth, x::Base.Vector)
-  print(io, string(count(x)) * "-element " * string(typeof(x)) * ": [\n")
-  indent(io, depth)
-
-  showseq(io, depth, x)
-
-  print(io, "\n")
-  indent(io, depth-1)
-  print(io, "]")
-end
-
-function showseq(io::IO, depth, x)
+function showseq(io::IO, depth, s)
   indent(io, depth)
   # REVIEW: Why 33?
-  if count(x) > 33
-    showseq(io, depth, take(16, s))
+  if count(s) > 33
+    showseqinner(io, depth, take(16, s))
     print(io, "\n ...\n")
     indent(io, depth)
-    showseq(io, depth, drop(count(x) - 16, s))
+    showseqinner(io, depth, drop(count(s) - 16, s))
   else
-    showseq(io, depth, s)
+    showseqinner(io, depth, s)
   end
   print(io, "\n")
   indent(io, depth-1)
+end
+
+function showrecur(io::IO, depth, x::Base.Vector)
+  print(io, string(count(x)) * "-element " * string(typeof(x)) * ": [\n")
+  showseq(io, depth, x)
+  print(io, "]")
 end

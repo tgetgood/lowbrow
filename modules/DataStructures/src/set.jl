@@ -274,7 +274,7 @@ function showrecur(io::IO, _, _::EmptySet)
   print(io, "#{}")
 end
 
-function showrecur(io, depth, x::Set)
+function showrecur(io::IO, depth, x::Set)
   print(io, string(count(x)) * "-element PersistentSet: {\n")
   showseq(io, depth, seq(x))
   print(io, "}")
