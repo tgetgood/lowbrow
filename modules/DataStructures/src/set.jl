@@ -266,7 +266,7 @@ end
 
 #### Set display
 
-function show(io::IO, mime::MIME"text/plain", s::SetMap)
+function show(io::IO, mime::MIME"text/plain", s::Set)
   showrecur(io, 1, s)
 end
 
