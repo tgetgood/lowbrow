@@ -11,10 +11,6 @@ import DataStructures: get, getin, assoc, hashmap, into, emptyvector, emptymap, 
 
 import resources: bufferusagebits, memorypropertybits, sharingmodes, imageusagebits
 
-function containsall(needles, hay)::Bool
-  return [nothing] == indexin([nothing], indexin(needles, hay))
-end
-
 """
 Returns a hashmap isomorphic to s. It's probably better to override fns for
 vk.HighLevelStruct to treat them like maps, rather than actually cast
@@ -34,89 +30,6 @@ function instanceinfo()
     :extensions, xrel(vk.unwrap(vk.enumerate_instance_extension_properties())),
     :layers, xrel(vk.unwrap(vk.enumerate_instance_layer_properties()))
   )
-end
-
-function findgraphicsqueue(device)
-  try
-    vk.find_queue_family(device, vk.QUEUE_GRAPHICS_BIT)
-  catch e
-    return nothing
-  end
-end
-
-function findpresentationqueue(pdevice, surface)
-  first(
-    filter(
-      i -> vk.unwrap(vk.get_physical_device_surface_support_khr(
-        pdevice,
-        i,
-        surface
-      )),
-      0:length(vk.get_physical_device_queue_family_properties(pdevice))-1
-    )
-  )
-end
-
-function findtransferqueue(qfproperties)
-  transferqs = into(
-    emptyvector,
-    ds.mapindexed((i, x) -> (x, i - 1))
-    ∘
-    filter(x -> (x[1].queue_flags & vk.QUEUE_TRANSFER_BIT).val > 0)
-    ,
-    qfproperties
-  )
-
-  # REVIEW: Is this productive? I.e. could there be a case where we have an
-  # async compute queue that can be used for transfers, but no dedicated
-  # transfer queue? In theory yes. But if we did only have compute and graphics
-  # queues, which one do we want to transfer on? That would be load dependent.
-  nog = filter(
-    x -> (x[1].queue_flags & vk.QUEUE_GRAPHICS_BIT).val == 0,
-    transferqs
-  )
-
-  noc = filter(
-    x -> (x[1].queue_flags & vk.QUEUE_COMPUTE_BIT).val == 0,
-    nog
-  )
-
-  if ds.emptyp(noc)
-    if ds.emptyp(nog)
-      first(transferqs)[2]
-    else
-      first(nog)[2]
-    end
-  else
-    first(noc)[2]
-  end
-end
-
-function findcomputequeue(qfproperties)
-  computeqs = into(
-    emptyvector,
-    ds.mapindexed((i, x) -> (x, i - 1))
-    ∘
-    filter(x -> (x[1].queue_flags & vk.QUEUE_COMPUTE_BIT).val > 0)
-    ,
-    qfproperties
-  )
-
-  if ds.emptyp(computeqs)
-    @error "device does not support compute. Vulkan requires that it does."
-    throw("Unreachable")
-  end
-
-  dedicated = filter(
-    x -> (x[1].queue_flags & vk.QUEUE_GRAPHICS_BIT).val == 0,
-    computeqs
-  )
-
-  if ds.emptyp(dedicated)
-    first(computeqs)[2]
-  else
-    first(dedicated)[2]
-  end
 end
 
 function swapchainsupport(surfaceinfo)
@@ -158,26 +71,6 @@ function findpresentmode(system, config)
   else
     first(modes)
   end
-end
-
-const queuefinders = hashmap(
-  :graphics, findgraphicsqueue,
-  # a device doesn't have a "presentation queue", it may have a queue that can
-  # present to a given surface. Thus `findpresentationqueue` is different in kind.
-  # :presentation, findpresentationqueue,
-  :transfer, findtransferqueue,
-  :compute, findcomputequeue
-)
-
-function findqueues(system)
-  pdevice = get(system, :physicaldevice)
-  qfproperties = get(system, :qf_properties)
-  hashmap(
-    :graphics, findgraphicsqueue(pdevice),
-    :presentation, findpresentationqueue(pdevice, get(system, :surface)),
-    :transfer, findtransferqueue(qfproperties),
-    :compute, findcomputequeue(qfproperties)
-  )
 end
 
 function multisamplemax(device)
