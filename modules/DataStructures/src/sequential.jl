@@ -637,3 +637,12 @@ function showrecur(io::IO, depth, x::Base.Vector)
     print(io, "]")
   end
 end
+
+function groupby(keyfn, coll)
+  function rf(m, e)
+    k = keyfn(e)
+    assoc(m, k, conj(get(m, k, empty(coll)), e))
+  end
+
+  reduce(rf, emptymap, coll)
+end

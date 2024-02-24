@@ -2,7 +2,7 @@ using Test
 
 using DataStructures
 import DataStructures as ds
-import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, EmptyVector, Vector, sibling, vectornode, vectorleaf, depth, emptyhashmap, reduce, arraymapsizethreashold, conj!, zip, intoemptyvec
+import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, EmptyVector, Vector, sibling, vectornode, vectorleaf, depth, emptyhashmap, reduce, arraymapsizethreashold, conj!, zip, intoemptyvec, groupby
 
 # TODO: Look into dev modules to separate these tests as the suite gets
 # larger. Not really a problem yet, but I have pasting files together.
@@ -23,3 +23,4 @@ include("settests.jl")
 include("asynctests.jl")
 include("typeinferencetests.jl")
 include("relational.jl")
+include("misctests.jl")
