@@ -196,6 +196,9 @@ function checkfeatures(requested, supported)
   end
 end
 
+function queuerequirements(config, info)
+end
+
 function devicerequirements(config, info)
   layers = torel(:layer_name, ds.getin(config, [:device, :layers], []))
   supported_layers = ds.join(layers, ds.getin(info, [:configurable, :layers]))
@@ -219,7 +222,7 @@ function devicerequirements(config, info)
 
   fcheck = checkfeatures(features, supported_features)
 
-  @info get(config, :pipelines)
+  queueinfo = queuerequirements(get(config, :pipelines), get(info, :device))
 
   if !lcheck || !echeck || !fcheck
     return :device_unsuitable

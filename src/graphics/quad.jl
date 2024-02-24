@@ -1,6 +1,5 @@
 ##### Simple rendered quadrilateral example.
 
-import graphics
 import init
 
 import Glfw as window
