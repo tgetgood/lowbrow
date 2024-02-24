@@ -68,7 +68,7 @@ function computepipeline(
     :bindpoint, :compute,
     :pipeline, vk.unwrap(vk.create_compute_pipelines(
       dev,
-      [vk.ComputePipelineCreateInfo(computeshader, pipelinelayout, 0)]
+      [vk.ComputePipelineCreateInfo(computeshader, pipelinelayout, -1)]
     ))[1][1]
   )
 end
