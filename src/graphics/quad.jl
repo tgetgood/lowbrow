@@ -56,7 +56,7 @@ function main()
   # config = graphics.configure(load(prog))
 
   window.shutdown()
-  system = init.setup(prog, window)
+  system, info = init.setup(prog, window)
 
   # FIXME: config should be static.
   config = fw.staticbuffers(system, get(prog, :render))

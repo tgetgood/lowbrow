@@ -47,18 +47,25 @@ defaults = ds.hashmap(
     :interactive, true
 
   ),
-  :render, ds.hashmap(
-    :msaa, 1, # Disabled
-    :swapchain, ds.hashmap(
-      # TODO: Fallback formats and init time selection.
-      :format, vk.FORMAT_B8G8R8A8_SRGB,
-      :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
-      :presentmode, vk.PRESENT_MODE_FIFO_KHR,
-      :images, 3
+  # TODO: Implement caching: I'm already suffering on the laptop.
+  :cache_pipelines, true,
+  :pipelines, ds.hashmap(
+    :render, ds.hashmap(
+      :type, :graphics,
+      :headless, false,
+      :msaa, 1, # Disabled
+    ),
+    :host_transfer, ds.hashmap(
+      :type, :transfer
     )
   ),
-  :concurrent_frames, 3
-)
+  :swapchain, ds.hashmap(
+    # TODO: Fallback formats and init time selection.
+    :format, vk.FORMAT_B8G8R8A8_SRGB,
+    :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
+    :presentmode, vk.PRESENT_MODE_FIFO_KHR,
+    :images, 2
+  ))
 
 devtooling = ds.hashmap(
   :instance, ds.hashmap(
@@ -211,6 +218,8 @@ function devicerequirements(config, info)
   )
 
   fcheck = checkfeatures(features, supported_features)
+
+  @info get(config, :pipelines)
 
   if !lcheck || !echeck || !fcheck
     return :device_unsuitable
