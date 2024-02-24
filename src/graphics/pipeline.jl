@@ -30,13 +30,7 @@ function shader(device, fname, stage, entry="main")
 end
 
 function shaders(device, config)
-  # REVIEW: This assumes only one shader of a given type per pipeline. Is that
-  # correct?
-  into(
-    [],
-    map(e -> shader(device, ds.val(e), ds.key(e))),
-    config
-  )
+  into!([], map(e -> shader(device, ds.val(e), ds.key(e))), config)
 end
 
 function pushconstantrange(x)

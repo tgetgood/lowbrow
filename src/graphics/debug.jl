@@ -72,4 +72,7 @@ function debugmsgr(instance, debuginfo)
   end
 end
 
+# TODO: Use DebugUtilsObjectNameInfoEXT and debug_marker_set_object_name_ext for
+# all vk resources. Debugging is often harder than it needs to be.
+
 end
