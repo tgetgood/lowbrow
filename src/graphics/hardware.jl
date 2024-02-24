@@ -427,30 +427,6 @@ function colourresources(system, config)
   assoc(image, :view, view)
 end
 
-function texturesampler(system, config)
-  props = vk.get_physical_device_properties(get(system, :physicaldevice))
-  anis = props.limits.max_sampler_anisotropy
-
-  vk.unwrap(vk.create_sampler(
-    get(system, :device),
-    vk.FILTER_LINEAR,
-    vk.FILTER_LINEAR,
-    vk.SAMPLER_MIPMAP_MODE_LINEAR,
-    vk.SAMPLER_ADDRESS_MODE_REPEAT,
-    vk.SAMPLER_ADDRESS_MODE_REPEAT,
-    vk.SAMPLER_ADDRESS_MODE_REPEAT,
-    0,
-    true,
-    anis,
-    false,
-    vk.COMPARE_OP_ALWAYS,
-    0,
-    get(config, :miplevels, 1),
-    vk.BORDER_COLOR_INT_OPAQUE_BLACK,
-    false
-  ))
-end
-
 function finddepthformats(system, config)
   pdev = get(system, :physicaldevice)
   reqs = get(config, :features)

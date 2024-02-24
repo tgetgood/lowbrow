@@ -15,6 +15,30 @@ import commands
 # png and jpg load as transposes of each other. Is that my fault?
 import ColorTypes.FixedPointNumbers
 
+function texturesampler(system, config)
+  props = vk.get_physical_device_properties(get(system, :physicaldevice))
+  anis = props.limits.max_sampler_anisotropy
+
+  vk.unwrap(vk.create_sampler(
+    get(system, :device),
+    vk.FILTER_LINEAR,
+    vk.FILTER_LINEAR,
+    vk.SAMPLER_MIPMAP_MODE_LINEAR,
+    vk.SAMPLER_ADDRESS_MODE_REPEAT,
+    vk.SAMPLER_ADDRESS_MODE_REPEAT,
+    vk.SAMPLER_ADDRESS_MODE_REPEAT,
+    0,
+    true,
+    anis,
+    false,
+    vk.COMPARE_OP_ALWAYS,
+    0,
+    get(config, :miplevels, 1),
+    vk.BORDER_COLOR_INT_OPAQUE_BLACK,
+    false
+  ))
+end
+
 function bgr(p)
   ds.vector(
     reinterpret(UInt8, p.b), reinterpret(UInt8, p.g), reinterpret(UInt8, p.r)
@@ -22,7 +46,6 @@ function bgr(p)
 end
 
 function generatemipmaps(vkim, system)
-
   props = vk.get_physical_device_format_properties(
     get(system, :physicaldevice),
     get(vkim, :format)
@@ -187,7 +210,7 @@ function textureimage(system, filename)
   return ds.hashmap(
     :texture, vkim,
     :textureimageview, view,
-    :sampler, hw.texturesampler(system, ds.hashmap(:miplevels, mips))
+    :sampler, texturesampler(system, ds.hashmap(:miplevels, mips))
   )
 end
 
