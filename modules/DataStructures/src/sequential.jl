@@ -629,7 +629,11 @@ function showseq(io::IO, depth, s)
 end
 
 function showrecur(io::IO, depth, x::Base.Vector)
-  print(io, string(count(x)) * "-element " * string(typeof(x)) * ": [\n")
-  showseq(io, depth, x)
-  print(io, "]")
+  if length(x) === 0
+    print(io, "[]")
+  else
+    print(io, string(count(x)) * "-element " * string(typeof(x)) * ": [\n")
+    showseq(io, depth, x)
+    print(io, "]")
+  end
 end

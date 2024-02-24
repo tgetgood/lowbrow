@@ -125,22 +125,6 @@ function swapchainsupport(surfaceinfo)
   return length(formats) > 0 && length(modes) > 0
 end
 
-
-function checkdevice(system, config)
-  pdev = get(system, :physicaldevice)
-  features = vk.get_physical_device_features(pdev)
-
-  return getin(system, [:queues, :graphics]) !== nothing &&
-         getin(system, [:queues, :presentation]) !== nothing &&
-         getin(system, [:queues, :transfer]) !== nothing &&
-         getin(system, [:queues, :compute]) !== nothing &&
-         all(
-           map(x -> getproperty(features, x),
-             ds.getin(config, [:device, :features]))
-         ) &&
-         swapchainsupport(system)
-end
-
 function findformat(system, config)
   filtered = filter(
     x -> x.format == getin(config, [:swapchain, :format]) &&
@@ -225,6 +209,14 @@ function surfaceinfo(pdev, surface)
     ),
     :present_modes, vk.unwrap(
       vk.get_physical_device_surface_present_modes_khr(pdev; surface)
+    ),
+    :presentation_qfs, into(ds.emptyset,
+      filter(i -> vk.unwrap(vk.get_physical_device_surface_support_khr(
+          pdev,
+          i,
+          surface
+        )),
+        0:length(vk.get_physical_device_queue_family_properties(pdev))-1)
     )
   )
 end
@@ -233,7 +225,12 @@ function physicaldeviceinfo(pdev)
   ds.hashmap(
     :qf_properties, vk.get_physical_device_queue_family_properties(pdev),
     :memoryproperties, vk.get_physical_device_memory_properties(pdev),
-    :properties, vk.get_physical_device_properties(pdev),
+    :properties, vk.get_physical_device_properties(pdev)
+  )
+end
+
+function deviceconfiginfo(pdev)
+  ds.hashmap(
     :extensions, xrel(vk.unwrap(vk.enumerate_device_extension_properties(pdev))),
     :layers, xrel(vk.unwrap(vk.enumerate_device_layer_properties(pdev))),
     :features, devicefeatures(pdev)
@@ -248,36 +245,11 @@ function physicaldevices(instance, surface)
       hashmap(
         :surface, surfaceinfo(x, surface),
         :device, physicaldeviceinfo(x),
-
+        :configurable, deviceconfiginfo(x)
       )
     ]),
     vk.unwrap(vk.enumerate_physical_devices(instance))
   )
-end
-
-function pdevice(system, config)
-  potential = into(
-    emptyvector,
-    map(x -> merge(system, hashmap(
-      :physicaldevice, x,
-      :max_msaa, multisamplemax(x)
-    )))
-    ∘
-    map(x -> merge(x, physicaldeviceinfo(get(x, :physicaldevice))))
-    ∘
-    map(x -> merge(x, surfaceinfo(x)))
-    ∘
-    map(x -> assoc(x, :queues, findqueues(x)))
-    ∘
-    filter(potential -> checkdevice(potential, config)),
-    vk.unwrap(vk.enumerate_physical_devices(get(system, :instance)))
-  )
-
-  if ds.emptyp(potential)
-    throw("No suitable hardware found. Cannot continue.")
-  else
-    first(potential)
-  end
 end
 
 function getqueue(system, queue, nth=1)

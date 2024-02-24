@@ -40,7 +40,13 @@ defaults = ds.hashmap(
     # FIXME: logically these are sets. How does vk handle repeats?
     :extensions, ["VK_KHR_swapchain"]
   ),
-  :window, (width=1200, height=1200),
+  :window, ds.hashmap(
+    :width, 1000,
+    :height, 1000,
+    :resizable, true,
+    :interactive, true
+
+  ),
   :render, ds.hashmap(
     :msaa, 1, # Disabled
     :swapchain, ds.hashmap(
@@ -185,16 +191,18 @@ end
 
 function devicerequirements(config, info)
   layers = torel(:layer_name, ds.getin(config, [:device, :layers], []))
-  supported_layers = ds.join(layers, ds.getin(info, [:device, :layers]))
+  supported_layers = ds.join(layers, ds.getin(info, [:configurable, :layers]))
   lcheck = checkavailability(layers, supported_layers, :layer_name, "layers")
 
   extensions = torel(:extension_name, ds.getin(config, [:device, :extensions], []))
-  supported_extensions = ds.join(extensions, ds.getin(info, [:device, :extensions]))
+  supported_extensions = ds.join(
+    extensions, ds.getin(info, [:configurable, :extensions])
+  )
   echeck = checkavailability(
     extensions, supported_extensions, :extension_name, "extensions"
   )
 
-  devicefeatures = ds.getin(info, [:device, :features])
+  devicefeatures = ds.getin(info, [:configurable, :features])
   features = ds.getin(config, [:device, :features])
 
   supported_features = ds.map(
@@ -207,10 +215,15 @@ function devicerequirements(config, info)
   if !lcheck || !echeck || !fcheck
     return :device_unsuitable
   else
-    return ds.hashmap(
-      :layers, supported_layers,
-      :extensions, supported_extensions,
-      :features, supported_features
+    return ds.update(
+      ds.dissoc(info, :configurable),
+      :device,
+      merge,
+      ds.hashmap(
+        :layers, supported_layers,
+        :extensions, supported_extensions,
+        :features, supported_features
+      )
     )
   end
 end
@@ -259,12 +272,13 @@ function queuecreateinfos(spec)
 end
 
 function device(pdev, info)
-  features = get(info, :features)
+  dev = get(info, :device)
+  features = get(dev, :features)
 
   dci = vk.DeviceCreateInfo(
     queuecreateinfos(get(info, :queues)),
-    layers(info),
-    extensions(info);
+    layers(dev),
+    extensions(dev);
     enabled_features=vk.PhysicalDeviceFeatures(get(features, v"1.0")...),
     next=ds.reduce(
       (s, v) -> get(hw.featuretypes, v)(get(features, v)...; next=s),
@@ -300,10 +314,7 @@ function setup(baseconfig, wm)
 
   debugmessenger = debug.debugmsgr(inst, get(instinfo, :debuginfo, nothing))
 
-  window, resizecb = wm.window(
-    get(config, :window),
-    get(config, :name)
-  )
+  window, resizecb = wm.window(get(config, :name), get(config, :window))
 
   surface = wm.surface(inst, window)
 
@@ -322,9 +333,13 @@ function setup(baseconfig, wm)
     # REVIEW: Include the windowmanager here? Or wrap the window object in a
     # struct that can query its size and whatnot?
     :surface, surface,
-    :pdevs, pdevs,
+    :pdev, pdev,
     :device, dev
   )
+
+  info = ds.assoc(deviceinfo, :instance, instinfo)
+
+  return system, info
 end
 
 end # module
