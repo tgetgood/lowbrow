@@ -532,22 +532,14 @@ end
 Takes a function and args and applies it in a thread, returning a channel which
 will eventually yield the result.
 """
-function thread(f, args...)
-  # TODO: Flag to disable in production
-  # HACK: This is slow as hell. Do not use except in dire straights.
-  # invocation_trace = stacktrace()
-  invocation_trace = "disabled"
-
+function thread(f, args...; name="")
   join = Channel()
   Threads.@spawn begin
       try
         put!(join, f(args...))
       catch e
+        @error "Error in thread " * name
         ds.handleerror(e)
-        print(stderr, "\n Thread launched from:\n")
-        # FIXME: This doesn't seem to be lexically captured, but gets
-        # dynamically bound to the most recent invocation of `thread`.
-        show(stderr, "text/plain", invocation_trace)
       end
   end
   return join
