@@ -9,6 +9,7 @@ import Vulkan as vk
 import DataStructures as ds
 import DataStructures: get, getin, assoc, hashmap, into, emptyvector, emptymap, emptyset
 
+import resources as rd
 import resources: bufferusagebits, memorypropertybits, sharingmodes, imageusagebits
 
 """
@@ -118,12 +119,7 @@ function physicaldeviceinfo(pdev)
   ds.hashmap(
     :qf_properties, vk.get_physical_device_queue_family_properties(pdev),
     :memoryproperties, vk.get_physical_device_memory_properties(pdev),
-    :properties, vk.get_physical_device_properties(pdev)
-  )
-end
-
-function deviceconfiginfo(pdev)
-  ds.hashmap(
+    :properties, vk.get_physical_device_properties(pdev),
     :extensions, xrel(vk.unwrap(vk.enumerate_device_extension_properties(pdev))),
     :layers, xrel(vk.unwrap(vk.enumerate_device_layer_properties(pdev))),
     :features, devicefeatures(pdev)
@@ -137,12 +133,28 @@ function physicaldevices(instance, surface)
       x,
       hashmap(
         :surface, surfaceinfo(x, surface),
-        :device, physicaldeviceinfo(x),
-        :configurable, deviceconfiginfo(x)
+        :device, physicaldeviceinfo(x)
       )
     ]),
     vk.unwrap(vk.enumerate_physical_devices(instance))
   )
+end
+
+"""
+Choose the "simplest" queue which has all bits specified. Simple means least
+queueflagbits total.
+"""
+function selectqueue(qfp, bits)
+  q = sort(
+    filter(x -> (x.queue_flags & bits) == bits, qfp);
+    by=x -> count_ones(x.queue_flags)
+  )[1]
+
+  return indexin([q], qfp)[1] - 1
+end
+
+function queuetype(qfp, t)
+  t, selectqueue(qfp, get(rd.queuebits, t, typo))
 end
 
 function getqueue(system, queue, nth=1)

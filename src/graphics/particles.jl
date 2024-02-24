@@ -73,9 +73,8 @@ prog = hashmap(
     :version, v"1.3"
   ),
   # TODO: Rectify this :device/:device_req split
-  :device_req, ds.hashmap(
+  :device, ds.hashmap(
     :features, ds.hashmap(
-      v"1.0", ds.set(:sampler_anisotropy),
       v"1.2", ds.set(:timeline_semaphore),
       v"1.3", [:synchronization2]
     ),
@@ -84,40 +83,38 @@ prog = hashmap(
   :dev_tools, true,
   :window, hashmap(:width, 1000, :height, 1000),
   :particles, nparticles,
-  :compute, ds.hashmap(
-    # inputs and outputs are combined to create descriptor sets.
-    :inputs, [ds.hashmap(:type, :ssbo)],
-    :outputs, [ds.hashmap(
-      :type, :ssbo,
-      :usage, ds.set(:vertex_buffer, :storage_buffer),
-      :size, sizeof(Particle) * nparticles,
-      :memoryflags, :device_local,
-      :queues, [:graphics, :compute]
-    )],
-    # push constants are... constants. Treat them accordingly.
-    :pushconstants, ds.hashmap(:size, 16),
-    # The workgroup size and shader local size are tightly coupled, so this is,
-    # in fact, a property of the pipeline, not of any task on it.
-    :workgroups, [Int(floor(nparticles / 256)), 1, 1],
-    :shader, ds.hashmap(
-      :stage, :compute,
-      :file, *(@__DIR__, "/../shaders/particles.comp"),
-      # FIXME: Currently no caching is implemented.
-      :cache, true
-    )
-  ),
-  :render, ds.hashmap(
-    :swapchain, hashmap(
-      # Triple buffering.
-      :images, 3
+  :pipelines, ds.hashmap(
+    :compute, ds.hashmap(
+      # inputs and outputs are combined to create descriptor sets.
+      :inputs, [ds.hashmap(:type, :ssbo)],
+      :outputs, [ds.hashmap(
+        :type, :ssbo,
+        :usage, ds.set(:vertex_buffer, :storage_buffer),
+        :size, sizeof(Particle) * nparticles,
+        :memoryflags, :device_local,
+        :queues, [:graphics, :compute]
+      )],
+      # push constants are... constants. Treat them accordingly.
+      :pushconstants, ds.hashmap(:size, 16),
+      # The workgroup size and shader local size are tightly coupled, so this is,
+      # in fact, a property of the pipeline, not of any task on it.
+      :workgroups, [Int(floor(nparticles / 256)), 1, 1],
+      :shader, ds.hashmap(
+        :stage, :compute,
+        :file, *(@__DIR__, "/../shaders/particles.comp"),
+        # FIXME: Currently no caching is implemented.
+        :cache, true
+      )
     ),
-    :inputassembly, ds.hashmap(
-      :topology, :points,
-      :restart, false
-    ),
-    :shaders, hashmap(
-      :vertex, *(@__DIR__, "/../shaders/particles.vert"),
-      :fragment, *(@__DIR__, "/../shaders/particles.frag")
+    :render, ds.hashmap(
+      :inputassembly, ds.hashmap(
+        :topology, :points,
+        :restart, false
+      ),
+      :shaders, hashmap(
+        :vertex, *(@__DIR__, "/../shaders/particles.vert"),
+        :fragment, *(@__DIR__, "/../shaders/particles.frag")
+      )
     )
   )
 )

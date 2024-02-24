@@ -54,13 +54,13 @@ defaults = ds.hashmap(
   :pipelines, ds.hashmap(
     :render, ds.hashmap(
       :type, :graphics,
-      :headless, false,
       :msaa, 1, # Disabled
     ),
     :host_transfer, ds.hashmap(
       :type, :transfer
     )
   ),
+  :headless, false,
   :swapchain, ds.hashmap(
     # TODO: Fallback formats and init time selection.
     :format, vk.FORMAT_B8G8R8A8_SRGB,
@@ -199,22 +199,65 @@ function checkfeatures(requested, supported)
 end
 
 function queuerequirements(config, info)
+  qfp = ds.getin(info, [:device, :qf_properties])
+  qtypes = [:transfer, :compute, :graphics]
+
+  queue_families = ds.into(ds.emptymap, map(x -> hw.queuetype(qfp, x)), qtypes)
+
+  pipelinecounts = ds.mapvals(
+    ds.count,
+    ds.groupby(x -> get(ds.val(x), :type), get(config, :pipelines))
+  )
+
+  queuecountbyfamily = ds.into(
+    ds.emptymap,
+    ds.mapvals(x -> ds.set(ds.keys(x)...))
+    ∘
+    ds.mapvals(x -> sum(ds.into!([], map(y -> get(pipelinecounts, y, 0)), x))),
+    ds.groupby(ds.val, queue_families)
+  )
+
+  if !get(config, :headless, false)
+    queue_families = ds.assoc(
+      queue_families,
+      :presentation,
+      first(sort(ds.seq(ds.getin(info, [:surface, :presentation_qfs]))))
+    )
+
+    presqf = get(queue_families, :presentation)
+
+    queuecountbyfamily = ds.assoc(
+      queuecountbyfamily,
+      presqf,
+      get(queuecountbyfamily, presqf, 0) + 1
+    )
+  end
+
+  supported_counts = map(
+    x -> [ds.key(x), min(ds.val(x), qfp[ds.key(x) + 1].queue_count)],
+    queuecountbyfamily
+  )
+
+  ds.hashmap(
+    :queue_families, queue_families,
+    :supported_counts, supported_counts
+  )
 end
 
 function devicerequirements(config, info)
   layers = torel(:layer_name, ds.getin(config, [:device, :layers], []))
-  supported_layers = ds.join(layers, ds.getin(info, [:configurable, :layers]))
+  supported_layers = ds.join(layers, ds.getin(info, [:device, :layers]))
   lcheck = checkavailability(layers, supported_layers, :layer_name, "layers")
 
   extensions = torel(:extension_name, ds.getin(config, [:device, :extensions], []))
   supported_extensions = ds.join(
-    extensions, ds.getin(info, [:configurable, :extensions])
+    extensions, ds.getin(info, [:device, :extensions])
   )
   echeck = checkavailability(
     extensions, supported_extensions, :extension_name, "extensions"
   )
 
-  devicefeatures = ds.getin(info, [:configurable, :features])
+  devicefeatures = ds.getin(info, [:device, :features])
   features = ds.getin(config, [:device, :features])
 
   supported_features = ds.map(
@@ -224,21 +267,20 @@ function devicerequirements(config, info)
 
   fcheck = checkfeatures(features, supported_features)
 
-  queueinfo = queuerequirements(get(config, :pipelines), get(info, :device))
+  queueinfo = queuerequirements(config, info)
 
   if !lcheck || !echeck || !fcheck
     return :device_unsuitable
   else
-    return ds.update(
-      ds.dissoc(info, :configurable),
-      :device,
-      merge,
-      ds.hashmap(
-        :layers, supported_layers,
-        :extensions, supported_extensions,
-        :features, supported_features
-      )
-    )
+    info = ds.assoc(info, :queues, queueinfo)
+
+    info = ds.update(info, :device, merge, ds.hashmap(
+      :layers, supported_layers,
+      :extensions, supported_extensions,
+      :features, supported_features
+    ))
+
+    return info
   end
 end
 
@@ -282,7 +324,11 @@ function choosedevice(devs)
 end
 
 function queuecreateinfos(spec)
-  [vk.DeviceQueueCreateInfo(0, [1.0])]
+  ds.into!(
+    [],
+    map(q -> vk.DeviceQueueCreateInfo(ds.key(q), repeat([1.0]; inner=ds.val(q)))),
+    get(spec, :supported_counts)
+  )
 end
 
 function device(pdev, info)
@@ -353,7 +399,7 @@ function setup(baseconfig, wm)
 
   info = ds.assoc(deviceinfo, :instance, instinfo)
 
-  return system, info
+  return system, info, config
 end
 
 end # module

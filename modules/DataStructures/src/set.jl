@@ -100,6 +100,10 @@ function iterate(s::PersistentArraySet)
   iterate(s.elements)
 end
 
+function iterate(s::PersistentArraySet, i::Int)
+  iterate(s.elements, i)
+end
+
 # TODO: These must be changed once there are hash sets!!!!
 function into(_::EmptySet, xform, from)
   arrayset(into!([], xform, from))
