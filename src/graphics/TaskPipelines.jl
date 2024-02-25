@@ -66,7 +66,7 @@ function passresources(a::LeakyAllocator)
   outputs = ds.into!(
     [],
     map(x -> allocout(a.system, x)),
-    get(a.config, :outputs)
+    a.config.outputs
   )
 
   return (dset, cmd, outputs, post)
@@ -99,25 +99,6 @@ function allocout(system, config)
   ds.assoc(out, :config, config)
 end
 
-# TODO: Wrap vk queues in tasks or some other form of locking so that they can
-# be shared from multiple threads
-# TODO: Check results and handle errors
-#
-# REVIEW: This is overkill for my current needs, but if I understand
-# https://registry.khronos.org/vulkan/specs/1.1-extensions/html/chap3.html#fundamentals-objectmodel-lifetime
-# correctly, vkQueueSubmit2 owns the array submissions while it is executing,
-# but releases ownership when it returns.
-#
-# This would mean that I can have a ringbuffer with many writers and one
-# consuming loop, and that loop can just submit chunks of the ringbuffer. Of
-# course it would have to be threadsafe, but since write could never (if
-# correct) touch the section of ring currently being consumed by submit, it
-# should work without any allocation at all. It would have to take a single
-# submission at a time and call reduce if they've already been allocated.
-#
-# The number of useless extra allocations --- often just wrapping values in
-# vectors --- is starting to worry me. Some high level architectural changes are
-# going to have to happen eventually.
 function submit(queue::vk.Queue, submissions)
   vk.queue_submit_2(queue, submissions)
 end
@@ -246,27 +227,10 @@ function presentationpipeline(system)
 end
 
 function graphicspipeline(system, config)
-  # REVIEW: As of yet, these are the keys required to create a graphics pipeline.
-  #
-  # There's a beautiful simplicity in just passing around the system map,
-  # building it up incrementally and using it everywhere. But it gets bloated
-  # and makes refactoring difficult because there's no explicit way to say what
-  # is and isn't needed where.
-  #
-  # Maybe what I need is a barrier between the super dynamic (and somewhat slow)
-  # world hashmap and structs or locals.
-  #
-  # I've mostly built things so that maps are read into locals at infrequent
-  # stages and everything is fast enough in the render loop, but there's
-  # overhead there in keeping track.
-  gkeys = [:device, :surface, :physicaldevice, :window,
-           :queues, :memoryproperties, :max_msaa,
-           :surface_formats, :surface_capabilities, :surface_present_modes]
+  dev = system.device
+  win = system.window
 
-  dev = get(system, :device)
-  win = get(system, :window)
-
-  qf = ds.getin(system, [:queues, :graphics])
+  qf = system.spec.queues.queue_families.graphics
   queue = hw.getqueue(system, :graphics)
 
   bindings = []

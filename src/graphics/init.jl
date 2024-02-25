@@ -8,6 +8,7 @@ import resources as rd
 import hardware as hw
 
 import pprint
+import Overrides
 
 ################################################################################
 ##### Default app config
@@ -115,18 +116,18 @@ Parses the program config and infers all requirements on the instance level.
 function instancerequirements(config)
   appmeta = ds.hashmap(
     :app, ds.selectkeys(config, [:version, :name]),
-    :engine, get(config, :engine)
+    :engine, config.engine
   )
 
   info = hw.instanceinfo()
-  ic = get(config, :instance)
-  api_version = get(ic, :vulkan_version)
+  ic = config.instance
+  api_version = ic.vulkan_version
 
   layers = torel(:layer_name, get(ic, :layers, []))
   extensions = torel(:extension_name, get(ic, :extensions, []))
 
-  supported_layers = ds.join(layers, get(info, :layers))
-  supported_extensions = ds.join(extensions, get(info, :extensions))
+  supported_layers = ds.join(layers, info.layers)
+  supported_extensions = ds.join(extensions, info.extensions)
 
   checkavailability(layers, supported_layers, :layer_name, "layers")
 
@@ -246,19 +247,17 @@ end
 
 function devicerequirements(config, info)
   layers = torel(:layer_name, ds.getin(config, [:device, :layers], []))
-  supported_layers = ds.join(layers, ds.getin(info, [:device, :layers]))
+  supported_layers = ds.join(layers, info.device.layers)
   lcheck = checkavailability(layers, supported_layers, :layer_name, "layers")
 
   extensions = torel(:extension_name, ds.getin(config, [:device, :extensions], []))
-  supported_extensions = ds.join(
-    extensions, ds.getin(info, [:device, :extensions])
-  )
+  supported_extensions = ds.join(extensions, info.device.extensions)
   echeck = checkavailability(
     extensions, supported_extensions, :extension_name, "extensions"
   )
 
-  devicefeatures = ds.getin(info, [:device, :features])
-  features = ds.getin(config, [:device, :features])
+  devicefeatures = info.device.features
+  features = config.device.features
 
   supported_features = ds.map(
     x -> [ds.key(x), featuressupported(ds.val(x), get(devicefeatures, ds.key(x)))],
@@ -326,17 +325,21 @@ end
 function queuecreateinfos(spec)
   ds.into!(
     [],
-    map(q -> vk.DeviceQueueCreateInfo(ds.key(q), repeat([1.0]; inner=ds.val(q)))),
-    get(spec, :supported_counts)
+    map(q -> (ds.key(q), repeat([1.0]; inner=ds.val(q))))
+    ∘
+    filter(t -> length(t[2]) > 0)
+    ∘
+    map(t -> vk.DeviceQueueCreateInfo(t...)),
+    spec.supported_counts
   )
 end
 
 function device(pdev, info)
-  dev = get(info, :device)
-  features = get(dev, :features)
+  dev = info.device
+  features = dev.features
 
   dci = vk.DeviceCreateInfo(
-    queuecreateinfos(get(info, :queues)),
+    queuecreateinfos(info.queues),
     layers(dev),
     extensions(dev);
     enabled_features=vk.PhysicalDeviceFeatures(get(features, v"1.0")...),
@@ -387,7 +390,10 @@ function setup(baseconfig, wm)
 
   dev = device(pdev, deviceinfo)
 
+  info = ds.assoc(deviceinfo, :instance, instinfo)
+
   system = ds.hashmap(
+    :spec, info,
     :instance, inst,
     :window, window,
     # REVIEW: Include the windowmanager here? Or wrap the window object in a
@@ -397,9 +403,7 @@ function setup(baseconfig, wm)
     :device, dev
   )
 
-  info = ds.assoc(deviceinfo, :instance, instinfo)
-
-  return system, info, config
+  return system, config
 end
 
 end # module

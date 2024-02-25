@@ -4,7 +4,7 @@ import init
 
 import Glfw as window
 import resources as rd
-import framework as fw
+import vertex
 import TaskPipelines as tp
 
 import DataStructures as ds
@@ -29,22 +29,24 @@ end
 
 prog = ds.hashmap(
   :name, "Quad",
-  :render, ds.hashmap(
-    :shaders, ds.hashmap(
-      :vertex, *(@__DIR__, "/../shaders/quad.vert"),
-      :fragment, *(@__DIR__, "/../shaders/quad.frag")
-    ),
-    :msaa, 4,
-    :inputassembly, ds.hashmap(
-      :topology, :triangles
-    ),
-    :verticies, [
-      [[-0.6, -0.6, 0.3], [1, 0, 0]],
-      [[0.5, -0.5, 0.3], [0, 1, 0]],
-      [[0.3, 0.3, 0.3], [0, 0, 1]],
-      [[-0.5, 0.5, 0.3], [0.5, 0.5, 0.5]]
-    ],
-    :indicies, [0, 3, 2, 2, 1, 0,]),
+  :pipelines, ds.hashmap(
+    :render, ds.hashmap(
+      :shaders, ds.hashmap(
+        :vertex, *(@__DIR__, "/../shaders/quad.vert"),
+        :fragment, *(@__DIR__, "/../shaders/quad.frag")
+      ),
+      :msaa, 4,
+      :inputassembly, ds.hashmap(
+        :topology, :triangles
+      ),
+      :verticies, [
+        [[-0.6, -0.6, 0.3], [1, 0, 0]],
+        [[0.5, -0.5, 0.3], [0, 1, 0]],
+        [[0.3, 0.3, 0.3], [0, 0, 1]],
+        [[-0.5, 0.5, 0.3], [0.5, 0.5, 0.5]]
+      ],
+      :indicies, [0, 3, 2, 2, 1, 0,])
+  ),
   :model, ds.hashmap(
     :loader, load,
     :vertex_type, Vertex
@@ -55,10 +57,14 @@ function main()
   # config = graphics.configure(load(prog))
 
   window.shutdown()
-  system, info, config = init.setup(prog, window)
+  system, config = init.setup(prog, window)
+  dev = system.device
 
-  # FIXME: config should be static.
-  config = fw.staticbuffers(system, get(prog, :render))
+  vertexbuffer, indexbuffer = vertex.buffers(
+    system,
+    ds.getin(prog, [:pipelines, :render, :verticies]),
+    ds.getin(prog, [:pipelines, :render, :indicies])
+  )
 
   gp = tp.graphicspipeline(system, config)
 
@@ -76,4 +82,4 @@ function main()
   tp.teardown(gp)
 end
 
-# main()
+main()

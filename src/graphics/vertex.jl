@@ -25,24 +25,14 @@ function vertexbuffer(system, data)
 
   commands.todevicelocal(system, data, buffer)
 
-  ds.hashmap(:vertexbuffer, ds.assoc(buffer,
+  ds.assoc(buffer,
     :verticies, length(data),
     :type, eltype(data)
-  ))
+  )
 end
 
 function indexbuffer(system, indicies)
   T = eltype(indicies)
-  bytes = sizeof(indicies)
-
-  staging = hw.transferbuffer(system, bytes)
-
-  dev = get(system, :device)
-  mem = get(staging, :memory)
-
-  memptr::Ptr{T} = vk.unwrap(vk.map_memory(dev, mem, 0, bytes))
-  unsafe_copyto!(memptr, pointer(indicies), length(indicies))
-  vk.unmap_memory(dev, mem)
 
   buffer = hw.buffer(
     system,
@@ -54,16 +44,18 @@ function indexbuffer(system, indicies)
     )
   )
 
-  commands.copybuffer(
-    system,
-    get(staging, :buffer), get(buffer, :buffer), bytes
-  )
+  commands.todevicelocal(system, indicies, buffer)
 
-  ds.hashmap(
-    :indexbuffer,
-    ds.assoc(buffer,
-      :verticies, length(indicies),
-      :type, T == UInt16 ? vk.INDEX_TYPE_UINT16 : vk.INDEX_TYPE_UINT32)
+  ds.assoc(buffer,
+    :verticies, length(indicies),
+    :type, T == UInt16 ? vk.INDEX_TYPE_UINT16 : vk.INDEX_TYPE_UINT32
+  )
+end
+
+function buffers(system, verticies, indicies=nothing)
+  (
+    vertexbuffer(system, verticies),
+    indicies === nothing ? nothing : indexbuffer(system, indicies)
   )
 end
 

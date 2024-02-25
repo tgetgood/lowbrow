@@ -147,7 +147,7 @@ queueflagbits total.
 function selectqueue(qfp, bits)
   q = sort(
     filter(x -> (x.queue_flags & bits) == bits, qfp);
-    by=x -> count_ones(x.queue_flags)
+    by=x -> count_ones(x.queue_flags.val)
   )[1]
 
   return indexin([q], qfp)[1] - 1
@@ -155,14 +155,6 @@ end
 
 function queuetype(qfp, t)
   t, selectqueue(qfp, get(rd.queuebits, t, typo))
-end
-
-function getqueue(system, queue, nth=1)
-  vk.get_device_queue(
-    get(system, :device),
-    getin(system, [:queues, queue]),
-    nth-1
-  )
 end
 
 function createswapchain(system, config)
@@ -259,9 +251,8 @@ function getpool(system, qf)
   getin(system, [:commandpools, getin(system, [:queues, qf])])
 end
 
-function findmemtype(system, config)
-  properties = get(system, :memoryproperties)
-
+function findmemtype(spec, config)
+  properties = ds.getin(spec, [:device, :memoryproperties])
   mask = get(config, :typemask)
   flags = get(config, :flags)
 
@@ -309,9 +300,13 @@ function orlist(bitmap, xs)
 end
 
 function buffer(system, config)
-  dev = get(system, :device)
+  dev = system.device
 
-  queues = into(ds.emptyset, map(x -> getin(system, [:queues, x]), get(config, :queues)))
+  queues = into(
+    ds.emptyset,
+    map(x -> get(system.spec.queues.queue_families, x)),
+    get(config, :queues)
+  )
 
   mode = get(sharingmodes, get(config, :sharingmode,
     ds.count(queues) == 1 ? :exclusive : :concurrent
@@ -333,7 +328,12 @@ function buffer(system, config)
     :flags, orlist(memorypropertybits, get(config, :memoryflags))
   )
 
-  memtype = findmemtype(system, req)
+  # TODO: There's a lot of confusion about who's responsibility it is to dig
+  # into the info struct for the correct element. I'm not sure about this.
+  #
+  # For now I'm going to treat it as a globalish immutable that can't be static
+  # because it must be negotiated at runtime.
+  memtype = findmemtype(system.spec, req)
 
   memory = vk.unwrap(vk.allocate_memory(dev, memreq.size, memtype[2]))
 

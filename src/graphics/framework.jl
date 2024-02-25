@@ -141,12 +141,14 @@ end
 Copy cpu vectors representing vertex and index lists into gpu side vertex and
 index buffers.
 """
-function staticbuffers(system, config)
-  merge(
-    config,
-    vertex.vertexbuffer(system, get(config, :verticies)),
-    indexbuffer(system, config)
-  )
+function staticbuffers(dev, spec, verticies, indicies=nothing)
+
+  vertex.vertexbuffer(dev, spec, verticies)
+
+  # merge(
+  #   config,
+  #   indexbuffer(system, config)
+  # )
 end
 
 function assemblerender(system, config)

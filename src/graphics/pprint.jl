@@ -2,6 +2,7 @@ module pprint
 
 import Vulkan as vk
 import DataStructures: showrecur, indent, showseq
+import DataStructures as ds
 
 function showrecur(io::IO, depth, s::vk.HighLevelStruct)
   print(io, string(typeof(s)) * ": {\n")
@@ -21,5 +22,6 @@ function showrecur(io::IO, depth, t::Tuple)
   showseq(io, depth, t)
   print(io, ")")
 end
+
 
 end
