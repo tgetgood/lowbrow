@@ -279,6 +279,14 @@ end
 
 ##### Array Maps
 
+@inline function Base.getproperty(m::PersistentArrayMap, k::Symbol)
+  if k === :kvs
+    return getfield(m, :kvs)
+  else
+    get(m, k)
+  end
+end
+
 first(m::PersistentArrayMap) = MapEntry(m.kvs[1], m.kvs[2])
 
 """
@@ -356,6 +364,14 @@ function Base.:(==)(x::PersistentArrayMap, y::PersistentArrayMap)
 end
 
 ##### Hash Maps
+
+@inline function Base.getproperty(m::PersistentHashMap, k::Symbol)
+  if k === :root
+    return getfield(m, :root)
+  else
+    get(m, k)
+  end
+end
 
 function getindexed(m::MapEntry, k, default, l)
   if m.key == k
