@@ -131,3 +131,7 @@ function showrecur(io::IO, depth, x::Base.Vector)
     print(io, "]")
   end
 end
+
+function conj(_::Tuple{}, x)
+  vector(x)
+end
