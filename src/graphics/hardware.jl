@@ -214,36 +214,6 @@ function commandpool(dev, qf, flags=vk.CommandPoolCreateFlag(0))
   vk.unwrap(vk.create_command_pool(dev, qf; flags=flags))
 end
 
-function createcommandpools(system, config)
-  dev = get(system, :device)
-  qfs = collect(Set(ds.vals(get(system, :queues))))
-
-  hashmap(
-    :commandpools,
-    ds.zipmap(
-      qfs,
-      map(qf -> commandpool(
-          dev, qf, vk.COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-        ), qfs))
-  )
-end
-
-function createdescriptorpools(system, config)
-  n = get(config, :concurrent_frames)
-
-  hashmap(
-    :descriptorpool,
-    vk.unwrap(vk.create_descriptor_pool(
-      get(system, :device),
-      2*n,
-      [
-        vk.DescriptorPoolSize(vk.DESCRIPTOR_TYPE_UNIFORM_BUFFER, n),
-        vk.DescriptorPoolSize(vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, n)
-      ]
-    ))
-  )
-end
-
 function findmemtype(spec, config)
   properties = spec.device.memoryproperties
   mask = config.typemask
