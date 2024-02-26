@@ -6,6 +6,10 @@ function deref(a::Atom)
   getfield(a, :value, :monotonic)
 end
 
+function getindex(a::Atom)
+  deref(a)
+end
+
 """
 Doesn't necessarily set the atom. Check the return value.
 """

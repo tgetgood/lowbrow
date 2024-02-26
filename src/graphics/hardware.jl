@@ -244,17 +244,10 @@ function createdescriptorpools(system, config)
   )
 end
 
-"""
-Returns command pool to use for given queue family `qf`.
-"""
-function getpool(system, qf)
-  getin(system, [:commandpools, getin(system, [:queues, qf])])
-end
-
 function findmemtype(spec, config)
-  properties = ds.getin(spec, [:device, :memoryproperties])
-  mask = get(config, :typemask)
-  flags = get(config, :flags)
+  properties = spec.device.memoryproperties
+  mask = config.typemask
+  flags = config.flags
 
   mt = into(
     [],

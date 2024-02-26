@@ -103,6 +103,10 @@ function submit(queue::vk.Queue, submissions)
   vk.queue_submit_2(queue, submissions)
 end
 
+struct SharedQueueInfo
+  info::vk.DeviceQueueInfo2
+end
+
 struct SharedQueue
   ch
   sigkill
@@ -129,6 +133,27 @@ function submit(queue::SharedQueue, submissions)
   out = Channel(1)
   put!(queue.ch, (submissions, out))
   return out
+end
+
+function getqueue(system, info::vk.DeviceQueueInfo2)
+  if ds.containsp(system.cache[].queues, info)
+    q = get(system.cache[].queues, info)
+    @warn "Creating multiple handles to externally synchronised queue: " * string(info)
+  else
+    q = vk.get_device_queue_2(system.device, info)
+    ds.swap!(system.cache, ds.associn, [:queues, info], q)
+  end
+  return q
+end
+
+function getqueue(system, info::SharedQueueInfo)
+  if ds.containsp(system.cache[].queues, info)
+    return get(system.cache[].queues, info)
+  else
+    q = sharedqueue(getqueue(system, info.info))
+    ds.swap!(system.cache, ds.associn, [:queues, info], q)
+    return q
+  end
 end
 
 function computepipeline(system, config)

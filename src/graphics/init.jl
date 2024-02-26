@@ -2,6 +2,7 @@ module init
 
 import Vulkan as vk
 import DataStructures as ds
+import TaskPipelines as tp
 
 import debug
 import resources as rd
@@ -199,16 +200,28 @@ function checkfeatures(requested, supported)
   end
 end
 
+function allocatequeues(request, requested_counts, supported_counts)
+  if requested_counts == supported_counts
+    # Easiest case
+    throw("not implemented")
+  elseif sum(ds.vals(supported_counts)) == 1
+    # REVIEW: If the hardware only supports one queue, it *has to be* (0, 0) no?
+    q = tp.SharedQueueInfo(vk.DeviceQueueInfo2(0, 0))
+    reduce(merge, map(m -> ds.mapvals(_ -> q, m), ds.vals(request)))
+  else
+    throw("not implemented")
+  end
+end
+
 function queuerequirements(config, info)
   qfp = ds.getin(info, [:device, :qf_properties])
   qtypes = [:transfer, :compute, :graphics]
 
   queue_families = ds.into(ds.emptymap, map(x -> hw.queuetype(qfp, x)), qtypes)
 
-  pipelinecounts = ds.mapvals(
-    ds.count,
-    ds.groupby(x -> get(ds.val(x), :type), get(config, :pipelines))
-  )
+  pipelines = ds.groupby(x -> get(ds.val(x), :type), get(config, :pipelines))
+
+  pipelinecounts = ds.mapvals(ds.count, pipelines)
 
   queuecountbyfamily = ds.into(
     ds.emptymap,
@@ -234,14 +247,21 @@ function queuerequirements(config, info)
     )
   end
 
-  supported_counts = map(
-    x -> [ds.key(x), min(ds.val(x), qfp[ds.key(x) + 1].queue_count)],
+  supported_counts = ds.into(
+    ds.emptymap,
+    map(x -> [ds.key(x), min(ds.val(x), qfp[ds.key(x) + 1].queue_count)])
+    ∘
+    filter(x -> x[2] > 0) ,
     queuecountbyfamily
   )
 
+  queue_allocations = allocatequeues(pipelines, pipelinecounts, supported_counts)
+
   ds.hashmap(
     :queue_families, queue_families,
-    :supported_counts, supported_counts
+    :supported_counts, supported_counts,
+    :pipelines, pipelines,
+    :allocations, queue_allocations
   )
 end
 
@@ -357,6 +377,14 @@ end
 ##### Entrypoint
 ################################################################################
 
+const emptycachestate = ds.hashmap(
+  :queues, ds.emptymap
+)
+
+function emptycache()
+  ds.Atom(emptycachestate)
+end
+
 # REVIEW: Takes in a module which provides an OS window. The idea is to be able
 # to swap glfw for sdl when required, but I need to standardise the api before
 # that's realistic. I want the end user to be able to extend this library with
@@ -392,8 +420,16 @@ function setup(baseconfig, wm)
 
   info = ds.assoc(deviceinfo, :instance, instinfo)
 
+  cache = emptycache()
+
   system = ds.hashmap(
     :spec, info,
+    # REVIEW: There's a lot of caching going on but if I want to be able to
+    # switch projects or reload a project without killing the process and
+    # reloading from scratch, the caches must be local.
+    #
+    # Nonetheless, I don't like this idea of carrying mutable state around...
+    :cache, cache,
     :instance, inst,
     :window, window,
     # REVIEW: Include the windowmanager here? Or wrap the window object in a
