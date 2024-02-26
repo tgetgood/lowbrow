@@ -268,6 +268,18 @@ function project(rel::Set, ks)
   into(emptyset, map(m -> selectkeys(m, ks)) ∘ remove(emptyp), rel)
 end
 
+##### Map inversion
+#
+# This should be in map.jl except for dependencies.
+
+function invert(m::Map)
+  reduce(
+    (m, x) -> assoc(m, val(x), conj(get(m, val(x), emptyset), key(x))),
+    emptymap,
+    m
+  )
+end
+
 #### Set display
 
 function show(io::IO, mime::MIME"text/plain", s::Set)

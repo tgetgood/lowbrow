@@ -573,7 +573,3 @@ depth(m::PersistentArrayMap) = 1
 depth(m::PersistentHashMap) = depth(m.root)
 depth(n::PersistentHashNode) = 1 + max(map(depth, n.ht)...)
 depth(n::MapNode) = 0
-
-function invert(m::Map)
-  map(x -> [val(x), key(x)], m)
-end
