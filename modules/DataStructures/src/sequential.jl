@@ -628,16 +628,6 @@ function showseq(io::IO, depth, s)
   indent(io, depth-1)
 end
 
-function showrecur(io::IO, depth, x::Base.Vector)
-  if length(x) === 0
-    print(io, "[]")
-  else
-    print(io, string(count(x)) * "-element " * string(typeof(x)) * ": [\n")
-    showseq(io, depth, x)
-    print(io, "]")
-  end
-end
-
 function groupby(keyfn, coll)
   function rf(m, e)
     k = keyfn(e)

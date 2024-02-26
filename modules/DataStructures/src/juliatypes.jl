@@ -117,3 +117,17 @@ end
 function conj(s1::String, s2::String)
   s1 * s2
 end
+
+function showrecur(io::IO, depth, x::Base.Vector{T}) where T <: Base.Array
+  show(io, "text/plain", x)
+end
+
+function showrecur(io::IO, depth, x::Base.Vector)
+  if length(x) === 0
+    print(io, "[]")
+  else
+    print(io, string(count(x)) * "-element " * string(typeof(x)) * ": [\n")
+    showseq(io, depth, x)
+    print(io, "]")
+  end
+end
