@@ -38,15 +38,8 @@ pool would be a better design, but this suffices for now.
 function cmdseq(body, system, qf;
   level=vk.COMMAND_BUFFER_LEVEL_PRIMARY, wait=[])
 
-  signal = vk.unwrap(vk.create_semaphore(
-    get(system, :device),
-    vk.SemaphoreCreateInfo(
-      next=vk.SemaphoreTypeCreateInfo(
-        vk.SEMAPHORE_TYPE_TIMELINE,
-        0
-      )
-    )
-  ))
+  signal = hw.timelinesemaphore(system.device, 0)
+  post = vk.SemaphoreSubmitInfo(signal, UInt(1), 0)
 
   pool = hw.getpool(system, qf)
   queue = hw.getqueue(system, qf)
@@ -62,7 +55,6 @@ function cmdseq(body, system, qf;
 
   vk.end_command_buffer(cmd)
 
-  post = vk.SemaphoreSubmitInfo(signal, UInt(1), 0)
   cbi = vk.CommandBufferSubmitInfo(cmd, 0)
 
   vk.queue_submit_2(queue, [vk.SubmitInfo2(wait, [cbi], [post])])

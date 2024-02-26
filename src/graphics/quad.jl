@@ -62,8 +62,8 @@ function main()
 
   vertexbuffer, indexbuffer = vertex.buffers(
     system,
-    ds.getin(prog, [:pipelines, :render, :verticies]),
-    ds.getin(prog, [:pipelines, :render, :indicies])
+    prog.pipelines.render.verticies,
+    prog.pipelines.render.indicies
   )
 
   gp = tp.graphicspipeline(system, config)
