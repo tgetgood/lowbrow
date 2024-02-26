@@ -200,15 +200,29 @@ function checkfeatures(requested, supported)
   end
 end
 
-function allocatequeues(request, requested_counts, supported_counts)
+function allocatequeues(requested_counts, supported_counts, pipelines, qfs)
   if requested_counts == supported_counts
-    # Easiest case
-    throw("not implemented")
+    pbyf = ds.mapvals(ds.keys, pipelines)
+    ds.into(
+      ds.emptymap,
+      ds.mapvals(v -> reduce(ds.concat, map(x -> get(pbyf, x), v)))
+      ∘
+      ds.remove(e -> ds.emptyp(ds.val(e)))
+      ∘
+      ds.map(e -> ds.mapindexed(
+        (i, name) -> [name, vk.DeviceQueueInfo2(ds.key(e), i - 1)],
+        ds.val(e))
+      )
+      ∘
+      ds.cat(),
+      ds.invert(qfs)
+    )
   elseif sum(ds.vals(supported_counts)) == 1
-    # REVIEW: If the hardware only supports one queue, it *has to be* (0, 0) no?
+    # REVIEW: If the hardware only supports one queue, it *has to be* (0, 0), no?
     q = tp.SharedQueueInfo(vk.DeviceQueueInfo2(0, 0))
-    reduce(merge, map(m -> ds.mapvals(_ -> q, m), ds.vals(request)))
+    reduce(merge, map(m -> ds.mapvals(_ -> q, m), ds.vals(pipelines)))
   else
+    # Hard case. Also the most likely, I would think.
     throw("not implemented")
   end
 end
@@ -225,10 +239,10 @@ function queuerequirements(config, info)
 
   queuecountbyfamily = ds.into(
     ds.emptymap,
-    ds.mapvals(x -> ds.set(ds.keys(x)...))
+    ds.mapvals(x -> sum(ds.into!([], map(y -> get(pipelinecounts, y, 0)), x)))
     ∘
-    ds.mapvals(x -> sum(ds.into!([], map(y -> get(pipelinecounts, y, 0)), x))),
-    ds.groupby(ds.val, queue_families)
+    filter(e -> ds.val(e) > 0),
+    ds.invert(queue_families)
   )
 
   if !get(config, :headless, false)
@@ -245,6 +259,10 @@ function queuerequirements(config, info)
       presqf,
       get(queuecountbyfamily, presqf, 0) + 1
     )
+
+    pipelines = ds.assoc(pipelines, :presentation,
+      ds.hashmap(:presentation, ds.hashmap(:type, :presentation))
+    )
   end
 
   supported_counts = ds.into(
@@ -255,12 +273,14 @@ function queuerequirements(config, info)
     queuecountbyfamily
   )
 
-  queue_allocations = allocatequeues(pipelines, pipelinecounts, supported_counts)
+  queue_allocations = allocatequeues(
+    queuecountbyfamily, supported_counts, pipelines, queue_families
+  )
 
   ds.hashmap(
     :queue_families, queue_families,
-    :supported_counts, supported_counts,
     :pipelines, pipelines,
+    :supported_counts, supported_counts,
     :allocations, queue_allocations
   )
 end
