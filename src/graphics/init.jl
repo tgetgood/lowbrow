@@ -136,7 +136,7 @@ function instancerequirements(config)
     extensions, supported_extensions, :extension_name, "extensions"
   )
 
-  version = get(info, :version)
+  version = info.version
 
   if version < api_version
     @warn "Vulkan api version " * string(api_version) *
@@ -228,12 +228,12 @@ function allocatequeues(requested_counts, supported_counts, pipelines, qfs)
 end
 
 function queuerequirements(config, info)
-  qfp = ds.getin(info, [:device, :qf_properties])
+  qfp = info.device.qf_properties
   qtypes = [:transfer, :compute, :graphics]
 
   queue_families = ds.into(ds.emptymap, map(x -> hw.queuetype(qfp, x)), qtypes)
 
-  pipelines = ds.groupby(x -> get(ds.val(x), :type), get(config, :pipelines))
+  pipelines = ds.groupby(x -> ds.val(x).type, config.pipelines)
 
   pipelinecounts = ds.mapvals(ds.count, pipelines)
 
@@ -249,10 +249,10 @@ function queuerequirements(config, info)
     queue_families = ds.assoc(
       queue_families,
       :presentation,
-      first(sort(ds.seq(ds.getin(info, [:surface, :presentation_qfs]))))
+      first(sort(ds.seq(info.surface.presentation_qfs)))
     )
 
-    presqf = get(queue_families, :presentation)
+    presqf = queue_families.presentation
 
     queuecountbyfamily = ds.assoc(
       queuecountbyfamily,
@@ -328,20 +328,20 @@ end
 ################################################################################
 
 function extensions(config)
-  ds.into!([], map(x -> get(x, :extension_name)), get(config, :extensions))
+  ds.into!([], map(x -> x.extension_name), config.extensions)
 end
 
 function layers(config)
-  ds.into!([], map(x -> get(x, :layer_name)), get(config, :layers))
+  ds.into!([], map(x -> x.layer_name), config.layers)
 end
 
 function instance(config)
   appinfo = vk.ApplicationInfo(
-    ds.getin(config, [:app, :version]),
-    ds.getin(config, [:engine, :version]),
-    get(config, :version);
-    application_name=ds.getin(config, [:app, :name]),
-    engine_name=ds.getin(config, [:engine, :name])
+    config.app.version,
+    config.engine.version,
+    config.version;
+    application_name=config.app.name,
+    engine_name=config.engine.name
   )
 
   vk.unwrap(vk.create_instance(
@@ -425,7 +425,7 @@ function setup(baseconfig, wm)
 
   debugmessenger = debug.debugmsgr(inst, get(instinfo, :debuginfo, nothing))
 
-  window, resizecb = wm.window(get(config, :name), get(config, :window))
+  window, resizecb = wm.window(config.name, config.window)
 
   surface = wm.surface(inst, window)
 
