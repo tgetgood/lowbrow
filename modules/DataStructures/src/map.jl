@@ -478,7 +478,7 @@ function mergewith(f, m1, m2)
 
   function rf(acc, e)
     if containsp(acc, key(e))
-      update(acc, key(e), f, val(e))
+      assoc(acc, key(e), f(val(e), get(acc, key(e))))
     else
       conj(acc, e)
     end
