@@ -35,7 +35,7 @@ prog = ds.hashmap(
         :vertex, *(@__DIR__, "/../shaders/quad.vert"),
         :fragment, *(@__DIR__, "/../shaders/quad.frag")
       ),
-      :msaa, 4,
+      :samples, 4,
       :inputassembly, ds.hashmap(
         :topology, :triangles
       ),
@@ -58,7 +58,8 @@ function main()
 
   window.shutdown()
   system, config = init.setup(prog, window)
-  dev = system.device
+
+  pipelines = tp.buildpipelines(system, config)
 
   vertexbuffer, indexbuffer = vertex.buffers(
     system,
@@ -66,7 +67,7 @@ function main()
     prog.pipelines.render.indicies
   )
 
-  gp = tp.graphicspipeline(system, config)
+  gp = pipelines.render
 
   while true
     window.poll()

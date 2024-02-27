@@ -1,5 +1,7 @@
 module TaskPipelines
 
+import Distributed: pmap
+
 import Vulkan as vk
 import DataStructures as ds
 
@@ -11,7 +13,20 @@ import render
 import Glfw as window
 import pipeline as pipe
 
+# Think of a Pipeline as gpu pipeline: one or more shaders plus all the crap to
+# configure and coordinate.
+#
+# A PipelineExecutor, is then a logical "thread" which feeds that pipeline. Most
+# of the resources which are required to create work for a queue are externally
+# synchronised, which means that if you want to feed one Pipeline (or Queue)
+# from more than one thread, you need multiple copies of these resources wrapped
+# up in such a way that you know each copy will be used on a single thread at
+# any given time. Those copies are the Executors.
+#
+# So we have one pipeline and one queue, with possibly many executors binding
+# memory and recording command buffers in between.
 abstract type Pipeline end
+abstract type PipelineExecutor end
 
 # REVIEW: Really a pipeline IO wrapper. All of the real logic is hidden in the
 # closure of the thread with which these channels communicate.
@@ -21,6 +36,180 @@ struct AsyncPipeline <: Pipeline
   input::Channel
   sigkill::Channel
 end
+
+################################################################################
+##### vk Queue wrappers
+################################################################################
+
+function submit(queue::vk.Queue, submissions)
+  out = Channel(1)
+  put!(out, vk.queue_submit_2(queue, submissions))
+  out
+end
+
+struct SharedQueueInfo
+  info::vk.DeviceQueueInfo2
+end
+
+struct SharedQueue
+  ch
+  sigkill
+end
+
+function teardown(p::SharedQueue)
+  put!(p.sigkill, true)
+end
+
+function sharedqueue(queue::vk.Queue)
+  ch = Channel()
+  kill = Channel()
+  hw.thread() do
+    while !isready(kill)
+      (submissions, out) = take!(ch)
+      res = vk.queue_submit_2(queue, submissions)
+      put!(out, res)
+    end
+  end
+
+  SharedQueue(ch, kill)
+end
+
+function submit(queue::SharedQueue, submissions)
+  out = Channel(1)
+  put!(queue.ch, (submissions, out))
+  return out
+end
+
+function getqueue(system, info::vk.DeviceQueueInfo2)
+  if ds.containsp(system.cache[].queues, info)
+    q = get(system.cache[].queues, info)
+    @warn "Creating multiple handles to externally synchronised queue: " * string(info)
+  else
+    q = vk.get_device_queue_2(system.device, info)
+    ds.swap!(system.cache, ds.associn, [:queues, info], q)
+  end
+  return q
+end
+
+function getqueue(system, info::SharedQueueInfo)
+  if ds.containsp(system.cache[].queues, info)
+    return get(system.cache[].queues, info)
+  else
+    q = sharedqueue(getqueue(system, info.info))
+    ds.swap!(system.cache, ds.associn, [:queues, info], q)
+    return q
+  end
+end
+
+################################################################################
+##### Host <-> Device Data Transfer
+################################################################################
+
+struct TransferPipeline <: Pipeline
+  taskqueue
+  kill
+  spec
+  executors
+end
+
+struct CommandPoolExecutor <: PipelineExecutor
+  work
+  kill
+  pool
+  queue
+end
+
+function cpe(system, qf, queue)
+  dev = system.device
+
+  buffercount = ds.Atom(0)
+  pool = vk.unwrap(vk.create_command_pool(dev, qf))
+
+  work = Channel()
+  sigkill = Channel(1)
+
+  hw.thread() do
+    while !isready(sigkill)
+      recorder = take!(work)
+
+      if buffercount[] === 0
+        @info "resetting transfer pool"
+        # FIXME: pools never get reset until the pipeline is idle.
+        #
+        # This will probably lead to memory leaks in heavily used pipelines.
+        vk.reset_command_pool(dev, pool)
+      end
+
+      ds.swap!(buffercount, +, 1)
+      postsig = hw.ssi(dev)
+      cmd = hw.commandbuffer(dev, pool)
+
+      recorder(cmd, postsig, queue)
+
+      hw.thread() do
+        # REVIEW: These probably block threads. Assess that.
+        commands.wait_semaphore(dev, postsig)
+        ds.swap!(buffercount, -, 1)
+      end
+    end
+  end
+
+  CommandPoolExecutor(work, sigkill, pool, queue)
+end
+
+function transferpipeline(system, name, spec)
+  dev = system.device
+
+  qf = get(system.spec.queues.queue_families, spec.type)
+  queue = getqueue(system, get(system.spec.queues.allocations, name))
+
+  tasks = Channel(32)
+  sigkill = Channel(1)
+  exec = ds.vector(cpe(system, qf, queue))
+
+  # FIXME: This indirection is stupid overengineering as presently used.
+  hw.thread() do
+    while !isready(sigkill)
+      cb = take!(tasks)
+      @info "scheduling transfer task."
+      put!(exec[1].work, cb)
+    end
+  end
+
+  TransferPipeline(tasks, sigkill, spec, ds.Atom(exec))
+end
+
+function register(p::TransferPipeline, cb)
+  put!(p.taskqueue, cb)
+end
+
+function record(cb, p::TransferPipeline, wait=[], signal=[])
+  out = Channel(1)
+
+  function recorder(cmd, post, queue)
+    vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
+
+    cb(cmd)
+
+    vk.end_command_buffer(cmd)
+
+    cbi = vk.CommandBufferSubmitInfo(cmd, 0)
+
+    res = submit(queue, [vk.SubmitInfo2(wait, [cbi], vcat(signal, [post]))])
+
+    put!(out, (post, take!(res)))
+  end
+
+  register(p, recorder)
+
+  return out
+
+end
+
+################################################################################
+##### Compute Pipelines
+################################################################################
+
 
 abstract type PipelineAllocator end
 
@@ -99,66 +288,10 @@ function allocout(system, config)
   ds.assoc(out, :config, config)
 end
 
-function submit(queue::vk.Queue, submissions)
-  vk.queue_submit_2(queue, submissions)
-end
-
-struct SharedQueueInfo
-  info::vk.DeviceQueueInfo2
-end
-
-struct SharedQueue
-  ch
-  sigkill
-end
-
-function teardown(p::SharedQueue)
-  put!(p.sigkill, true)
-end
-
-function sharedqueue(queue::vk.Queue)
-  ch = Channel()
-  kill = Channel()
-  hw.thread() do
-    while !isready(kill)
-      (submissions, out) = take!(ch)
-      put!(out, submit(queue, submissions))
-    end
-  end
-
-  SharedQueue(ch, kill)
-end
-
-function submit(queue::SharedQueue, submissions)
-  out = Channel(1)
-  put!(queue.ch, (submissions, out))
-  return out
-end
-
-function getqueue(system, info::vk.DeviceQueueInfo2)
-  if ds.containsp(system.cache[].queues, info)
-    q = get(system.cache[].queues, info)
-    @warn "Creating multiple handles to externally synchronised queue: " * string(info)
-  else
-    q = vk.get_device_queue_2(system.device, info)
-    ds.swap!(system.cache, ds.associn, [:queues, info], q)
-  end
-  return q
-end
-
-function getqueue(system, info::SharedQueueInfo)
-  if ds.containsp(system.cache[].queues, info)
-    return get(system.cache[].queues, info)
-  else
-    q = sharedqueue(getqueue(system, info.info))
-    ds.swap!(system.cache, ds.associn, [:queues, info], q)
-    return q
-  end
-end
-
-function computepipeline(system, config)
-  dev = get(system, :device)
-  qf = ds.getin(system, [:queues, :compute])
+function computepipeline(system, name, config)
+  dev = system.device
+  qf = system.queues.compute
+  # FIXME:
   queue = hw.getqueue(system, :compute)
 
   stage = ds.hashmap(:stage, :compute)
@@ -168,13 +301,13 @@ function computepipeline(system, config)
     config = ds.update(config, :pushconstants, merge, stage)
   end
 
-  bindings = stagesetter(vcat(get(config, :inputs, []), get(config, :outputs)))
+  bindings = stagesetter(vcat(get(config, :inputs, []), config.outputs))
 
   layoutci = rd. descriptorsetlayout(bindings)
   layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
 
   pipeline = pipe.computepipeline(
-    dev, get(config, :shader), layout, [get(config, :pushconstants)]
+    dev, config.shader, layout, [config.pushconstants]
   )
 
   allocator = dummyallocator(system, config, qf, layoutci, layout)
@@ -197,14 +330,14 @@ function computepipeline(system, config)
 
         commands.recordcomputation(
           cmdbuff,
-          get(pipeline, :pipeline),
-          get(pipeline, :layout),
-          get(config, :workgroups),
+          pipeline.pipeline,
+          pipeline.layout,
+          config.workgroups,
           [dset],
-          ds.assoc(get(config, :pushconstants), :value, pcs)
+          ds.assoc(config.pushconstants, :value, pcs)
         )
 
-        wait = ds.into!([], map(x -> get(x, :wait)) ∘ ds.cat(), inputs)
+        wait = ds.into!([], map(x -> x.wait) ∘ ds.cat(), inputs)
 
         cmdsub = vk.CommandBufferSubmitInfo(cmdbuff, 0)
 
@@ -251,12 +384,12 @@ end
 function presentationpipeline(system)
 end
 
-function graphicspipeline(system, config)
+function graphicspipeline(system, name, config)
   dev = system.device
   win = system.window
 
   qf = system.spec.queues.queue_families.graphics
-  queue = hw.getqueue(system, :graphics)
+  queue = getqueue(system, get(system.spec.queues.allocations, name))
 
   bindings = []
   layoutci = rd. descriptorsetlayout(bindings)
@@ -267,20 +400,20 @@ function graphicspipeline(system, config)
   # Steps to initialise graphics.
 
   swch = hw.thread() do
-    swapchain = hw.createswapchain(system, config)
-    iviews = hw.createimageviews(merge(system, swapchain), config)
+    swapchain = hw.createswapchain(system, system.spec)
+    iviews = hw.createimageviews(merge(system, swapchain), system.spec)
     return merge(swapchain, iviews)
   end
 
   system = merge(system, pipe.renderpass(system, config))
 
   gpch = hw.thread() do
-    pipe.creategraphicspipeline(system, ds.hashmap(:render, config))
+    pipe.creategraphicspipeline(system, ds.hashmap(name, config))
   end
 
   system = merge(system, take!(swch))
 
-  system = merge(system, pipe.createframebuffers(system, config))
+  system = merge(system, pipe.createframebuffers(system, system.spec))
 
   system = merge(system, take!(gpch))
 
@@ -325,13 +458,37 @@ function graphicspipeline(system, config)
       end
       @info "Average fps: " * string(round(framecounter / (time() - t)))
     catch e
-      print(stderr, "\n Error in pipeline thread: " *
-                    string(get(config, :name)) * "\n")
+      print(stderr, "\n Error in pipeline thread: " * string(name) * "\n")
       ds.handleerror(e)
     end
   end
 
   return AsyncPipeline(inch, killch)
+end
+
+function initpipeline(system, pipeline)
+  name = ds.key(pipeline)
+  config = ds.val(pipeline)
+  t = config.type
+  if t === :transfer
+    transferpipeline(system, name, config)
+  elseif t === :compute
+    computepipeline(system, name, config)
+  elseif t === :graphics
+    graphicspipeline(system, name, config)
+  else
+    throw("unknown pipeline type: " * string(pipeline))
+  end
+end
+
+function buildpipelines(system, config)
+  # TODO: Here's where we set up the pipeline cache
+
+  map(e -> [ds.key(e), initpipeline(system, e)], config.pipelines)
+  # ds.into(ds.emptymap, pmap(
+  #   e -> [ds.key(e), initpipeline(system, e)],
+  #   config.pipelines
+  # ))
 end
 
 end

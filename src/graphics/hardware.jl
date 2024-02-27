@@ -74,12 +74,14 @@ function findpresentmode(system, config)
   end
 end
 
-function multisamplemax(device)
-  props = vk.get_physical_device_properties(device)
-  depth = props.limits.framebuffer_depth_sample_counts
-  colour = props.limits.framebuffer_color_sample_counts
+function multisamplemax(spec, samples)
+  limits = spec.device.properties.limits
+  depth = limits.framebuffer_depth_sample_counts
+  colour = limits.framebuffer_color_sample_counts
 
-  vk.SampleCountFlag(1 << (ndigits((depth&colour).val, base=2) - 1))
+  vk.SampleCountFlag(
+    1 << (ndigits((depth&colour&(2*samples - 1)).val, base=2) - 1)
+  )
 end
 
 const featuretypes = hashmap(
@@ -325,6 +327,10 @@ function commandbuffers(
   )
 end
 
+function commandbuffer(dev, pool, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
+  commandbuffers(dev, pool, 1, level)[1]
+end
+
 function commandbuffers(system, n::Int, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMARY)
   commandbuffers(get(system, :device), getpool(system, qf), n, level)
 end
@@ -403,9 +409,6 @@ function colourresources(system, config)
 end
 
 function finddepthformats(system, config)
-  pdev = get(system, :physicaldevice)
-  reqs = get(config, :features)
-
   function getfeats(x)
     t = get(config, :tiling)
     if t == vk.IMAGE_TILING_LINEAR
@@ -417,10 +420,11 @@ function finddepthformats(system, config)
 
   candidates = ds.into(
     [],
-    map(x -> (x, vk.get_physical_device_format_properties(pdev, x)))
+    # FIXME: We should do all of this querying at device creation time.
+    map(x -> (x, vk.get_physical_device_format_properties(system.pdev, x)))
     ∘
-    filter(x -> (reqs & getfeats(x[2])) > 0),
-    get(config, :formats)
+    filter(x -> (config.features & getfeats(x[2])) > 0),
+    config.formats
   )
 
   @assert length(candidates) > 0
@@ -497,6 +501,10 @@ function timelinesemaphore(dev::vk.Device, init=1)
       )
     )
   ))
+end
+
+function ssi(dev, init=1, df=0)
+  vk.SemaphoreSubmitInfo(timelinesemaphore(dev, init), UInt(init + 1), sf)
 end
 
 function tick(ss::vk.SemaphoreSubmitInfo)

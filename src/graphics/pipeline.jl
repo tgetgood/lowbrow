@@ -70,15 +70,17 @@ end
 ##### Render Pipelines
 
 function renderpass(system, config)
-  samples = get(system, :max_msaa)
+  samples = hw.multisamplemax(system.spec, config.samples)
 
+  # TODO: If samples === 1, we shouldn't include a separate colour attachement
+  # for multisampling.
   hashmap(
     :renderpass,
     vk.unwrap(vk.create_render_pass(
-      get(system, :device),
+      system.device,
       [
         vk.AttachmentDescription(
-          getin(config, [:swapchain, :format]),
+          system.spec.swapchain.format,
           samples,
           vk.ATTACHMENT_LOAD_OP_CLEAR,
           vk.ATTACHMENT_STORE_OP_DONT_CARE,
@@ -98,7 +100,7 @@ function renderpass(system, config)
           vk.IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         ),
         vk.AttachmentDescription(
-          getin(config, [:swapchain, :format]),
+          system.spec.swapchain.format,
           vk.SAMPLE_COUNT_1_BIT,
           vk.ATTACHMENT_LOAD_OP_DONT_CARE,
           vk.ATTACHMENT_STORE_OP_STORE,

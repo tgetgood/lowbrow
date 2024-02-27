@@ -20,6 +20,8 @@ VS = Union{Vector, ds.Vector}
 mergeconfig(x, y) = y
 mergeconfig(x::ds.Map, y::ds.Map) = ds.mergewith(mergeconfig, x, y)
 mergeconfig(x::VS, y::VS) = ds.into(y, x)
+mergeconfig() = ds.emptymap
+mergeconfig(x) = x
 mergeconfig(x, ys...) = ds.reduce(mergeconfig, x, ys)
 
 defaults = ds.hashmap(
@@ -56,7 +58,7 @@ defaults = ds.hashmap(
   :pipelines, ds.hashmap(
     :render, ds.hashmap(
       :type, :graphics,
-      :msaa, 1, # Disabled
+      :samples, 1, # Disabled
     ),
     :host_transfer, ds.hashmap(
       :type, :transfer
@@ -269,7 +271,7 @@ function queuerequirements(config, info)
     ds.emptymap,
     map(x -> [ds.key(x), min(ds.val(x), qfp[ds.key(x) + 1].queue_count)])
     ∘
-    filter(x -> x[2] > 0) ,
+    filter(x -> x[2] > 0),
     queuecountbyfamily
   )
 
@@ -279,10 +281,18 @@ function queuerequirements(config, info)
 
   ds.hashmap(
     :queue_families, queue_families,
-    :pipelines, pipelines,
     :supported_counts, supported_counts,
     :allocations, queue_allocations
   )
+end
+
+function checkswapchain(requested, supported)
+  true
+end
+
+function swapchainrequirements(config, info)
+  # TODO: check and negotiate.
+  config.swapchain
 end
 
 function devicerequirements(config, info)
@@ -318,6 +328,17 @@ function devicerequirements(config, info)
       :extensions, supported_extensions,
       :features, supported_features
     ))
+
+    if !get(config, :headless, false)
+      swapchaininfo = swapchainrequirements(config, info)
+
+      if !checkswapchain(config.swapchain, swapchaininfo)
+        return :device_unsuitable
+      end
+
+      info = ds.assoc(info, :swapchain, swapchaininfo)
+
+    end
 
     return info
   end
