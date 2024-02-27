@@ -58,7 +58,9 @@ defaults = ds.hashmap(
   :pipelines, ds.hashmap(
     :render, ds.hashmap(
       :type, :graphics,
-      :samples, 1, # Disabled
+      # On modern hardware, 4x msaa has very little cost, so this seems like a
+      # good default. Defaulting to 1 will just make things look bad.
+      :samples, 4,
     ),
     :host_transfer, ds.hashmap(
       :type, :transfer
