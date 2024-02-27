@@ -6,6 +6,9 @@ function deref(a::Atom)
   getfield(a, :value, :monotonic)
 end
 
+# Same syntax as jl's Ref
+#
+# REVIEW: Have I just reimplemented (poorly) something already available?
 function getindex(a::Atom)
   deref(a)
 end
