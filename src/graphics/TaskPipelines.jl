@@ -145,10 +145,10 @@ function record(cb, p::TransferPipeline, wait=[], signal=[])
 
 end
 
-function sendcmd(cb, system, name, type, wait=[], signal=[])
+function sendcmd(cb, system, name, wait=[], signal=[])
   dev = system.device
-  qf = get(system.spec.queues.queue_families, type)
   queue = q.getqueue(system, get(system.spec.queues.allocations, name))
+  qf = queue.qf
 
   commandpool = hw.commandpool(dev, qf)
   cmd = hw.commandbuffers(dev, commandpool, 1)[1]

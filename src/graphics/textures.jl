@@ -90,9 +90,7 @@ function generatemipmaps(system, vkim)
     0:mips-2 # mip levels start at zero
   )
 
-  # FIXME: This is pretty ugly. I think it shows a weakess in my wrapper
-  # abstraction or a confusion between the needs of queues and pipelines.
-  tp.sendcmd(system, :render, :graphics) do cmd
+  tp.sendcmd(system, :render) do cmd
     ds.reduce(0, mipconstruct) do _, x
       Commands.transitionimage(cmd, get(x, :prebarrier))
       Commands.mipblit(cmd, get(x, :blit))

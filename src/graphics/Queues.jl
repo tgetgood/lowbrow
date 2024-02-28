@@ -17,6 +17,7 @@ struct SharedQueue
   ch
   sigkill
   queue
+  qf
 end
 
 function submit(queue::vk.Queue, submissions, fence=C_NULL)
@@ -33,7 +34,7 @@ function teardown(p::SharedQueue)
   put!(p.sigkill, true)
 end
 
-function sharedqueue(queue::vk.Queue)
+function sharedqueue(queue::vk.Queue, qf)
   ch = Channel()
   kill = Channel()
   thread() do
@@ -44,14 +45,17 @@ function sharedqueue(queue::vk.Queue)
     end
   end
 
-  SharedQueue(ch, kill, queue)
+  SharedQueue(ch, kill, queue, qf)
 end
 
 function getqueue(system, info::vk.DeviceQueueInfo2)
   if ds.containsp(system.cache[].queues, info)
     return get(system.cache[].queues, info)
   else
-    q = sharedqueue(vk.get_device_queue_2(system.device, info))
+    q = sharedqueue(
+      vk.get_device_queue_2(system.device, info),
+      info.queue_family_index
+    )
     ds.swap!(system.cache, ds.associn, [:queues, info], q)
     return q
   end
