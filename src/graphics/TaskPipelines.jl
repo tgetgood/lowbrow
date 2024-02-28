@@ -372,12 +372,12 @@ function computepipeline(system, name, config)
   return AsyncPipeline(inch, killch)
 end
 
-function run(p::AsyncPipeline, inputs, pcs=[])
+function run(p::AsyncPipeline, inputs)
   # Create a fresh output channel for each set of inputs. I'm not convinced this
   # is the right way to do it, but it lets multiple people submit work and only
   # be able to see their own results.
   out = Channel()
-  put!(p.input, [inputs, pcs, out])
+  put!(p.input, (inputs, out))
   return out
 end
 
@@ -417,8 +417,6 @@ function graphicspipeline(system, name, config)
 
   system = merge(system, take!(gpch))
 
-  renderstate = fw.assemblerender(system, config)
-
   inch = Channel()
   killch = Channel()
 
@@ -428,7 +426,7 @@ function graphicspipeline(system, name, config)
     try
       while !isready(killch)
         framecounter += 1
-        (vbuff, pcs, outch) = take!(inch)
+        (renderstate, outch) = take!(inch)
 
         if window.closep(win)
           put!(outch, :closed)
@@ -441,11 +439,7 @@ function graphicspipeline(system, name, config)
           cmd = hw.commandbuffers(dev, commandpool, 1)[1]
           co = ds.assoc(render.syncsetup(system), :commandbuffer, cmd)
 
-          if vbuff != []
-            renderstate = ds.assoc(renderstate, :vertexbuffer, vbuff)
-          end
-
-          gsig = render.draw(system, co, renderstate)
+          gsig = render.draw(system, queue, co, renderstate)
 
           @async begin
             commands.wait_semaphore(dev, gsig)

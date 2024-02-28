@@ -33,21 +33,20 @@ function commandbuffers(system, config)
   )
 end
 
-function recorder(cmd, i, framebuffers, config)
+function recorder(cmd, i, system, config)
   # REVIEW: This can probably be sped up a lot by moving all of the lookups out
   # of runtime.
   #
   # N.B.: This runs in the render loop!
 
+  framebuffers = system.framebuffers
   cmdbuf = get(cmd, :commandbuffer)
-  render_pass = get(config, :renderpass)
+  render_pass = system.renderpass
 
-  viewports = get(config, :viewports)
-  scissors = get(config, :scissors)
+  viewports = system.viewports
+  scissors = system.scissors
 
-  graphics_pipeline = get(config, :pipeline)
-
-  # vk.unwrap(vk.reset_command_buffer(cmdbuf))
+  graphics_pipeline = system.pipeline
 
   vk.unwrap(vk.begin_command_buffer(
     cmdbuf,
@@ -79,7 +78,7 @@ function recorder(cmd, i, framebuffers, config)
   vk.cmd_set_scissor(cmdbuf, scissors)
 
   descriptorsets = ds.getin(config, [:descriptorsets, :sets], [])
-  layout = get(config, :pipelinelayout)
+  layout = system.pipelinelayout
 
   if length(descriptorsets) > 0
     vk.cmd_bind_descriptor_sets(
@@ -106,19 +105,19 @@ function recorder(cmd, i, framebuffers, config)
     )
   end
 
-  vert = ds.get(config, :vertexbuffer)
+  vert = config.vertexbuffer
 
   vb = get(vert, :buffer)
 
-  vk.cmd_bind_vertex_buffers(cmdbuf, [vb], vk.VkDeviceSize[0])
+  vk.cmd_bind_vertex_buffers(cmdbuf, [vert.buffer], vk.VkDeviceSize[0])
 
   if ds.containsp(config, :indexbuffer)
-    ind = get(config, :indexbuffer)
-    vk.cmd_bind_index_buffer(cmdbuf, get(ind, :buffer), 0, get(ind, :type))
+    ind = config.indexbuffer
+    vk.cmd_bind_index_buffer(cmdbuf, ind.buffer, 0, ind.type)
 
-    vk.cmd_draw_indexed(cmdbuf, get(ind, :verticies), 1, 0, 0, 0)
+    vk.cmd_draw_indexed(cmdbuf, ind.verticies, 1, 0, 0, 0)
   else
-    vk.cmd_draw(cmdbuf, get(vert, :verticies), 1, 0, 0)
+    vk.cmd_draw(cmdbuf, vert.verticies, 1, 0, 0)
   end
 
   vk.cmd_end_render_pass(cmdbuf)
@@ -126,7 +125,7 @@ function recorder(cmd, i, framebuffers, config)
   vk.unwrap(vk.end_command_buffer(cmdbuf))
 end
 
-function draw(system, cmd, renderstate)
+function draw(system, queue, cmd, renderstate)
   dev = get(system, :device)
   timeout = typemax(Int64)
   (imagesem, rendersem, fence) = get(cmd, :locks)
@@ -158,7 +157,7 @@ function draw(system, cmd, renderstate)
       )
     end
 
-    recorder(cmd, image + 1, get(system, :framebuffers), renderstate)
+    recorder(cmd, image + 1, system, renderstate)
 
     sigsem = hw.timelinesemaphore(dev, 1)
     sig = vk.SemaphoreSubmitInfo(sigsem, 2, 0)
@@ -174,7 +173,7 @@ function draw(system, cmd, renderstate)
       [vk.SemaphoreSubmitInfo(rendersem, 0, 0), sig]
     )
 
-    vk.queue_submit_2(hw.getqueue(system, :graphics), [submission]; fence)
+    vk.queue_submit_2(queue, [submission]; fence)
 
     # end fenced region
 
@@ -182,7 +181,8 @@ function draw(system, cmd, renderstate)
     # the framebuffer image.
 
     preres = vk.queue_present_khr(
-      hw.getqueue(system, :presentation),
+      # FIXME: These might not be the same queue.
+      queue,
       vk.PresentInfoKHR(
         [rendersem],
         [get(system, :swapchain)],

@@ -7,7 +7,7 @@ import Vulkan as vk
 import DataStructures as ds
 
 import hardware as hw
-import commands
+import Commands
 
 # TODO: These buffers should both use SHARING_MODE_EXCLUSIVE and be returned
 # after transfer to the graphics queue.
@@ -23,7 +23,7 @@ function vertexbuffer(system, data)
     )
   )
 
-  commands.todevicelocal(system, data, buffer)
+  Commands.todevicelocal(system, data, buffer)
 
   ds.assoc(buffer,
     :verticies, length(data),
@@ -33,18 +33,20 @@ end
 
 function indexbuffer(system, indicies)
   T = eltype(indicies)
+  bytes =
 
   buffer = hw.buffer(
     system,
     ds.hashmap(
-      :size, bytes,
+      # indicies might be a persistent vector, I suppose.
+      :size, sizeof(T) * length(indicies),
       :usage, [:index_buffer, :transfer_dst],
       :queues, [:graphics, :transfer],
       :memoryflags, :device_local
     )
   )
 
-  commands.todevicelocal(system, indicies, buffer)
+  Commands.todevicelocal(system, indicies, buffer)
 
   ds.assoc(buffer,
     :verticies, length(indicies),

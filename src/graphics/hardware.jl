@@ -506,7 +506,7 @@ function timelinesemaphore(dev::vk.Device, init=1)
 end
 
 function ssi(dev, init=1, df=0)
-  vk.SemaphoreSubmitInfo(timelinesemaphore(dev, init), UInt(init + 1), sf)
+  vk.SemaphoreSubmitInfo(timelinesemaphore(dev, init), UInt(init + 1), df)
 end
 
 function tick(ss::vk.SemaphoreSubmitInfo)

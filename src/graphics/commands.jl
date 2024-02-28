@@ -189,15 +189,18 @@ function copybuffer(cmd::vk.CommandBuffer, src, dst, size,
 end
 
 function todevicelocal(system, data, buffers...)
+  dev = system.device
   staging = hw.transferbuffer(system, sizeof(data))
 
   memptr::Ptr{eltype(data)} = vk.unwrap(vk.map_memory(
-    get(system, :device), get(staging, :memory), 0, sizeof(data)
+    dev, staging.memory, 0, sizeof(data)
   ))
 
   unsafe_copyto!(memptr, pointer(data), length(data))
 
-  vk.unmap_memory(get(system, :device), get(staging, :memory))
+  vk.unmap_memory(dev, staging.memory)
+
+
 
   post = cmdseq(system, :transfer) do cmd
     for buffer in buffers

@@ -245,6 +245,7 @@ mapvals(f, m) = into(empty(m), mapvals(f), m)
 
 ##### Empty maps
 
+merge(x::EmptyMap, y::EmptyMap) = emptymap
 merge(x::EmptyMap, y::Map) = y
 merge(x::Map, y::EmptyMap) = x
 

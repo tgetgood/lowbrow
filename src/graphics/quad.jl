@@ -60,8 +60,9 @@ function main()
   system, config = init.setup(load(prog), window)
 
   pipelines = tp.buildpipelines(system, config)
+  system = ds.assoc(system, :pipelines, pipelines)
 
-  vertexbuffer, indexbuffer = vertex.buffers(
+  vb, ib = vertex.buffers(
     system,
     prog.pipelines.render.verticies,
     prog.pipelines.render.indicies
@@ -71,7 +72,7 @@ function main()
 
   while true
     window.poll()
-    sig = take!(tp.run(gp, []))
+    sig = take!(tp.run(gp, ds.hashmap(:vertexbuffer, vb, :indexbuffer, ib)))
 
     if sig === :closed
       break
