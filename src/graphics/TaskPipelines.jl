@@ -1,7 +1,5 @@
 module TaskPipelines
 
-import Distributed: pmap
-
 import Vulkan as vk
 import DataStructures as ds
 
@@ -13,7 +11,6 @@ import Sync
 import hardware as hw
 import framework as fw
 import resources as rd
-import commands
 import render
 import Glfw as window
 import pipeline as pipe
@@ -139,12 +136,35 @@ function record(cb, p::TransferPipeline, wait=[], signal=[])
 
     res = q.submit(queue, [vk.SubmitInfo2(wait, [cbi], vcat(signal, [post]))])
 
-    put!(out, (post, take!(res)))
+    put!(out, (post, res))
   end
 
   register(p, recorder)
 
   return out
+
+end
+
+function sendcmd(cb, system, name, type, wait=[], signal=[])
+  dev = system.device
+  qf = get(system.spec.queues.queue_families, type)
+  queue = q.getqueue(system, get(system.spec.queues.allocations, name))
+
+  commandpool = hw.commandpool(dev, qf)
+  cmd = hw.commandbuffers(dev, commandpool, 1)[1]
+
+  post = Sync.ssi(dev)
+  vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
+
+  cb(cmd)
+
+  vk.end_command_buffer(cmd)
+
+  cbi = vk.CommandBufferSubmitInfo(cmd, 0)
+
+  res = q.submit(queue, [vk.SubmitInfo2(wait, [cbi], vcat(signal, [post]))])
+
+  return post, res
 
 end
 
@@ -400,11 +420,13 @@ function graphicspipeline(system, name, config)
         framecounter += 1
         (renderstate, outch) = take!(inch)
 
+        # FIXME: This will crash if we switch window managers.
         if window.closep(win)
           put!(outch, :closed)
           break
         end
 
+        # FIXME: This will also crash if we switch window managers.
         if window.minimised(win)
           put!(outch, :skip)
         else

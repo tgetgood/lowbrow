@@ -4,7 +4,9 @@ import FileIO as fio
 import hardware as hw
 import DataStructures as ds
 import Vulkan as vk
-import commands
+import Commands
+import TaskPipelines as tp
+import Sync
 
 # N.B: This import automagically allows us to read the bytes out of the
 # image. *Do not remove it*!
@@ -16,9 +18,6 @@ import commands
 import ColorTypes.FixedPointNumbers
 
 function texturesampler(system, config)
-  props = vk.get_physical_device_properties(get(system, :physicaldevice))
-  anis = props.limits.max_sampler_anisotropy
-
   vk.unwrap(vk.create_sampler(
     get(system, :device),
     vk.FILTER_LINEAR,
@@ -29,7 +28,7 @@ function texturesampler(system, config)
     vk.SAMPLER_ADDRESS_MODE_REPEAT,
     0,
     true,
-    anis,
+    system.spec.device.properties.limits.max_sampler_anisotropy,
     false,
     vk.COMPARE_OP_ALWAYS,
     0,
@@ -45,11 +44,8 @@ function bgr(p)
   )
 end
 
-function generatemipmaps(vkim, system)
-  props = vk.get_physical_device_format_properties(
-    get(system, :physicaldevice),
-    get(vkim, :format)
-  )
+function generatemipmaps(system, vkim)
+  props = vk.get_physical_device_format_properties(system.pdev, vkim.format)
 
   if (props.optimal_tiling_features &
       vk.FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT).val == 0
@@ -94,14 +90,16 @@ function generatemipmaps(vkim, system)
     0:mips-2 # mip levels start at zero
   )
 
-  commands.cmdseq(system, :graphics) do cmd
+  # FIXME: This is pretty ugly. I think it shows a weakess in my wrapper
+  # abstraction or a confusion between the needs of queues and pipelines.
+  tp.sendcmd(system, :render, :graphics) do cmd
     ds.reduce(0, mipconstruct) do _, x
-      commands.transitionimage(cmd, get(x, :prebarrier))
-      commands.mipblit(cmd, get(x, :blit))
-      commands.transitionimage(cmd, get(x, :postbarrier))
+      Commands.transitionimage(cmd, get(x, :prebarrier))
+      Commands.mipblit(cmd, get(x, :blit))
+      Commands.transitionimage(cmd, get(x, :postbarrier))
     end
 
-    commands.transitionimage(
+    Commands.transitionimage(
       cmd,
       ds.merge(
         barrier,
@@ -155,8 +153,8 @@ function textureimage(system, filename)
     :memoryflags, :device_local
   ))
 
-  post = commands.cmdseq(system, :transfer) do cmd
-    commands.transitionimage(cmd, ds.hashmap(
+  join = tp.record(system.pipelines.host_transfer) do cmd
+    Commands.transitionimage(cmd, ds.hashmap(
       :image, vkim,
       :miplevels, mips,
       :srclayout, vk.IMAGE_LAYOUT_UNDEFINED,
@@ -166,11 +164,11 @@ function textureimage(system, filename)
       :dststage, vk.PIPELINE_STAGE_TRANSFER_BIT
     ))
 
-    commands.copybuffertoimage(
+    Commands.copybuffertoimage(
       cmd, system, get(staging, :buffer), get(vkim, :image), size(image)
     )
 
-    commands.transitionimage(cmd, ds.hashmap(
+    Commands.transitionimage(cmd, ds.hashmap(
       :image, vkim,
       :srclayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       :dstlayout, vk.IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -178,26 +176,16 @@ function textureimage(system, filename)
       :dstaccess, vk.ACCESS_TRANSFER_WRITE_BIT,
       :srcstage, vk.PIPELINE_STAGE_TRANSFER_BIT,
       :dststage, vk.PIPELINE_STAGE_TRANSFER_BIT,
-      :srcqueue, ds.getin(system, [:queues, :transfer]),
-      :dstqueue, ds.getin(system, [:queues, :graphics])
+      :srcqueue, system.spec.queues.queue_families.transfer,
+      :dstqueue, system.spec.queues.queue_families.graphics,
     ))
 
   end
 
-  # REVIEW: Ideally we'd send `sem` as a wait to the mipmap `queue_submit`.
-  #
-  # The problem is that the semaphore gets freed by Julia's GC, so we'd have to
-  # hold on to the `sem` handle somehow for an unknown length of time. The
-  # easiest way I can think to do that is use a task and another tick of the
-  # timeline. But if I'm blocking a thread anyway, why bother for something that
-  # happens only at load time?
-  vk.wait_semaphores(
-    get(system, :device),
-    vk.SemaphoreWaitInfo([post.semaphore], [post.value]),
-    typemax(UInt)
-  )
+  (post, _) = take!(join)
+  Sync.wait_semaphore(system.device, post)
 
-  generatemipmaps(vkim, system)
+  generatemipmaps(system, vkim)
 
   view = hw.imageview(
     system,

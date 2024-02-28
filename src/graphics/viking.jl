@@ -47,19 +47,15 @@ function timerotate(u)
 end
 
 function load(config)
-  ds.updatein(ds.update(config, :ubo, ubo),
-    [:pipelines, :render],
-    merge,
-    ds.assoc(model.load(config),
-      :vertex_input_state, rd.vertex_input_state(model.Vertex)
-    )
+  ds.associn(ds.update(config, :ubo, ubo),
+    [:pipelines, :render, :vertex_input_state],
+    rd.vertex_input_state(model.Vertex)
   )
 end
 
 ##### Main definition
 
 x = pi/3
-frames = 3
 
 """
 Static description of the program to be run. Pure data. Shouldn't invoke
@@ -76,7 +72,6 @@ prog = ds.hashmap(
   ),
   :model_file, *(@__DIR__, "/../../assets/viking_room.obj"),
   :texture_file, *(@__DIR__, "/../../assets/viking_room.png"),
-  :concurrent_frames, frames,
   :pipelines, ds.hashmap(
     :render, ds.hashmap(
       :shaders, ds.hashmap(
@@ -87,7 +82,7 @@ prog = ds.hashmap(
         :topology, :triangles
       ),
       :descriptorsets, ds.hashmap(
-        :count, frames,
+        :count, 3,
         :bindings, [
           ds.hashmap(
             :type, :uniform,
@@ -101,14 +96,6 @@ prog = ds.hashmap(
       )
     )
   ),
-  # REVIEW: Is it really effective to multiply these matricies over for each
-  # vertex on the GPU? It seems like multiplying once per frame on the cpu side
-  # before pushing would be smarter. We could also use push constants that way,
-  # but I'm mainly worried about multiplying the same three matricies 10 000+
-  # times...
-  #
-  # The only reason I can think not to is latency. But we're talking
-  # microseconds here, aren't we?
   :ubo, ds.hashmap(
     :model, [
       1 0 0 0
@@ -134,35 +121,42 @@ prog = ds.hashmap(
 function main()
   window.shutdown()
 
-  system, config = init.setup(prog, window)
-  pipelines = tp.buildpipelines(system, config)
-  system = ds.assoc(system, :pipelines, pipelines)
+  system, config = init.setup(load(prog), window)
+  dev = system.device
+  frames = system.spec.swapchain.images
 
-  frames = get(config, :concurrent_frames)
-  dev = get(system, :device)
+  dsets = fw.descriptors(
+    dev, config.pipelines.render.descriptorsets.bindings, frames
+  )
+
+  config = ds.updatein(
+    config, [:pipelines, :render, :descriptorsets], merge, dsets
+  )
+
+  pipelines = tp.buildpipelines(system, config)
+
+  system = ds.assoc(system, :pipelines, pipelines)
 
   texture = textures.textureimage(system, get(config, :texture_file))
 
   ubos = uniform.allocatebuffers(system, MVP, frames)
 
-  dsets = fw.descriptors(
-    dev,
-    ds.getin(config, [:render, :descriptorsets, :bindings]),
-    frames
-  )
-
-  config = ds.updatein(config, [:render, :descriptorsets], merge, dsets)
-
   fw.binddescriptors(
     dev,
-    ds.getin(config, [:render, :descriptorsets]),
+    ds.getin(config, [:pipelines, :render, :descriptorsets]),
     ds.into([], map(i -> [ubos[i], texture]), 1:frames)
   )
 
   graphics = system.pipelines.render
 
-  vb, ib = vertex.buffers(system, load(config)...)
-  renderstate = ds.hashmap(:vertexbuffer, vb, :indexbuffer, ib)
+  vb, ib = vertex.buffers(system, model.load(config)...)
+
+  renderstate = ds.hashmap(
+    :vertexbuffer, vb,
+    :indexbuffer, ib,
+    :descriptorsets, dsets,
+    :texture, texture
+  )
 
   i = 0
   while true
@@ -183,7 +177,7 @@ function main()
   end
 
   window.shutdown()
-  tp.teardown(gp)
+  tp.teardown(graphics)
 end
 
 main()
