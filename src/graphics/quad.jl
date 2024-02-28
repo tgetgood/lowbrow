@@ -68,11 +68,13 @@ function main()
     config.pipelines.render.indicies
   )
 
+  renderstate = ds.hashmap(:vertexbuffer, vb, :indexbuffer, ib)
+
   gp = pipelines.render
 
   while true
     window.poll()
-    sig = take!(tp.run(gp, ds.hashmap(:vertexbuffer, vb, :indexbuffer, ib)))
+    sig = take!(tp.run(gp, renderstate))
 
     if sig === :closed
       break

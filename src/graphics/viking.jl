@@ -47,8 +47,8 @@ function timerotate(u)
 end
 
 function load(config)
-  ds.update(ds.update(config, :ubo, ubo),
-    :render,
+  ds.updatein(ds.update(config, :ubo, ubo),
+    [:pipelines, :render],
     merge,
     ds.assoc(model.load(config),
       :vertex_input_state, rd.vertex_input_state(model.Vertex)
@@ -77,26 +77,28 @@ prog = ds.hashmap(
   :model_file, *(@__DIR__, "/../../assets/viking_room.obj"),
   :texture_file, *(@__DIR__, "/../../assets/viking_room.png"),
   :concurrent_frames, frames,
-  :render, ds.hashmap(
-    :shaders, ds.hashmap(
-      :vertex, *(@__DIR__, "/../shaders/viking.vert"),
-      :fragment, *(@__DIR__, "/../shaders/viking.frag")
-    ),
-    :inputassembly, ds.hashmap(
-      :topology, :triangles
-    ),
-    :descriptorsets, ds.hashmap(
-      :count, frames,
-      :bindings, [
-        ds.hashmap(
-          :type, :uniform,
-          :stage, :vertex
-        ),
-        ds.hashmap(
-          :type, :combined_sampler,
-          :stage, :fragment
-        )
-      ]
+  :pipelines, ds.hashmap(
+    :render, ds.hashmap(
+      :shaders, ds.hashmap(
+        :vertex, *(@__DIR__, "/../shaders/viking.vert"),
+        :fragment, *(@__DIR__, "/../shaders/viking.frag")
+      ),
+      :inputassembly, ds.hashmap(
+        :topology, :triangles
+      ),
+      :descriptorsets, ds.hashmap(
+        :count, frames,
+        :bindings, [
+          ds.hashmap(
+            :type, :uniform,
+            :stage, :vertex
+          ),
+          ds.hashmap(
+            :type, :combined_sampler,
+            :stage, :fragment
+          )
+        ]
+      )
     )
   ),
   # REVIEW: Is it really effective to multiply these matricies over for each
@@ -132,10 +134,11 @@ prog = ds.hashmap(
 function main()
   window.shutdown()
 
-  config = graphics.configure(load(prog))
-  frames = get(config, :concurrent_frames)
+  system, config = init.setup(prog, window)
+  pipelines = tp.buildpipelines(system, config)
+  system = ds.assoc(system, :pipelines, pipelines)
 
-  system = graphics.staticinit(config)
+  frames = get(config, :concurrent_frames)
   dev = get(system, :device)
 
   texture = textures.textureimage(system, get(config, :texture_file))
@@ -156,9 +159,10 @@ function main()
     ds.into([], map(i -> [ubos[i], texture]), 1:frames)
   )
 
-  gconfig = fw.staticbuffers(system, get(config, :render))
+  graphics = system.pipelines.render
 
-  gp = tp.graphicspipeline(system, gconfig)
+  vb, ib = vertex.buffers(system, load(config)...)
+  renderstate = ds.hashmap(:vertexbuffer, vb, :indexbuffer, ib)
 
   i = 0
   while true
@@ -169,7 +173,7 @@ function main()
     i = (i % frames) + 1
     uniform.setubo!(ubos[i], timerotate(get(config, :ubo)))
 
-    sig = take!(tp.run(gp, []))
+    sig = take!(tp.run(graphics, renderstate))
 
     if sig === :closed
       break
@@ -177,6 +181,8 @@ function main()
       sleep(0.08)
     end
   end
+
+  window.shutdown()
   tp.teardown(gp)
 end
 
