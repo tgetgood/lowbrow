@@ -3,84 +3,13 @@ module commands
 import Vulkan as vk
 
 import Helpers: thread
-import Sync: wait_semaphore
+import Sync
 
 import hardware as hw
 import resources: shaderstagebits
 
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
-
-"""
-Returns a timeline semaphore which will signal `1` when submitted commands are
-finished.
-
-Also starts a new task which waits and collects the command buffer. Some sort of
-pool would be a better design, but this suffices for now.
-"""
-function cmdseq(body, system, qf;
-  level=vk.COMMAND_BUFFER_LEVEL_PRIMARY, wait=[])
-
-  signal = Sync.timelinesemaphore(system.device, 0)
-  post = vk.SemaphoreSubmitInfo(signal, UInt(1), 0)
-
-  pool = hw.getpool(system, qf)
-  queue = hw.getqueue(system, qf)
-
-  # FIXME: command pools are not thread safe, so this whole mechanism needs to
-  # be rethought.
-  cmds = hw.commandbuffers(system, 1, qf, level)
-  cmd = cmds[1]
-
-  vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
-
-  body(cmd)
-
-  vk.end_command_buffer(cmd)
-
-  cbi = vk.CommandBufferSubmitInfo(cmd, 0)
-
-  vk.queue_submit_2(queue, [vk.SubmitInfo2(wait, [cbi], [post])])
-
-  thread() do
-    wait_semaphore(get(system, :device), post,)
-    vk.free_command_buffers(get(system, :device), pool, cmds)
-  end
-
-  return post
-end
-
-function recordcomputation(
-  cmd, pipeline, layout, workgroup=[1, 1, 1], dsets=[], pcs=ds.emptymap
-)
-  vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
-
-  vk.cmd_bind_pipeline(cmd, vk.PIPELINE_BIND_POINT_COMPUTE, pipeline)
-
-  if !ds.emptyp(pcs)
-    vk.cmd_push_constants(
-      cmd,
-      layout,
-      vk.SHADER_STAGE_COMPUTE_BIT,
-      get(pcs, :offset, 0),
-      get(pcs, :size),
-      Ptr{Nothing}(pointer(get(pcs, :value)))
-    )
-  end
-
-  vk.cmd_bind_descriptor_sets(
-    cmd,
-    vk.PIPELINE_BIND_POINT_COMPUTE,
-    layout,
-    0,
-    dsets,
-    []
-  )
-
-  vk.cmd_dispatch(cmd, workgroup...)
-
-  vk.end_command_buffer(cmd)
-end
 
 function copybuffertoimage(cmd, system, src, dst, size, qf=:transfer)
   vk.cmd_copy_buffer_to_image(
@@ -171,44 +100,6 @@ function copybuffer(cmd::vk.CommandBuffer, src, dst, size,
   vk.cmd_copy_buffer(cmd, src, dst, [vk.BufferCopy(0, 0, size)])
 end
 
-function todevicelocal(system, data, buffers...)
-  dev = system.device
-  staging = hw.transferbuffer(system, sizeof(data))
-
-  memptr::Ptr{eltype(data)} = vk.unwrap(vk.map_memory(
-    dev, staging.memory, 0, sizeof(data)
-  ))
-
-  unsafe_copyto!(memptr, pointer(data), length(data))
-
-  vk.unmap_memory(dev, staging.memory)
-
-
-
-  post = cmdseq(system, :transfer) do cmd
-    for buffer in buffers
-      copybuffer(
-        cmd,
-        get(staging, :buffer),
-        get(buffer, :buffer),
-        get(staging, :size),
-        :transfer
-      )
-    end
-  end
-
-  # This *seems* to fix a highly intermittent use after free of the staging buffer.
-  # I can't replicate the issue reliably enough to call it fixed.
-  thread() do
-    wait_semaphore(get(system, :device), post)
-    staging
-  end
-
-  # REVIEW: I'm trying a convention where functions which submit modifications
-  # to buffers return SemaphoreSubmitInfos. Then we package those with the buffer and any downstream consumers know for what to wait when submitting further changes.
-  post
-end
-
 """
 Copy outputs of compute shaders back to cpu ram. Returns Vector<T>.
 """
@@ -228,7 +119,7 @@ function fromdevicelocal(system, T, buffer)
     )
   end
 
-  wait_semaphore(dev, post)
+  Sync.wait_semaphore(dev, post)
 
   out = Vector{T}(undef, Int(size / sizeof(T)))
 

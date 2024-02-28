@@ -30,11 +30,13 @@ function todevicelocal(system, data, buffers...)
     end
   end
 
+  (post, _) = take!(join)
   thread() do
-    (post, _) = take!(join)
     Sync.wait_semaphore(system.device, post)
     staging
   end
+
+  return post
 end
 
 end #module

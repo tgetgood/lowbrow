@@ -230,11 +230,42 @@ function allocout(system, config)
   ds.assoc(out, :config, config)
 end
 
+function recordcomputation(
+  cmd, pipeline, layout, workgroup=[1, 1, 1], dsets=[], pcs=ds.emptymap
+)
+  vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
+
+  vk.cmd_bind_pipeline(cmd, vk.PIPELINE_BIND_POINT_COMPUTE, pipeline)
+
+  if !ds.emptyp(pcs)
+    vk.cmd_push_constants(
+      cmd,
+      layout,
+      vk.SHADER_STAGE_COMPUTE_BIT,
+      get(pcs, :offset, 0),
+      get(pcs, :size),
+      Ptr{Nothing}(pointer(get(pcs, :value)))
+    )
+  end
+
+  vk.cmd_bind_descriptor_sets(
+    cmd,
+    vk.PIPELINE_BIND_POINT_COMPUTE,
+    layout,
+    0,
+    dsets,
+    []
+  )
+
+  vk.cmd_dispatch(cmd, workgroup...)
+
+  vk.end_command_buffer(cmd)
+end
+
 function computepipeline(system, name, config)
   dev = system.device
-  qf = system.queues.compute
-  # FIXME:
-  queue = hw.getqueue(system, :compute)
+  qf = system.spec.queues.queue_families.compute
+  queue = q.getqueue(system, get(system.spec.queues.allocations, name))
 
   stage = ds.hashmap(:stage, :compute)
   stagesetter(sets) = map(set -> merge(stage, set), sets)
@@ -262,7 +293,8 @@ function computepipeline(system, name, config)
   Threads.@spawn begin
     try
       while !isready(killch)
-        (inputs, pcs, outch) = take!(inch)
+        (input, outch) = take!(inch)
+        inputs, pcs = input
 
         (dset, cmdbuff, outputs, postsem) = passresources(allocator)
 
@@ -270,7 +302,7 @@ function computepipeline(system, name, config)
           dev, bindings, dset, vcat(inputs, outputs)
         )
 
-        commands.recordcomputation(
+        recordcomputation(
           cmdbuff,
           pipeline.pipeline,
           pipeline.layout,
@@ -296,17 +328,12 @@ function computepipeline(system, name, config)
       # No more work will be submitted on this queue, but there might be
       # submitted work waiting on something else.
       #
-
-      # "finished" (typemax(UInt32) maybe)? So long as every semaphore in
-      # every pipeline runner gets bumped, that should be enough for everything
-      # to unblock and flush.
-      #
-      # What about presentation? That's a little different. Do we actually
-      # have to present all buffered frames before exiting? Do we care?
+      # Bump all timelines to "finished" (typemax(UInt32) maybe)? So long as
+      # every semaphore in every pipeline runner gets bumped, that should be
+      # enough for everything to unblock and flush.
 
     catch e
-      print(stderr, "\n Error in pipeline thread: " *
-                    string(get(config, :name)) * "\n")
+      print(stderr, "\n Error in pipeline thread: " * name * "\n")
       ds.handleerror(e)
     end
   end
@@ -359,6 +386,8 @@ function graphicspipeline(system, name, config)
   system = merge(system, pipe.createframebuffers(system))
 
   system = merge(system, take!(gpch))
+
+  # Initialised
 
   inch = Channel()
   killch = Channel()

@@ -109,8 +109,6 @@ function recorder(cmd, i, system, config)
 
   vert = config.vertexbuffer
 
-  vb = get(vert, :buffer)
-
   vk.cmd_bind_vertex_buffers(cmdbuf, [vert.buffer], vk.VkDeviceSize[0])
 
   if ds.containsp(config, :indexbuffer)
@@ -165,11 +163,13 @@ function draw(system, gqueue, pqueue, cmd, renderstate)
 
     vwait = ds.getin(renderstate, [:vertexbuffer, :wait], [])
 
+    imagewait = vk.SemaphoreSubmitInfo(
+      imagesem, 0, 0;
+      stage_mask=vk.PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+    )
+
     submission = vk.SubmitInfo2(
-      ds.conj(vwait, vk.SemaphoreSubmitInfo(
-        imagesem, 0, 0;
-        stage_mask=vk.PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-      )),
+      ds.conj(vwait, imagewait),
       [vk.CommandBufferSubmitInfo(get(cmd, :commandbuffer), 0)],
       [vk.SemaphoreSubmitInfo(rendersem, 0, 0), sig]
     )

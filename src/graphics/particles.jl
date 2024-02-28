@@ -1,12 +1,13 @@
 import hardware as hw
 import resources as rd
 import framework as fw
-import commands
+import Commands
 import graphics
 import render
 import Glfw as window
 import TaskPipelines as tp
 import Sync
+import init
 
 import DataStructures as ds
 import DataStructures: hashmap, into, emptyvector
@@ -32,7 +33,7 @@ function velocity(p)
   (25.0f-3 / n) .* (x, y)
 end
 
-function init(count)
+function initparticles(count)
   ds.into!(
     Particle[],
     ds.partition(5)
@@ -48,7 +49,7 @@ end
 
 function init_particle_buffer(system, config)
   n = get(config, :particles)
-  particles = init(n)
+  particles = initparticles(n)
 
   buffconfig = ds.hashmap(
     :usage, ds.set(:vertex_buffer, :storage_buffer, :transfer_dst),
@@ -59,7 +60,7 @@ function init_particle_buffer(system, config)
 
   ssbo = hw.buffer(system, buffconfig)
 
-  next = commands.todevicelocal(system, particles, ssbo)
+  next = Commands.todevicelocal(system, particles, ssbo)
 
   ds.assoc(ssbo, :wait, [next], :config, buffconfig)
 end
@@ -85,7 +86,7 @@ prog = hashmap(
   :window, hashmap(:width, 1000, :height, 1000),
   :particles, nparticles,
   :pipelines, ds.hashmap(
-    :compute, ds.hashmap(
+    :sim, ds.hashmap(
       # inputs and outputs are combined to create descriptor sets.
       :inputs, [ds.hashmap(:type, :ssbo)],
       :outputs, [ds.hashmap(
@@ -95,6 +96,7 @@ prog = hashmap(
         :memoryflags, :device_local,
         :queues, [:graphics, :compute]
       )],
+      :type, :compute,
       # push constants are... constants. Treat them accordingly.
       :pushconstants, ds.hashmap(:size, 16),
       # The workgroup size and shader local size are tightly coupled, so this is,
@@ -108,6 +110,8 @@ prog = hashmap(
       )
     ),
     :render, ds.hashmap(
+      :samples, 1,
+      :type, :graphics,
       :inputassembly, ds.hashmap(
         :topology, :points,
         :restart, false
@@ -120,22 +124,27 @@ prog = hashmap(
   )
 )
 
-function main()
-  window.shutdown()
-  config = graphics.configure(prog)
-  frames = get(config, :concurrent_frames)
-  nparticles = get(config, :particles)
-
-  system = graphics.staticinit(config)
-  dev = get(system, :device)
-
-  ### rendering
-
-  config = ds.associn(
+function load(config)
+  ds.associn(
     config,
-    [:render, :vertex_input_state],
+    [:pipelines, :render, :vertex_input_state],
     rd.vertex_input_state(Particle, [:position, :colour])
   )
+end
+
+function main()
+  window.shutdown()
+
+  system, config = init.setup(load(prog), window)
+
+  # REVIEW: building the pipelines is not in the purview of init, but it this is
+  # just boilerplate that should be wrapped up somehow.
+  pipelines = tp.buildpipelines(system, config)
+  system = ds.assoc(system, :pipelines, pipelines)
+
+  nparticles = config.particles
+
+  dev = system.device
 
   ### Initial sim state
 
@@ -143,9 +152,9 @@ function main()
 
   ### pipelines
 
-  compute = tp.computepipeline(system, get(config, :compute))
+  compute = system.pipelines.sim
 
-  gp = tp.graphicspipeline(system, get(config, :render))
+  graphics = system.pipelines.render
 
   ### render loop
 
@@ -162,9 +171,10 @@ function main()
     dt = Float32(t2 - t1)
     t1 = t2
 
-    comp = tp.run(compute, [current_particles], [dt])
+    comp = tp.run(compute, ([current_particles], [dt]))
 
-    gout = tp.run(gp, ds.assoc(current_particles, :verticies, nparticles))
+    gout = tp.run(graphics, ds.hashmap(:vertexbuffer,
+      ds.assoc(current_particles, :verticies, nparticles)))
 
     next_particles = take!(comp)[1]
     current_particles = next_particles
@@ -185,7 +195,7 @@ function main()
   end
 
   tp.teardown(compute)
-  tp.teardown(gp)
+  tp.teardown(graphics)
 end
 
 main()
