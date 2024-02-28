@@ -52,8 +52,7 @@ end
 gather(x) = x
 
 function load(config)
-  filename = ds.getin(config, [:model_file])
-  objs = typesort(eachline(filename))
+  objs = typesort(eachline(config.model_file))
 
   vs = tofloat(get(objs, "v"))
   ts = tofloat(get(objs, "vt"))
@@ -82,7 +81,7 @@ function load(config)
     T = UInt32
   end
 
-  ds.hashmap(:verticies, verticies, :indicies, convert(Vector{T}, indicies))
+  (verticies, convert(Vector{T}, indicies))
 end
 
 end

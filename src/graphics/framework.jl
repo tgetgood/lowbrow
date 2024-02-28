@@ -9,7 +9,6 @@ import DataStructures as ds
 
 import commands
 import resources as rd
-import vertex
 import pipeline as pipe
 import hardware as hw
 import render
@@ -127,28 +126,6 @@ function binddescriptors(dev, config, bindings)
   for write in writes
     vk.update_descriptor_sets(dev, write, [])
   end
-end
-
-function indexbuffer(system, config)
-  if ds.containsp(config, :indicies)
-    vertex.indexbuffer(system, get(config, :indicies))
-  else
-    ds.emptymap
-  end
-end
-
-"""
-Copy cpu vectors representing vertex and index lists into gpu side vertex and
-index buffers.
-"""
-function staticbuffers(dev, spec, verticies, indicies=nothing)
-
-  vertex.vertexbuffer(dev, spec, verticies)
-
-  # merge(
-  #   config,
-  #   indexbuffer(system, config)
-  # )
 end
 
 function assemblerender(system, config)
