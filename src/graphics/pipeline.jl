@@ -30,7 +30,7 @@ function shader(device, fname, stage, entry="main")
 end
 
 function shaders(device, config)
-  into!([], map(e -> shader(device, ds.val(e), ds.key(e))), config)
+  ds.into!([], map(e -> shader(device, ds.val(e), ds.key(e))), config)
 end
 
 function pushconstantrange(x)
@@ -157,20 +157,20 @@ const topomap = ds.hashmap(
 )
 
 function creategraphicspipeline(system, config)
-  device = get(system, :device)
+  device = system.device
 
   dynamic_state = vk.PipelineDynamicStateCreateInfo([
     vk.DYNAMIC_STATE_SCISSOR,
     vk.DYNAMIC_STATE_VIEWPORT
   ])
 
-  ias = ds.getin(config, [:render, :inputassembly])
+  ias = config.render.inputassembly
+
   input_assembly_state = vk.PipelineInputAssemblyStateCreateInfo(
-    get(topomap, get(ias, :topology)),
-    get(ias, :restart, false)
+    get(topomap, ias.topology), get(ias, :restart, false)
   )
 
-  ext = hw.findextent(system, config)
+  ext = hw.findextent(system)
 
   viewports = [vk.Viewport(0, 0, ext.width, ext.height, 0, 1)]
   scissors = [vk.Rect2D(vk.Offset2D(0, 0), ext)]
@@ -178,7 +178,7 @@ function creategraphicspipeline(system, config)
   viewport_state = vk.PipelineViewportStateCreateInfo(; viewports, scissors)
 
   multisample_state = vk.PipelineMultisampleStateCreateInfo(
-    get(system, :max_msaa),
+    hw.multisamplemax(system.spec, config.render.samples),
     false,
     1,
     false,
@@ -228,14 +228,14 @@ function creategraphicspipeline(system, config)
     1
   )
 
-  vertex_input_state = ds.getin(config, [:render, :vertex_input_state])
+  vertex_input_state = config.render.vertex_input_state
 
   layout = pipelinelayout(system, config)
 
   ps = vk.unwrap(vk.create_graphics_pipelines(
     device,
     [vk.GraphicsPipelineCreateInfo(
-      shaders(device, ds.getin(config, [:render, :shaders])),
+      shaders(device, config.render.shaders),
       vk.PipelineRasterizationStateCreateInfo(
         false,
         false,
@@ -265,11 +265,11 @@ function creategraphicspipeline(system, config)
           :pipelinelayout, layout)
 end
 
-function createframebuffers(system, config)
+function createframebuffers(system)
   dev = get(system, :device)
   images = get(system, :imageviews)
   pass = get(system, :renderpass)
-  extent = hw.findextent(system, config)
+  extent = hw.findextent(system)
   depthview = ds.getin(system, [:depth, :view])
   colourview = ds.getin(system, [:colour, :view])
 

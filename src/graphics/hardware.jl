@@ -39,11 +39,11 @@ function swapchainsupport(surfaceinfo)
   return length(formats) > 0 && length(modes) > 0
 end
 
-function findformat(system, config)
+function findformat(spec)
   filtered = filter(
-    x -> x.format == getin(config, [:swapchain, :format]) &&
-      x.color_space == getin(config, [:swapchain, :colourspace]),
-    get(system, :surface_formats)
+    x -> x.format == spec.swapchain.format &&
+      x.color_space == spec.swapchain.colourspace,
+    spec.surface.formats
   )
 
   if length(filtered) == 0
@@ -53,10 +53,10 @@ function findformat(system, config)
   end
 end
 
-function findextent(system, config)
-  sc = get(system, :surface_capabilities)
+function findextent(system)
+  sc = system.spec.surface.capabilities
 
-  win = window.size(get(system, :window))
+  win = window.size(system.window)
 
   vk.Extent2D(
     clamp(win.width, sc.min_image_extent.width, sc.max_image_extent.width),
@@ -64,8 +64,8 @@ function findextent(system, config)
   )
 end
 
-function findpresentmode(system, config)
-  modes = get(system, :surface_present_modes)
+function findpresentmode(spec)
+  modes = spec.surface.present_modes
 
   if length(modes) == 0
     nothing
@@ -160,8 +160,8 @@ function queuetype(qfp, t)
 end
 
 function createswapchain(system, config)
-  format = findformat(system, config)
-  extent = findextent(system, config)
+  format = findformat(system.spec)
+  extent = findextent(system)
 
   # TODO: Use createinfo structs. Stop relying on Vulkan.jl wrapper functions
   # since I'm probably going to stop using it.
@@ -182,7 +182,7 @@ function createswapchain(system, config)
     [],
     vk.SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
     vk.COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-    findpresentmode(system, config),
+    findpresentmode(system.spec),
     true;
     old_swapchain=get(system, :swapchain, C_NULL)
   )
@@ -336,22 +336,24 @@ function commandbuffers(system, n::Int, qf, level=vk.COMMAND_BUFFER_LEVEL_PRIMAR
 end
 
 function createimage(system, config)
-  dev = get(system, :device)
+  dev = system.device
   samples = get(config, :samples, vk.SAMPLE_COUNT_1_BIT)
 
   queues::Vector{UInt32} = ds.into(
-    [], map(x -> ds.getin(system, [:queues, x])), get(config, :queues)
+    [], map(x -> get(system.spec.queues.queue_families, x)), config.queues
   )
 
   sharingmode = get(sharingmodes, get(config, :sharingmode,
     length(queues) == 1 ? :exclusive : :concurrent
   ))
 
+  ex = findextent(system)
+
   image = vk.unwrap(vk.create_image(
     dev,
     vk.IMAGE_TYPE_2D,
-    get(config, :format),
-    vk.Extent3D(get(config, :size)..., 1),
+    config.format,
+    vk.Extent3D(config.size..., 1),
     get(config, :miplevels, 1),
     1,
     samples,
@@ -367,7 +369,7 @@ function createimage(system, config)
   memory = vk.unwrap(vk.allocate_memory(
     dev,
     memreq.size,
-    findmemtype(system, ds.hashmap(
+    findmemtype(system.spec, ds.hashmap(
       :typemask, memreq.memory_type_bits,
       :flags, orlist(memorypropertybits, get(config, :memoryflags))
     ))[2]
@@ -387,13 +389,13 @@ function createimage(system, config)
 end
 
 function colourresources(system, config)
-  format = getin(config, [:swapchain, :format])
-  ext = get(system, :extent)
+  format = system.spec.swapchain.format
+  ext = findextent(system)
 
   image = createimage(system, hashmap(
     :size, [ext.width, ext.height],
     :format, format,
-    :samples, get(system, :max_msaa),
+    :samples, multisamplemax(system.spec, config.samples),
     :memoryflags, :device_local,
     # FIXME: Negotiate with host and allow optional flags. Lazy allocation is an
     # optimisation which might or might not be supported. We want to use it if
@@ -447,13 +449,13 @@ optdepthformat(system) = finddepthformats(
 
 function depthresources(system, config)
   format = optdepthformat(system)
+  ex = findextent(system)
 
-  ex = get(system, :extent)
   image = createimage(system,
     hashmap(
       :tiling, vk.IMAGE_TILING_OPTIMAL,
       :format, format,
-     :samples, get(system, :max_msaa),
+     :samples, multisamplemax(system.spec, config.samples),
       :size, [ex.width, ex.height],
       :usage, [:depth_stencil, :transient],
       :queues, [:graphics],
@@ -481,7 +483,7 @@ function createimageviews(system, config)
       emptyvector,
       map(image -> imageview(
         system,
-        hashmap(:format, findformat(system, config).format),
+        hashmap(:format, findformat(system.spec).format),
         hashmap(:image, image)
       )),
       vk.unwrap(vk.get_swapchain_images_khr(dev, get(system, :swapchain)))

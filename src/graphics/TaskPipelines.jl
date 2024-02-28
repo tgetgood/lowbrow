@@ -401,7 +401,7 @@ function graphicspipeline(system, name, config)
 
   swch = hw.thread() do
     swapchain = hw.createswapchain(system, system.spec)
-    iviews = hw.createimageviews(merge(system, swapchain), system.spec)
+    iviews = hw.createimageviews(merge(system, swapchain), config)
     return merge(swapchain, iviews)
   end
 
@@ -413,7 +413,7 @@ function graphicspipeline(system, name, config)
 
   system = merge(system, take!(swch))
 
-  system = merge(system, pipe.createframebuffers(system, system.spec))
+  system = merge(system, pipe.createframebuffers(system))
 
   system = merge(system, take!(gpch))
 

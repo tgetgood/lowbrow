@@ -34,7 +34,8 @@ pure.
 function swap!(a::Atom, f, args...)
   i = 0
   # REVIEW: is 2^16 too many tries before failing? Probably.
-  # TODO: backoff
+  # TODO: jl has a builtin ExponentialBackOff iterator. Use it.
+
   while i < 2^16
     i += 1
     current = deref(a)

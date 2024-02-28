@@ -20,10 +20,12 @@ function vert((pos, colour))
 end
 
 function load(config)
-  config = ds.updatein(config, [:render, :verticies], x -> map(vert, x))
-  config = ds.updatein(config, [:render, :indicies], x -> map(UInt16, x))
-  config = ds.associn(config,
-    [:render, :vertex_input_state], rd.vertex_input_state(Vertex)
+  ds.updatein(config, [:pipelines, :render],
+    x -> ds.assoc(x,
+      :verticies, map(vert, x.verticies),
+      :indicies, map(UInt16, x.indicies),
+      :vertex_input_state, rd.vertex_input_state(Vertex)
+    )
   )
 end
 
@@ -54,10 +56,8 @@ prog = ds.hashmap(
 )
 
 function main()
-  # config = graphics.configure(load(prog))
-
   window.shutdown()
-  system, config = init.setup(prog, window)
+  system, config = init.setup(load(prog), window)
 
   pipelines = tp.buildpipelines(system, config)
 
@@ -83,4 +83,4 @@ function main()
   tp.teardown(gp)
 end
 
-# main()
+main()
