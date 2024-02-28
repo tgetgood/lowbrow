@@ -88,11 +88,18 @@ const featuretypes = hashmap(
   v"1.3", vk.PhysicalDeviceVulkan13Features,
   v"1.2", vk.PhysicalDeviceVulkan12Features,
   v"1.1", vk.PhysicalDeviceVulkan11Features,
-  v"1.0", vk.PhysicalDeviceFeatures2
 )
 
+
 function devicefeatures(pdev)
-  ds.mapvals(x -> vk.get_physical_device_features_2(pdev, x).next, featuretypes)
+  ds.assoc(ds.mapvals(
+      x -> vk.get_physical_device_features_2(pdev, x).next, featuretypes
+    ),
+    v"1.0", # ah 1.0...
+    vk.get_physical_device_features_2(
+      pdev, vk.PhysicalDeviceFeatures2
+    ).next.features
+  )
 end
 
 function surfaceinfo(pdev, surface)
