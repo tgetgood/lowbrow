@@ -37,7 +37,7 @@ prog = ds.hashmap(
         :vertex, *(@__DIR__, "/../shaders/quad.vert"),
         :fragment, *(@__DIR__, "/../shaders/quad.frag")
       ),
-      :samples, 4,
+      :samples, 8,
       :inputassembly, ds.hashmap(
         :topology, :triangles
       ),
@@ -64,8 +64,8 @@ function main()
 
   vb, ib = vertex.buffers(
     system,
-    prog.pipelines.render.verticies,
-    prog.pipelines.render.indicies
+    config.pipelines.render.verticies,
+    config.pipelines.render.indicies
   )
 
   gp = pipelines.render

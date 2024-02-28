@@ -32,8 +32,8 @@ function vertexbuffer(system, data)
 end
 
 function indexbuffer(system, indicies)
+  @info typeof(indicies)
   T = eltype(indicies)
-  bytes =
 
   buffer = hw.buffer(
     system,
