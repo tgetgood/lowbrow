@@ -5,6 +5,10 @@ import Distributed: pmap
 import Vulkan as vk
 import DataStructures as ds
 
+import Helpers: thread
+
+import Queues as q
+
 import hardware as hw
 import framework as fw
 import resources as rd
@@ -37,69 +41,6 @@ struct AsyncPipeline <: Pipeline
   sigkill::Channel
 end
 
-################################################################################
-##### vk Queue wrappers
-################################################################################
-
-function submit(queue::vk.Queue, submissions)
-  out = Channel(1)
-  put!(out, vk.queue_submit_2(queue, submissions))
-  out
-end
-
-struct SharedQueueInfo
-  info::vk.DeviceQueueInfo2
-end
-
-struct SharedQueue
-  ch
-  sigkill
-end
-
-function teardown(p::SharedQueue)
-  put!(p.sigkill, true)
-end
-
-function sharedqueue(queue::vk.Queue)
-  ch = Channel()
-  kill = Channel()
-  hw.thread() do
-    while !isready(kill)
-      (submissions, out) = take!(ch)
-      res = vk.queue_submit_2(queue, submissions)
-      put!(out, res)
-    end
-  end
-
-  SharedQueue(ch, kill)
-end
-
-function submit(queue::SharedQueue, submissions)
-  out = Channel(1)
-  put!(queue.ch, (submissions, out))
-  return out
-end
-
-function getqueue(system, info::vk.DeviceQueueInfo2)
-  if ds.containsp(system.cache[].queues, info)
-    q = get(system.cache[].queues, info)
-    @warn "Creating multiple handles to externally synchronised queue: " * string(info)
-  else
-    q = vk.get_device_queue_2(system.device, info)
-    ds.swap!(system.cache, ds.associn, [:queues, info], q)
-  end
-  return q
-end
-
-function getqueue(system, info::SharedQueueInfo)
-  if ds.containsp(system.cache[].queues, info)
-    return get(system.cache[].queues, info)
-  else
-    q = sharedqueue(getqueue(system, info.info))
-    ds.swap!(system.cache, ds.associn, [:queues, info], q)
-    return q
-  end
-end
 
 ################################################################################
 ##### Host <-> Device Data Transfer
@@ -128,7 +69,7 @@ function cpe(system, qf, queue)
   work = Channel()
   sigkill = Channel(1)
 
-  hw.thread() do
+  thread() do
     while !isready(sigkill)
       recorder = take!(work)
 
@@ -146,7 +87,7 @@ function cpe(system, qf, queue)
 
       recorder(cmd, postsig, queue)
 
-      hw.thread() do
+      thread() do
         # REVIEW: These probably block threads. Assess that.
         commands.wait_semaphore(dev, postsig)
         ds.swap!(buffercount, -, 1)
@@ -161,14 +102,14 @@ function transferpipeline(system, name, spec)
   dev = system.device
 
   qf = get(system.spec.queues.queue_families, spec.type)
-  queue = getqueue(system, get(system.spec.queues.allocations, name))
+  queue = q.getqueue(system, get(system.spec.queues.allocations, name))
 
   tasks = Channel(32)
   sigkill = Channel(1)
   exec = ds.vector(cpe(system, qf, queue))
 
   # FIXME: This indirection is stupid overengineering as presently used.
-  hw.thread() do
+  thread() do
     while !isready(sigkill)
       cb = take!(tasks)
       @info "scheduling transfer task."
@@ -195,7 +136,7 @@ function record(cb, p::TransferPipeline, wait=[], signal=[])
 
     cbi = vk.CommandBufferSubmitInfo(cmd, 0)
 
-    res = submit(queue, [vk.SubmitInfo2(wait, [cbi], vcat(signal, [post]))])
+    res = q.submit(queue, [vk.SubmitInfo2(wait, [cbi], vcat(signal, [post]))])
 
     put!(out, (post, take!(res)))
   end
@@ -343,7 +284,7 @@ function computepipeline(system, name, config)
 
         submission = vk.SubmitInfo2(wait, [cmdsub], [postsem])
 
-        submit(queue, [submission])
+        q.submit(queue, [submission])
 
         wrap = ds.into!([], map(x -> ds.assoc(x, :wait, [postsem])), outputs)
 
@@ -389,7 +330,8 @@ function graphicspipeline(system, name, config)
   win = system.window
 
   qf = system.spec.queues.queue_families.graphics
-  queue = getqueue(system, get(system.spec.queues.allocations, name))
+  gqueue = q.getqueue(system, get(system.spec.queues.allocations, name))
+  pqueue = q.getqueue(system, system.spec.queues.allocations.presentation).queue
 
   bindings = []
   layoutci = rd. descriptorsetlayout(bindings)
@@ -399,7 +341,7 @@ function graphicspipeline(system, name, config)
 
   # Steps to initialise graphics.
 
-  swch = hw.thread() do
+  swch = thread() do
     swapchain = hw.createswapchain(system, system.spec)
     iviews = hw.createimageviews(merge(system, swapchain), config)
     return merge(swapchain, iviews)
@@ -407,7 +349,7 @@ function graphicspipeline(system, name, config)
 
   system = merge(system, pipe.renderpass(system, config))
 
-  gpch = hw.thread() do
+  gpch = thread() do
     pipe.creategraphicspipeline(system, ds.hashmap(name, config))
   end
 
@@ -439,7 +381,7 @@ function graphicspipeline(system, name, config)
           cmd = hw.commandbuffers(dev, commandpool, 1)[1]
           co = ds.assoc(render.syncsetup(system), :commandbuffer, cmd)
 
-          gsig = render.draw(system, queue, co, renderstate)
+          gsig = render.draw(system, gqueue, pqueue, co, renderstate)
 
           @async begin
             commands.wait_semaphore(dev, gsig)

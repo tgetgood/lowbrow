@@ -4,6 +4,8 @@ import Vulkan as vk
 
 import DataStructures as ds
 
+import Helpers: thread
+
 import hardware as hw
 import TaskPipelines as tp
 
@@ -35,7 +37,7 @@ function todevicelocal(system, data, buffers...)
     end
   end
 
-  hw.thread() do
+  thread() do
     (post, _) = take!(join)
     wait_semaphore(system.device, post)
     staging

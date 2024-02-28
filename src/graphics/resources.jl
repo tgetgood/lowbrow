@@ -202,4 +202,32 @@ function vertex_input_state(T)
   vertex_input_state(T, fieldnames(T))
 end
 
+##### Bitmask helpers
+
+# How do we catch typographical errors in a dynamic language?
+
+struct Typo end
+typo = Typo()
+
+function orlist(bitmap, x::Symbol)
+  get(bitmap, x, typo)
+end
+
+# OR is such a basic monoid, but because |() needs to return a *typed* zero, we
+# can't treat it as such. If you're going to insist on a type system of this
+# sort, the identity should be its own type.
+#
+# I've run into the same problem with datastructures. Making the empty list,
+# empty map, empty set, &c. into singleton types is the only way I've figured
+# out how to make generic sequence operations play nice with type inference.
+bitor() = 0
+bitor(x) = x
+bitor(x, y) = x | y
+
+function orlist(bitmap, xs)
+  flags = ds.transduce(map(k -> get(bitmap, k, typo)), bitor, xs)
+  @assert flags !== 0
+  flags
+end
+
 end

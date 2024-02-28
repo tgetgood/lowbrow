@@ -142,23 +142,6 @@ function physicaldevices(instance, surface)
   )
 end
 
-"""
-Choose the "simplest" queue which has all bits specified. Simple means least
-queueflagbits total.
-"""
-function selectqueue(qfp, bits)
-  q = sort(
-    filter(x -> (x.queue_flags & bits) == bits, qfp);
-    by=x -> count_ones(x.queue_flags.val)
-  )[1]
-
-  return indexin([q], qfp)[1] - 1
-end
-
-function queuetype(qfp, t)
-  t, selectqueue(qfp, get(rd.queuebits, t, typo))
-end
-
 function createswapchain(system, config)
   format = findformat(system.spec)
   extent = findextent(system)
@@ -235,35 +218,6 @@ function findmemtype(spec, config)
   mt[1]
 end
 
-# How do we catch typographical errors in a dynamic language?
-
-struct Typo end
-typo = Typo()
-
-function orlist(bitmap, x::Symbol)
-  get(bitmap, x, typo)
-end
-
-# OR is such a basic monoid, but because |() needs to return a *typed* zero, we
-# can't treat it as such. If you're going to insist on a type system of this
-# sort, the identity should be its own type.
-#
-# I've run into the same problem with datastructures. Making the empty list,
-# empty map, empty set, &c. into singleton types is the only way I've figured
-# out how to make generic sequence operations play nice with type inference.
-#
-# It doesn't matter in this case since the bitmasks Vulkan uses will cast the
-# zero to their own empty set
-bitor() = 0
-bitor(x) = x
-bitor(x, y) = x | y
-
-function orlist(bitmap, xs)
-  flags = ds.transduce(map(k -> get(bitmap, k, typo)), bitor, xs)
-  @assert flags !== 0
-  flags
-end
-
 function buffer(system, config)
   dev = system.device
 
@@ -279,7 +233,7 @@ function buffer(system, config)
 
   bci = vk.BufferCreateInfo(
     get(config, :size),
-    vk.BufferUsageFlag(orlist(bufferusagebits, get(config, :usage))),
+    vk.BufferUsageFlag(rd.orlist(bufferusagebits, config.usage)),
     mode,
     into([], queues)
   )
@@ -290,7 +244,7 @@ function buffer(system, config)
 
   req = ds.hashmap(
     :typemask, memreq.memory_type_bits,
-    :flags, orlist(memorypropertybits, get(config, :memoryflags))
+    :flags, rd.orlist(memorypropertybits, get(config, :memoryflags))
   )
 
   # TODO: There's a lot of confusion about who's responsibility it is to dig
@@ -358,7 +312,7 @@ function createimage(system, config)
     1,
     samples,
     get(config, :tiling, vk.IMAGE_TILING_OPTIMAL),
-    orlist(imageusagebits, get(config, :usage)),
+    rd.orlist(imageusagebits, config.usage),
     sharingmode,
     queues,
     get(config, :layout, vk.IMAGE_LAYOUT_UNDEFINED)
@@ -371,7 +325,7 @@ function createimage(system, config)
     memreq.size,
     findmemtype(system.spec, ds.hashmap(
       :typemask, memreq.memory_type_bits,
-      :flags, orlist(memorypropertybits, get(config, :memoryflags))
+      :flags, rd.orlist(memorypropertybits, config.memoryflags)
     ))[2]
   ))
 
@@ -511,23 +465,6 @@ end
 
 function tick(ss::vk.SemaphoreSubmitInfo)
   vk.SemaphoreSubmitInfo(ss.semaphore, ss.value + 1, ss.device_index)
-end
-
-"""
-Takes a function and args and applies it in a thread, returning a channel which
-will eventually yield the result.
-"""
-function thread(f, args...; name="")
-  join = Channel()
-  Threads.@spawn begin
-      try
-        put!(join, f(args...))
-      catch e
-        @error "Error in thread " * name
-        ds.handleerror(e)
-      end
-  end
-  return join
 end
 
 end

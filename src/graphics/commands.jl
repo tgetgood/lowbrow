@@ -2,6 +2,8 @@ module commands
 
 import Vulkan as vk
 
+import Helpers: thread
+
 import hardware as hw
 import resources: shaderstagebits
 
@@ -59,7 +61,7 @@ function cmdseq(body, system, qf;
 
   vk.queue_submit_2(queue, [vk.SubmitInfo2(wait, [cbi], [post])])
 
-  hw.thread() do
+  thread() do
     wait_semaphore(get(system, :device), post,)
     vk.free_command_buffers(get(system, :device), pool, cmds)
   end
@@ -216,7 +218,7 @@ function todevicelocal(system, data, buffers...)
 
   # This *seems* to fix a highly intermittent use after free of the staging buffer.
   # I can't replicate the issue reliably enough to call it fixed.
-  hw.thread() do
+  thread() do
     wait_semaphore(get(system, :device), post)
     staging
   end

@@ -1,5 +1,6 @@
 module render
 
+import Queues as q
 import hardware as hw
 import Vulkan as vk
 import DataStructures as ds
@@ -125,7 +126,7 @@ function recorder(cmd, i, system, config)
   vk.unwrap(vk.end_command_buffer(cmdbuf))
 end
 
-function draw(system, queue, cmd, renderstate)
+function draw(system, gqueue, pqueue, cmd, renderstate)
   dev = get(system, :device)
   timeout = typemax(Int64)
   (imagesem, rendersem, fence) = get(cmd, :locks)
@@ -173,19 +174,19 @@ function draw(system, queue, cmd, renderstate)
       [vk.SemaphoreSubmitInfo(rendersem, 0, 0), sig]
     )
 
-    vk.queue_submit_2(queue, [submission]; fence)
-
-    # end fenced region
-
-    # FIXME: If graphics and present are not the same qf, we need to transfer
-    # the framebuffer image.
+    # We need to wait for this submission before submitting to the presentation
+    # queue. This is because binary semaphores must be set to signal before
+    # anything can be set to wait on them. This restriction doesn't apply to
+    # timeline semaphores, but presentation can't take those.
+    take!(q.submit(gqueue, [submission], fence))
 
     preres = vk.queue_present_khr(
-      # FIXME: These might not be the same queue.
-      queue,
+      pqueue,
       vk.PresentInfoKHR(
         [rendersem],
         [get(system, :swapchain)],
+        # FIXME: If graphics and present are not the same qf, we need to
+        # transfer the framebuffer image.
         [image]
       )
     )
