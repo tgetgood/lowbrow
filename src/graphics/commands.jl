@@ -3,32 +3,13 @@ module commands
 import Vulkan as vk
 
 import Helpers: thread
+import Sync: wait_semaphore
 
 import hardware as hw
 import resources: shaderstagebits
 
 import DataStructures as ds
 import DataStructures: getin, assoc, hashmap, into, emptyvector, emptymap
-
-function wait_semaphore(
-  dev::vk.Device, info::vk.SemaphoreSubmitInfo, timeout=typemax(UInt)
-)
-  vk.wait_semaphores(
-    dev, vk.SemaphoreWaitInfo([info.semaphore], [info.value]), timeout
-  )
-end
-
-function wait_semaphores(
-  dev::vk.Device, infos::Vector{vk.SemaphoreSubmitInfo}, timeout=typemax(UInt)
-)
-  vk.wait_semaphores(
-    dev, vk.SemaphoreWaitInfo(
-      ds.into!([], map(x -> x.semaphore), infos),
-      ds.into!([], map(x -> x.value), infos)
-    ),
-    timeout
-  )
-end
 
 """
 Returns a timeline semaphore which will signal `1` when submitted commands are
@@ -40,7 +21,7 @@ pool would be a better design, but this suffices for now.
 function cmdseq(body, system, qf;
   level=vk.COMMAND_BUFFER_LEVEL_PRIMARY, wait=[])
 
-  signal = hw.timelinesemaphore(system.device, 0)
+  signal = Sync.timelinesemaphore(system.device, 0)
   post = vk.SemaphoreSubmitInfo(signal, UInt(1), 0)
 
   pool = hw.getpool(system, qf)

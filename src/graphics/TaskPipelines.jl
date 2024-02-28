@@ -8,6 +8,7 @@ import DataStructures as ds
 import Helpers: thread
 
 import Queues as q
+import Sync
 
 import hardware as hw
 import framework as fw
@@ -82,14 +83,14 @@ function cpe(system, qf, queue)
       end
 
       ds.swap!(buffercount, +, 1)
-      postsig = hw.ssi(dev)
+      postsig = Sync.ssi(dev)
       cmd = hw.commandbuffer(dev, pool)
 
       recorder(cmd, postsig, queue)
 
       thread() do
         # REVIEW: These probably block threads. Assess that.
-        commands.wait_semaphore(dev, postsig)
+        Sync.wait_semaphore(dev, postsig)
         ds.swap!(buffercount, -, 1)
       end
     end
@@ -384,7 +385,7 @@ function graphicspipeline(system, name, config)
           gsig = render.draw(system, gqueue, pqueue, co, renderstate)
 
           @async begin
-            commands.wait_semaphore(dev, gsig)
+            Sync.wait_semaphore(dev, gsig)
             # Don't let GC get the command buffer prematurely.
             co
           end

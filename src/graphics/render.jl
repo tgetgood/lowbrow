@@ -1,5 +1,6 @@
 module render
 
+import Sync
 import Queues as q
 import hardware as hw
 import Vulkan as vk
@@ -160,8 +161,7 @@ function draw(system, gqueue, pqueue, cmd, renderstate)
 
     recorder(cmd, image + 1, system, renderstate)
 
-    sigsem = hw.timelinesemaphore(dev, 1)
-    sig = vk.SemaphoreSubmitInfo(sigsem, 2, 0)
+    sig = Sync.ssi(dev)
 
     vwait = ds.getin(renderstate, [:vertexbuffer, :wait], [])
 

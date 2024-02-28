@@ -447,24 +447,4 @@ function createimageviews(system, config)
   )
 end
 
-function timelinesemaphore(dev::vk.Device, init=1)
-  vk.unwrap(vk.create_semaphore(
-    dev,
-    vk.SemaphoreCreateInfo(
-      next=vk.SemaphoreTypeCreateInfo(
-        vk.SEMAPHORE_TYPE_TIMELINE,
-        UInt(init)
-      )
-    )
-  ))
-end
-
-function ssi(dev, init=1, df=0)
-  vk.SemaphoreSubmitInfo(timelinesemaphore(dev, init), UInt(init + 1), df)
-end
-
-function tick(ss::vk.SemaphoreSubmitInfo)
-  vk.SemaphoreSubmitInfo(ss.semaphore, ss.value + 1, ss.device_index)
-end
-
 end

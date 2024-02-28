@@ -6,6 +6,7 @@ import graphics
 import render
 import Glfw as window
 import TaskPipelines as tp
+import Sync
 
 import DataStructures as ds
 import DataStructures: hashmap, into, emptyvector
@@ -176,7 +177,7 @@ function main()
       sleep(0.08)
     else
       @async begin
-        commands.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
+        Sync.wait_semaphores(dev, ds.conj(get(next_particles, :wait), gsig))
         # It's safe to free the particle buffer after the above signals.
         current_particles
       end

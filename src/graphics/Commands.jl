@@ -5,17 +5,10 @@ import Vulkan as vk
 import DataStructures as ds
 
 import Helpers: thread
+import Sync
 
 import hardware as hw
 import TaskPipelines as tp
-
-function wait_semaphore(
-  dev::vk.Device, info::vk.SemaphoreSubmitInfo, timeout=typemax(UInt)
-)
-  vk.wait_semaphores(
-    dev, vk.SemaphoreWaitInfo([info.semaphore], [info.value]), timeout
-  )
-end
 
 function todevicelocal(system, data, buffers...)
   dev = system.device
@@ -39,7 +32,7 @@ function todevicelocal(system, data, buffers...)
 
   thread() do
     (post, _) = take!(join)
-    wait_semaphore(system.device, post)
+    Sync.wait_semaphore(system.device, post)
     staging
   end
 end
