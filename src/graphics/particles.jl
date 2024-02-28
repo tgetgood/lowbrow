@@ -2,7 +2,6 @@ import hardware as hw
 import resources as rd
 import framework as fw
 import Commands
-import graphics
 import render
 import Glfw as window
 import TaskPipelines as tp
@@ -65,7 +64,6 @@ function init_particle_buffer(system, config)
   ds.assoc(ssbo, :wait, [next], :config, buffconfig)
 end
 
-frames = 3
 nparticles = 2^12
 
 prog = hashmap(
@@ -110,7 +108,6 @@ prog = hashmap(
       )
     ),
     :render, ds.hashmap(
-      :samples, 1,
       :type, :graphics,
       :inputassembly, ds.hashmap(
         :topology, :points,
@@ -161,9 +158,6 @@ function main()
   t1 = time()
   t0 = t1
 
-  iters = 10
-  terminate() = begin iters -= 1; iters < 0 end
-
   while true
     window.poll()
 
@@ -194,6 +188,7 @@ function main()
     end
   end
 
+  window.shutdown()
   tp.teardown(compute)
   tp.teardown(graphics)
 end
