@@ -7,7 +7,6 @@ module framework
 import Vulkan as vk
 import DataStructures as ds
 
-import commands
 import resources as rd
 import pipeline as pipe
 import hardware as hw
@@ -126,25 +125,6 @@ function binddescriptors(dev, config, bindings)
   for write in writes
     vk.update_descriptor_sets(dev, write, [])
   end
-end
-
-function assemblerender(system, config)
-  merge(
-    ds.selectkeys(system, [
-      :renderpass,
-      :viewports,
-      :scissors,
-      :pipeline,
-      :pipelinelayout,
-    ]),
-    ds.selectkeys(config, [
-      :vertexbuffer,
-      :indexbuffer,
-      :descriptorsets,
-      :vbuffers,
-      :bindings
-    ])
-  )
 end
 
 end
