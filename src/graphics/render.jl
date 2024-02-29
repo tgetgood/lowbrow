@@ -180,13 +180,13 @@ function draw(system, gqueue, pqueue, cmd, renderstate)
     # timeline semaphores, but presentation can't take those.
     take!(q.submit(gqueue, [submission], fence))
 
-    preres = vk.queue_present_khr(
+    preres = q.submit(
       pqueue,
       vk.PresentInfoKHR(
         [rendersem],
         [get(system, :swapchain)],
         # FIXME: If graphics and present are not the same qf, we need to
-        # transfer the framebuffer image.
+        # transfer the framebuffer image. Is that possible?
         [image]
       )
     )

@@ -14,19 +14,47 @@ import Helpers: thread
 ################################################################################
 
 struct SharedQueue
-  ch
-  sigkill
-  queue
-  qf
+  queue::vk.Queue
+  info::vk.DeviceQueueInfo2
+  submissions::Channel
+  kill::Channel
 end
 
-function submit(queue::vk.Queue, submissions, fence=C_NULL)
-  vk.queue_submit_2(queue, submissions; fence)
+struct Submit2
+  submissions::Vector{vk.SubmitInfo2}
+  fence
+end
+
+function sharedqueue(queue::vk.Queue, info::vk.DeviceQueueInfo2)
+  ch = Channel()
+  kill = Channel()
+  thread() do
+    while !isready(kill)
+      (submission, responsech) = take!(ch)
+      put!(responsech, submit(queue, submission))
+    end
+  end
+
+  SharedQueue(queue, info, ch, kill)
+end
+
+function submit(queue::vk.Queue, submission::Submit2)
+  vk.queue_submit_2(queue, submission.submissions; fence=submission.fence)
+end
+
+function submit(queue::vk.Queue, submission::vk.PresentInfoKHR)
+  vk.queue_present_khr(queue, submission)
 end
 
 function submit(queue::SharedQueue, submissions, fence=C_NULL)
   out = Channel(1)
-  put!(queue.ch, (out, submissions, fence))
+  put!(queue.submissions, (Submit2(submissions, fence), out))
+  return out
+end
+
+function submit(queue::SharedQueue, submission::vk.PresentInfoKHR)
+  out = Channel(1)
+  put!(queue.submissions, (submission, out))
   return out
 end
 
@@ -34,31 +62,23 @@ function teardown(p::SharedQueue)
   put!(p.sigkill, true)
 end
 
-function sharedqueue(queue::vk.Queue, qf)
-  ch = Channel()
-  kill = Channel()
-  thread() do
-    while !isready(kill)
-      (out, submissions, fence) = take!(ch)
-      res = submit(queue, submissions, fence)
-      put!(out, res)
-    end
-  end
-
-  SharedQueue(ch, kill, queue, qf)
-end
-
-function getqueue(system, info::vk.DeviceQueueInfo2)
-  if ds.containsp(system.cache[].queues, info)
-    return get(system.cache[].queues, info)
+function createqueue(device, cache, info::vk.DeviceQueueInfo2)
+  if ds.containsp(cache[], info)
+    return get(cache[], info)
   else
-    q = sharedqueue(
-      vk.get_device_queue_2(system.device, info),
-      info.queue_family_index
-    )
-    ds.swap!(system.cache, ds.associn, [:queues, info], q)
+    q = sharedqueue(vk.get_device_queue_2(device, info), info)
+    ds.swap!(cache, ds.assoc, info, q)
     return q
   end
+end
+
+function createqueues(device, queuemap)
+  cache = ds.Atom(ds.emptymap)
+  ds.mapvals(v -> createqueue(device, cache, v), queuemap)
+end
+
+@inline function queue_family(q::SharedQueue)
+  q.info.queue_family_index
 end
 
 ################################################################################

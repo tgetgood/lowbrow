@@ -58,11 +58,11 @@ struct CommandPoolExecutor <: PipelineExecutor
   queue
 end
 
-function cpe(system, qf, queue)
+function cpe(system, queue)
   dev = system.device
 
   buffercount = ds.Atom(0)
-  pool = vk.unwrap(vk.create_command_pool(dev, qf))
+  pool = vk.unwrap(vk.create_command_pool(dev, q.queue_family(queue)))
 
   work = Channel()
   sigkill = Channel(1)
@@ -99,12 +99,11 @@ end
 function transferpipeline(system, name, spec)
   dev = system.device
 
-  qf = get(system.spec.queues.queue_families, spec.type)
-  queue = q.getqueue(system, get(system.spec.queues.allocations, name))
+  queue = get(system.queues, name)
 
   tasks = Channel(32)
   sigkill = Channel(1)
-  exec = ds.vector(cpe(system, qf, queue))
+  exec = ds.vector(cpe(system, queue))
 
   # FIXME: This indirection is stupid overengineering as presently used.
   thread() do
@@ -147,8 +146,8 @@ end
 
 function sendcmd(cb, system, name, wait=[], signal=[])
   dev = system.device
-  queue = q.getqueue(system, get(system.spec.queues.allocations, name))
-  qf = queue.qf
+  queue = get(system.queues, name)
+  qf = q.queue_family(queue)
 
   commandpool = hw.commandpool(dev, qf)
   cmd = hw.commandbuffers(dev, commandpool, 1)[1]
@@ -285,7 +284,7 @@ end
 function computepipeline(system, name, config)
   dev = system.device
   qf = system.spec.queues.queue_families.compute
-  queue = q.getqueue(system, get(system.spec.queues.allocations, name))
+  queue = get(system.queues, name)
 
   stage = ds.hashmap(:stage, :compute)
   stagesetter(sets) = map(set -> merge(stage, set), sets)
@@ -378,8 +377,8 @@ function graphicspipeline(system, name, config)
   win = system.window
 
   qf = system.spec.queues.queue_families.graphics
-  gqueue = q.getqueue(system, get(system.spec.queues.allocations, name))
-  pqueue = q.getqueue(system, system.spec.queues.allocations.presentation).queue
+  gqueue = get(system.queues, name)
+  pqueue = system.queues.presentation
 
   bindings = []
   layoutci = rd. descriptorsetlayout(bindings)

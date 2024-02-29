@@ -252,6 +252,7 @@ function devicerequirements(config, info)
       swapchaininfo = swapchainrequirements(config, info)
 
       if !checkswapchain(config.swapchain, swapchaininfo)
+        @warn "swapchain failure."
         return :device_unsuitable
       end
 
@@ -337,14 +338,6 @@ end
 ##### Entrypoint
 ################################################################################
 
-const emptycachestate = ds.hashmap(
-  :queues, ds.emptymap
-)
-
-function emptycache()
-  ds.Atom(emptycachestate)
-end
-
 # REVIEW: Takes in a module which provides an OS window. The idea is to be able
 # to swap glfw for sdl when required, but I need to standardise the api before
 # that's realistic. I want the end user to be able to extend this library with
@@ -380,23 +373,18 @@ function setup(baseconfig, wm)
 
   info = ds.assoc(deviceinfo, :instance, instinfo)
 
-  cache = emptycache()
+  queues = q.createqueues(dev, deviceinfo.queues.allocations)
 
   system = ds.hashmap(
     :spec, info,
-    # REVIEW: There's a lot of caching going on but if I want to be able to
-    # switch projects or reload a project without killing the process and
-    # reloading from scratch, the caches must be local.
-    #
-    # Nonetheless, I don't like this idea of carrying mutable state around...
-    :cache, cache,
     :instance, inst,
     :window, window,
     # REVIEW: Include the windowmanager here? Or wrap the window object in a
     # struct that can query its size and whatnot?
     :surface, surface,
     :pdev, pdev,
-    :device, dev
+    :device, dev,
+    :queues, queues
   )
 
   return system, config
