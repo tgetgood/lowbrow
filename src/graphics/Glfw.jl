@@ -10,6 +10,17 @@ function size(window)
   glfw.GetFramebufferSize(window)
 end
 
+function extent(window, spec)
+  sc = spec.surface.capabilities
+
+  win = size(window)
+
+  vk.Extent2D(
+    clamp(win.width, sc.min_image_extent.width, sc.max_image_extent.width),
+    clamp(win.height, sc.min_image_extent.height, sc.max_image_extent.height)
+  )
+end
+
 function minimised(window)
   (width, height) = size(window)
   return width == 0 ||

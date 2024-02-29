@@ -9,21 +9,9 @@ import Vulkan as vk
 import DataStructures as ds
 import DataStructures: get, getin, assoc, hashmap, into, emptyvector, emptymap, emptyset
 
+import Helpers: xrel
 import resources as rd
 import resources: bufferusagebits, memorypropertybits, sharingmodes, imageusagebits
-
-"""
-Returns a hashmap isomorphic to s. It's probably better to override fns for
-vk.HighLevelStruct to treat them like maps, rather than actually cast
-everything.
-"""
-function srecord(s::T) where T
-  into(emptymap, map(k -> (k, getproperty(s, k))), fieldnames(T))
-end
-
-function xrel(s::Vector{T}) where T
-  into(emptyset, map(srecord), s)
-end
 
 function instanceinfo()
   hashmap(
@@ -31,47 +19,6 @@ function instanceinfo()
     :extensions, xrel(vk.unwrap(vk.enumerate_instance_extension_properties())),
     :layers, xrel(vk.unwrap(vk.enumerate_instance_layer_properties()))
   )
-end
-
-function swapchainsupport(surfaceinfo)
-  formats = get(surfaceinfo, :formats)
-  modes = get(surfaceinfo, :present_modes)
-  return length(formats) > 0 && length(modes) > 0
-end
-
-function findformat(spec)
-  filtered = filter(
-    x -> x.format == spec.swapchain.format &&
-      x.color_space == spec.swapchain.colourspace,
-    spec.surface.formats
-  )
-
-  if length(filtered) == 0
-    nothing
-  else
-    first(filtered)
-  end
-end
-
-function findextent(system)
-  sc = system.spec.surface.capabilities
-
-  win = window.size(system.window)
-
-  vk.Extent2D(
-    clamp(win.width, sc.min_image_extent.width, sc.max_image_extent.width),
-    clamp(win.height, sc.min_image_extent.height, sc.max_image_extent.height)
-  )
-end
-
-function findpresentmode(spec)
-  modes = spec.surface.present_modes
-
-  if length(modes) == 0
-    nothing
-  else
-    first(modes)
-  end
 end
 
 function multisamplemax(spec, samples)
@@ -90,15 +37,12 @@ const featuretypes = hashmap(
   v"1.1", vk.PhysicalDeviceVulkan11Features,
 )
 
-
 function devicefeatures(pdev)
   ds.assoc(ds.mapvals(
       x -> vk.get_physical_device_features_2(pdev, x).next, featuretypes
     ),
-    v"1.0", # ah 1.0...
-    vk.get_physical_device_features_2(
-      pdev, vk.PhysicalDeviceFeatures2
-    ).next.features
+    v"1.0",
+    vk.get_physical_device_features(pdev)
   )
 end
 
@@ -149,36 +93,6 @@ function physicaldevices(instance, surface)
   )
 end
 
-function createswapchain(system, config)
-  format = findformat(system.spec)
-  extent = findextent(system)
-
-  # TODO: Use createinfo structs. Stop relying on Vulkan.jl wrapper functions
-  # since I'm probably going to stop using it.
-  # sci = vk._SwapchainCreateInfoKHR(
-
-  # )
-
-  sc = vk.create_swapchain_khr(
-    get(system, :device),
-    get(system, :surface),
-    getin(config, [:swapchain, :images]),
-    format.format,
-    format.color_space,
-    extent,
-    1, # image arrays
-    vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-    vk.SHARING_MODE_EXCLUSIVE, # <- FIXME: don't hardcode this
-    [],
-    vk.SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
-    vk.COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-    findpresentmode(system.spec),
-    true;
-    old_swapchain=get(system, :swapchain, C_NULL)
-  )
-
-  hashmap(:swapchain, vk.unwrap(sc), :extent, extent, :format, format)
-end
 
 function imageview(system, config, image)
   vk.unwrap(vk.create_image_view(
@@ -308,8 +222,6 @@ function createimage(system, config)
     length(queues) == 1 ? :exclusive : :concurrent
   ))
 
-  ex = findextent(system)
-
   image = vk.unwrap(vk.create_image(
     dev,
     vk.IMAGE_TYPE_2D,
@@ -349,13 +261,12 @@ function createimage(system, config)
   )
 end
 
-function colourresources(system, config)
+function colourresources(system, ext, config)
   format = system.spec.swapchain.format
-  ext = findextent(system)
 
   image = createimage(system, hashmap(
     :size, [ext.width, ext.height],
-    :format, format,
+    :format, format.format,
     :samples, multisamplemax(system.spec, config.samples),
     :memoryflags, :device_local,
     # FIXME: Negotiate with host and allow optional flags. Lazy allocation is an
@@ -366,7 +277,7 @@ function colourresources(system, config)
     :usage, [:transient, :colour]
   ))
 
-  view = imageview(system, hashmap(:format, format), image)
+  view = imageview(system, format, image)
 
   assoc(image, :view, view)
 end
@@ -408,9 +319,8 @@ optdepthformat(system) = finddepthformats(
   )
 )
 
-function depthresources(system, config)
+function depthresources(system, ex, config)
   format = optdepthformat(system)
-  ex = findextent(system)
 
   image = createimage(system,
     hashmap(
@@ -436,7 +346,7 @@ function depthresources(system, config)
   assoc(image, :view, view)
 end
 
-function createimageviews(system, config)
+function createimageviews(system, extent, config)
   dev = get(system, :device)
 
   hashmap(
@@ -444,13 +354,13 @@ function createimageviews(system, config)
       emptyvector,
       map(image -> imageview(
         system,
-        hashmap(:format, findformat(system.spec).format),
+        hashmap(:format, system.spec.swapchain.format.format),
         hashmap(:image, image)
       )),
       vk.unwrap(vk.get_swapchain_images_khr(dev, get(system, :swapchain)))
     ),
-    :depth, depthresources(system, config),
-    :colour, colourresources(system, config)
+    :depth, depthresources(system, extent, config),
+    :colour, colourresources(system, extent, config)
   )
 end
 

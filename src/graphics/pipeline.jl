@@ -80,7 +80,7 @@ function renderpass(system, config)
       system.device,
       [
         vk.AttachmentDescription(
-          system.spec.swapchain.format,
+          system.spec.swapchain.format.format,
           samples,
           vk.ATTACHMENT_LOAD_OP_CLEAR,
           vk.ATTACHMENT_STORE_OP_DONT_CARE,
@@ -100,7 +100,7 @@ function renderpass(system, config)
           vk.IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         ),
         vk.AttachmentDescription(
-          system.spec.swapchain.format,
+          system.spec.swapchain.format.format,
           vk.SAMPLE_COUNT_1_BIT,
           vk.ATTACHMENT_LOAD_OP_DONT_CARE,
           vk.ATTACHMENT_STORE_OP_STORE,
@@ -156,7 +156,7 @@ const topomap = ds.hashmap(
   :triangles, vk.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
 )
 
-function creategraphicspipeline(system, config)
+function creategraphicspipeline(system, ext, config)
   device = system.device
 
   dynamic_state = vk.PipelineDynamicStateCreateInfo([
@@ -169,8 +169,6 @@ function creategraphicspipeline(system, config)
   input_assembly_state = vk.PipelineInputAssemblyStateCreateInfo(
     get(topomap, ias.topology), get(ias, :restart, false)
   )
-
-  ext = hw.findextent(system)
 
   viewports = [vk.Viewport(0, 0, ext.width, ext.height, 0, 1)]
   scissors = [vk.Rect2D(vk.Offset2D(0, 0), ext)]
@@ -265,11 +263,10 @@ function creategraphicspipeline(system, config)
           :pipelinelayout, layout)
 end
 
-function createframebuffers(system)
+function createframebuffers(system, extent)
   dev = get(system, :device)
   images = get(system, :imageviews)
   pass = get(system, :renderpass)
-  extent = hw.findextent(system)
   depthview = ds.getin(system, [:depth, :view])
   colourview = ds.getin(system, [:colour, :view])
 

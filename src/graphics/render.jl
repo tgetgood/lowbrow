@@ -133,10 +133,7 @@ function draw(system, gqueue, pqueue, cmd, renderstate)
   vk.wait_for_fences(dev, [fence], true, timeout)
 
   imres = vk.acquire_next_image_khr(
-    dev,
-    get(system, :swapchain),
-    timeout,
-    semaphore = imagesem
+    dev, system.swapchain, timeout; semaphore = imagesem
   )
 
   if vk.iserror(imres)
@@ -178,13 +175,13 @@ function draw(system, gqueue, pqueue, cmd, renderstate)
     # queue. This is because binary semaphores must be set to signal before
     # anything can be set to wait on them. This restriction doesn't apply to
     # timeline semaphores, but presentation can't take those.
-    take!(q.submit(gqueue, [submission], fence))
+    q.submitsync(gqueue, [submission], fence)
 
-    preres = q.submit(
+    preres = q.submitsync(
       pqueue,
       vk.PresentInfoKHR(
         [rendersem],
-        [get(system, :swapchain)],
+        [system.swapchain],
         # FIXME: If graphics and present are not the same qf, we need to
         # transfer the framebuffer image. Is that possible?
         [image]

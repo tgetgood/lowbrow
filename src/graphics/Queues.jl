@@ -59,6 +59,17 @@ function submit(queue::SharedQueue, submission::vk.PresentInfoKHR)
   return out
 end
 
+"""
+Like `submit`, but parks until a return value is available.
+"""
+function submitsync(queue::SharedQueue, submission::vk.PresentInfoKHR)
+  take!(submit(queue, submission))
+end
+
+function submitsync(queue::SharedQueue, submissions, fence=C_NULL)
+  take!(submit(queue, submissions, fence))
+end
+
 function teardown(p::SharedQueue)
   put!(p.sigkill, true)
 end

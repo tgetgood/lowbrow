@@ -8,6 +8,7 @@ import Helpers: thread
 import Queues as q
 import Sync
 
+import Presentation
 import hardware as hw
 import framework as fw
 import resources as rd
@@ -362,23 +363,25 @@ function graphicspipeline(system, name, config)
 
   commandpool = hw.commandpool(dev, qf)
 
+  extent = window.extent(system.window, system.spec)
+
   # Steps to initialise graphics.
 
   swch = thread() do
-    swapchain = hw.createswapchain(system, system.spec)
-    iviews = hw.createimageviews(merge(system, swapchain), config)
+    swapchain = Presentation.swapchain(system, extent, system.spec.swapchain)
+    iviews = hw.createimageviews(merge(system, swapchain), extent, config)
     return merge(swapchain, iviews)
   end
 
   system = merge(system, pipe.renderpass(system, config))
 
   gpch = thread() do
-    pipe.creategraphicspipeline(system, ds.hashmap(name, config))
+    pipe.creategraphicspipeline(system, extent, ds.hashmap(name, config))
   end
 
   system = merge(system, take!(swch))
 
-  system = merge(system, pipe.createframebuffers(system))
+  system = merge(system, pipe.createframebuffers(system, extent))
 
   system = merge(system, take!(gpch))
 

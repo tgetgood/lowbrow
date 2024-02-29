@@ -7,6 +7,7 @@ import debug
 import resources as rd
 import hardware as hw
 import Queues as q
+import Presentation
 
 import pprint
 import Overrides
@@ -70,9 +71,9 @@ defaults = ds.hashmap(
   :swapchain, ds.hashmap(
     :formats, [ds.hashmap(
       :format, vk.FORMAT_B8G8R8A8_SRGB,
-      :colour_space, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR
+      :color_space, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR
     )],
-    :presentmode, [vk.PRESENT_MODE_MAILBOX_KHR, vk.PRESENT_MODE_FIFO_KHR],
+    :present_mode, [vk.PRESENT_MODE_MAILBOX_KHR, vk.PRESENT_MODE_FIFO_KHR],
     :images, 2
   ))
 
@@ -371,7 +372,15 @@ function setup(baseconfig, wm)
 
   dev = device(pdev, deviceinfo)
 
-  info = ds.assoc(deviceinfo, :instance, instinfo)
+  if get(config, :headless, false)
+    scinfo = nothing
+  else
+    scinfo = Presentation.swapchainrequirements(
+      config.swapchain, deviceinfo.surface
+    )
+  end
+
+  info = ds.assoc(deviceinfo, :instance, instinfo, :swapchain, scinfo)
 
   queues = q.createqueues(dev, deviceinfo.queues.allocations)
 
