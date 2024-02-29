@@ -5,7 +5,7 @@ import hardware as hw
 import DataStructures as ds
 import Vulkan as vk
 import Commands
-import TaskPipelines as tp
+import Queues as q
 import Sync
 
 # N.B: This import automagically allows us to read the bytes out of the
@@ -90,7 +90,7 @@ function generatemipmaps(system, vkim)
     0:mips-2 # mip levels start at zero
   )
 
-  tp.sendcmd(system, :render) do cmd
+  q.submitcommands(system.device, system.queues.render) do cmd
     ds.reduce(0, mipconstruct) do _, x
       Commands.transitionimage(cmd, get(x, :prebarrier))
       Commands.mipblit(cmd, get(x, :blit))
@@ -151,7 +151,7 @@ function textureimage(system, filename)
     :memoryflags, :device_local
   ))
 
-  join = tp.record(system.pipelines.host_transfer) do cmd
+  post, _ = q.submitcommands(system.device, system.queues.host_transfer) do cmd
     Commands.transitionimage(cmd, ds.hashmap(
       :image, vkim,
       :miplevels, mips,
@@ -180,7 +180,6 @@ function textureimage(system, filename)
 
   end
 
-  (post, _) = take!(join)
   Sync.wait_semaphore(system.device, post)
 
   generatemipmaps(system, vkim)

@@ -6,9 +6,9 @@ import DataStructures as ds
 
 import Helpers: thread
 import Sync
+import Queues as q
 
 import hardware as hw
-import TaskPipelines as tp
 
 ################################################################################
 ##### Data Transfer. This might need to be its own module.
@@ -26,7 +26,7 @@ function todevicelocal(system, data, buffers...)
 
   vk.unmap_memory(dev, staging.memory)
 
-  join = tp.record(system.pipelines.host_transfer) do cmd
+  post, _ = q.submitcommands(system.device, system.queues.host_transfer) do cmd
     for buffer in buffers
       vk.cmd_copy_buffer(
         cmd, staging.buffer, buffer.buffer, [vk.BufferCopy(0, 0, staging.size)]
@@ -34,7 +34,6 @@ function todevicelocal(system, data, buffers...)
     end
   end
 
-  (post, _) = take!(join)
   thread() do
     Sync.wait_semaphore(system.device, post)
     staging
@@ -52,7 +51,7 @@ function fromdevicelocal(system, T, buffer)
 
   staging = hw.transferbuffer(system, size)
 
-  join = tp.record(system.pipelines.host_transfer) do cmd
+  join = q.submitcommands(system.device, system.queues.host_transfer) do cmd
     vk.cmd_copy_buffer(
       cmd, buffer.buffer, staging.buffer, [vk.BufferCopy(0, 0, staging.size)]
     )

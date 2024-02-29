@@ -6,6 +6,7 @@ import DataStructures as ds
 import resources as rd
 
 import Helpers: thread
+import Sync
 
 ################################################################################
 ##### Wrap vk queues for thread safety
@@ -188,6 +189,39 @@ function queuerequirements(config, info)
     :supported_counts, supported_counts,
     :allocations, queue_allocations
   )
+end
+
+################################################################################
+##### Pipeline-free Work Submission
+################################################################################
+
+function submitcommands(cb, dev::vk.Device, queue::SharedQueue, wait=[], signal=[])
+  # FIXME: I want to keep dependencies clean, but at the same time, I want to
+  # wrap this VK interaction. Dilemma
+  pool = vk.unwrap(vk.create_command_pool(dev, queue_family(queue)))
+  cmd = vk.unwrap(vk.allocate_command_buffers(dev, vk.CommandBufferAllocateInfo(
+      pool, vk.COMMAND_BUFFER_LEVEL_PRIMARY, 1))
+  )[1]
+
+  post = Sync.ssi(dev)
+  vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
+
+  cb(cmd)
+
+  vk.end_command_buffer(cmd)
+
+  cbi = vk.CommandBufferSubmitInfo(cmd, 0)
+
+  res = submit(queue, [vk.SubmitInfo2(wait, [cbi], vcat(signal, [post]))])
+
+  thread() do
+    # Prevent GC from deleting this pool until the GPU is done with it
+    Sync.wait_semaphore(dev, post)
+    pool
+    cmd
+  end
+
+  return post, res
 end
 
 end

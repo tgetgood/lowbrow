@@ -144,33 +144,9 @@ function record(cb, p::TransferPipeline, wait=[], signal=[])
 
 end
 
-function sendcmd(cb, system, name, wait=[], signal=[])
-  dev = system.device
-  queue = get(system.queues, name)
-  qf = q.queue_family(queue)
-
-  commandpool = hw.commandpool(dev, qf)
-  cmd = hw.commandbuffers(dev, commandpool, 1)[1]
-
-  post = Sync.ssi(dev)
-  vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
-
-  cb(cmd)
-
-  vk.end_command_buffer(cmd)
-
-  cbi = vk.CommandBufferSubmitInfo(cmd, 0)
-
-  res = q.submit(queue, [vk.SubmitInfo2(wait, [cbi], vcat(signal, [post]))])
-
-  return post, res
-
-end
-
 ################################################################################
 ##### Compute Pipelines
 ################################################################################
-
 
 abstract type PipelineAllocator end
 
