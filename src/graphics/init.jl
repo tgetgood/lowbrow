@@ -68,10 +68,11 @@ defaults = ds.hashmap(
   ),
   :headless, false,
   :swapchain, ds.hashmap(
-    # TODO: Fallback formats and init time selection.
-    :format, vk.FORMAT_B8G8R8A8_SRGB,
-    :colourspace, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR,
-    :presentmode, vk.PRESENT_MODE_FIFO_KHR,
+    :formats, [ds.hashmap(
+      :format, vk.FORMAT_B8G8R8A8_SRGB,
+      :colour_space, vk.COLOR_SPACE_SRGB_NONLINEAR_KHR
+    )],
+    :presentmode, [vk.PRESENT_MODE_MAILBOX_KHR, vk.PRESENT_MODE_FIFO_KHR],
     :images, 2
   ))
 
