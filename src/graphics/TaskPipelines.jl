@@ -97,8 +97,9 @@ function cpe(system, queue)
   CommandPoolExecutor(work, sigkill, pool, queue)
 end
 
-function transferpipeline(system, name, spec)
+function transferpipeline(system, spec)
   dev = system.device
+  name = spec.name
 
   queue = get(system.queues, name)
 
@@ -258,8 +259,9 @@ function recordcomputation(
   vk.end_command_buffer(cmd)
 end
 
-function computepipeline(system, name, config)
+function computepipeline(system, config)
   dev = system.device
+  name = config.name
   qf = system.spec.queues.queue_families.compute
   queue = get(system.queues, name)
 
@@ -276,7 +278,7 @@ function computepipeline(system, name, config)
   layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
 
   pipeline = pipe.computepipeline(
-    dev, config.shader, layout, [config.pushconstants]
+    system, config.shader, layout, [config.pushconstants]
   )
 
   allocator = dummyallocator(system, config, qf, layoutci, layout)
@@ -346,13 +348,11 @@ function run(p::AsyncPipeline, inputs)
   return out
 end
 
-function presentationpipeline(system)
-end
-
-function graphicspipeline(system, name, config)
+function graphicspipeline(system, config)
   dev = system.device
   win = system.window
 
+  name = config.name
   qf = system.spec.queues.queue_families.graphics
   gqueue = get(system.queues, name)
   pqueue = system.queues.presentation
@@ -432,29 +432,57 @@ function graphicspipeline(system, name, config)
   return AsyncPipeline(inch, killch)
 end
 
-function initpipeline(system, pipeline)
-  name = ds.key(pipeline)
-  config = ds.val(pipeline)
+function initpipeline(system, config)
   t = config.type
   if t === :transfer
-    transferpipeline(system, name, config)
+    transferpipeline(system, config)
   elseif t === :compute
-    computepipeline(system, name, config)
+    computepipeline(system, config)
   elseif t === :graphics
-    graphicspipeline(system, name, config)
+    graphicspipeline(system, config)
   else
-    throw("unknown pipeline type: " * string(pipeline))
+    @warn config
+    throw("unknown pipeline type: " * string(t))
   end
 end
 
-function buildpipelines(system, config)
-  # TODO: Here's where we set up the pipeline cache
+function getcache(dev, config)
+  key = *(
+    @__DIR__, "/../../cache/", string(config.name), "-", string(config.version)
+  )
 
-  map(e -> [ds.key(e), initpipeline(system, e)], config.pipelines)
-  # ds.into(ds.emptymap, pmap(
-  #   e -> [ds.key(e), initpipeline(system, e)],
-  #   config.pipelines
-  # ))
+  if false
+    init = 0
+  else
+    init = Ptr{Nothing}()
+  end
+
+  vk.unwrap(vk.create_pipeline_cache(dev, init))
+end
+
+function savecache(cache)
+end
+
+function buildpipelines(system, config)
+  if get(config, :cache_pipelines, false)
+    system = ds.assoc(system, :pipeline_cache, getcache(system.device, config))
+  end
+
+  ps = ds.into(
+    ds.emptymap,
+    map(e -> ds.MapEntry(ds.key(e), ds.assoc(ds.val(e), :name, ds.key(e))))
+    ∘
+    ds.mapvals(p -> thread(() -> initpipeline(system, p)))
+    ∘
+    ds.mapvals(take!),
+    config.pipelines
+  )
+
+  if get(config, :cache_pipelines, false)
+    savecache(system.pipeline_cache)
+  end
+
+  return ps
 end
 
 end
