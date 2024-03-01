@@ -484,7 +484,7 @@ function buildpipelines(system, config)
 
   ps = ds.into(
     ds.emptymap,
-    map(e -> ds.MapEntry(ds.key(e), ds.assoc(ds.val(e), :name, ds.key(e))))
+    map(e -> (ds.key(e), ds.assoc(ds.val(e), :name, ds.key(e))))
     ∘
     ds.mapvals(p -> thread(() -> initpipeline(system, p)))
     ∘

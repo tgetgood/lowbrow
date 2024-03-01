@@ -234,8 +234,11 @@ function mapvals(f)
     function inner(result)
       emit(result)
     end
-    function inner(result, e)
+    function inner(result, e::MapEntry)
       emit(result, MapEntry(key(e), f(val(e))))
+    end
+    function inner(result, e::Union{Base.Vector, Tuple})
+      emit(result, (e[1], f(e[2])))
     end
   end
 end
