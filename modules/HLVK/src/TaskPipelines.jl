@@ -3,18 +3,17 @@ module TaskPipelines
 import Vulkan as vk
 import DataStructures as ds
 
-import Helpers: thread
+import ..Helpers: thread
 
-import Queues as q
-import Sync
+import ..Queues as q
+import ..Sync
 
-import Presentation
-import hardware as hw
-import framework as fw
-import resources as rd
-import render
-import Glfw as window
-import pipeline as pipe
+import ..Presentation
+import ..hardware as hw
+import ..framework as fw
+import ..resources as rd
+import ..render
+import ..pipeline as pipe
 
 # Think of a Pipeline as gpu pipeline: one or more shaders plus all the crap to
 # configure and coordinate.
@@ -274,7 +273,7 @@ function computepipeline(system, config)
 
   bindings = stagesetter(vcat(get(config, :inputs, []), config.outputs))
 
-  layoutci = rd. descriptorsetlayout(bindings)
+  layoutci = rd.descriptorsetlayout(bindings)
   layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
 
   pipeline = pipe.computepipeline(
@@ -358,12 +357,12 @@ function graphicspipeline(system, config)
   pqueue = system.queues.presentation
 
   bindings = []
-  layoutci = rd. descriptorsetlayout(bindings)
+  layoutci = rd.descriptorsetlayout(bindings)
   layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
 
   commandpool = hw.commandpool(dev, qf)
 
-  extent = window.extent(system.window, system.spec)
+  extent = system.wm.extent(system.window, system.spec)
 
   # Steps to initialise graphics.
 

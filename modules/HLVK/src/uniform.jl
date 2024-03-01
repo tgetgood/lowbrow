@@ -3,7 +3,8 @@ module uniform
 import Vulkan as vk
 
 import DataStructures as ds
-import hardware as hw
+
+import ..hardware as hw
 
 function allocatebuffers(system, T, n)
   ds.into(

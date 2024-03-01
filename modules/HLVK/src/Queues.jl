@@ -3,10 +3,9 @@ module Queues
 import Vulkan as vk
 import DataStructures as ds
 
-import resources as rd
-
-import Helpers: thread
-import Sync
+import ..resources as rd
+import ..Helpers: thread
+import ..Sync
 
 ################################################################################
 ##### Wrap vk queues for thread safety

@@ -1,11 +1,12 @@
 module render
 
-import Sync
-import Queues as q
-import hardware as hw
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, nth
+
+import ..Sync
+import ..Queues as q
+import ..hardware as hw
 
 function syncsetup(system)
   hashmap(

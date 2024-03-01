@@ -3,11 +3,10 @@
 module vertex
 
 import Vulkan as vk
-
 import DataStructures as ds
 
-import hardware as hw
-import Commands
+import ..hardware as hw
+import ..Commands
 
 # TODO: These buffers should both use SHARING_MODE_EXCLUSIVE and be returned
 # after transfer to the graphics queue.

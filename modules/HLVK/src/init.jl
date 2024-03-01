@@ -3,14 +3,11 @@ module init
 import Vulkan as vk
 import DataStructures as ds
 
-import debug
-import resources as rd
-import hardware as hw
-import Queues as q
-import Presentation
-
-import pprint
-import Overrides
+import ..debug
+import ..resources as rd
+import ..hardware as hw
+import ..Queues as q
+import ..Presentation
 
 ################################################################################
 ##### Default app config
@@ -388,8 +385,7 @@ function setup(baseconfig, wm)
     :spec, info,
     :instance, inst,
     :window, window,
-    # REVIEW: Include the windowmanager here? Or wrap the window object in a
-    # struct that can query its size and whatnot?
+    :wm, wm,
     :surface, surface,
     :pdev, pdev,
     :device, dev,

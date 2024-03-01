@@ -1,3 +1,0 @@
-module Transfer
-
-end

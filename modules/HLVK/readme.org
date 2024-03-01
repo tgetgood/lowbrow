@@ -20,7 +20,7 @@ prototype. So I'll leave "good enough" informally defined for now.
 The ability to "copy and modify" existing pipelines should be easy to facilitate
 if a pipeline is just a data structure. Of course, "just a datastructure" is
 hard to get my head around when there's a render loop involved. How close might
-we get the that ideal?
+we get to that ideal?
 
 Would a relational algebra, or Kanren style logic engine help with negotiating
 between what the program wants and what the hardware can do? This aspect of

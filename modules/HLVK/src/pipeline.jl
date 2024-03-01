@@ -1,11 +1,11 @@
 module pipeline
 
-import hardware as hw
-import resources: shaderstagebits
-
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: getin, emptymap, hashmap, emptyvector, into, mapindexed
+
+import ..hardware as hw
+import ..resources: shaderstagebits
 
 function glslc(src, out)
   run(`glslc $src -o $out`)

@@ -3,15 +3,13 @@ Wrappers for querying hardware.
 """
 module hardware
 
-import Glfw as window
-
 import Vulkan as vk
 import DataStructures as ds
 import DataStructures: get, getin, assoc, hashmap, into, emptyvector, emptymap, emptyset
 
-import Helpers: xrel
-import resources as rd
-import resources: bufferusagebits, memorypropertybits, sharingmodes, imageusagebits
+import ..Helpers: xrel
+import ..resources as rd
+import ..resources: bufferusagebits, memorypropertybits, sharingmodes, imageusagebits
 
 function instanceinfo()
   hashmap(

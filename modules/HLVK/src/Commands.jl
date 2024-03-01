@@ -4,11 +4,10 @@ import Vulkan as vk
 
 import DataStructures as ds
 
-import Helpers: thread
-import Sync
-import Queues as q
-
-import hardware as hw
+import ..Helpers: thread
+import ..Sync
+import ..Queues as q
+import ..hardware as hw
 
 ################################################################################
 ##### Data Transfer. This might need to be its own module.

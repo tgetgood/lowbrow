@@ -1,12 +1,13 @@
 module textures
 
 import FileIO as fio
-import hardware as hw
 import DataStructures as ds
 import Vulkan as vk
-import Commands
-import Queues as q
-import Sync
+
+import ..hardware as hw
+import ..Commands
+import ..Queues as q
+import ..Sync
 
 # N.B: This import automagically allows us to read the bytes out of the
 # image. *Do not remove it*!

@@ -7,11 +7,7 @@ module framework
 import Vulkan as vk
 import DataStructures as ds
 
-import resources as rd
-import pipeline as pipe
-import hardware as hw
-import render
-import Glfw as window
+import ..resources as rd
 
 ##### Descriptors
 

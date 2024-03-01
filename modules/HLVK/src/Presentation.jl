@@ -3,7 +3,7 @@ module Presentation
 import Vulkan as vk
 import DataStructures as ds
 
-import Helpers: xrel
+import ..Helpers: xrel
 
 function swapchainrequirements(config, info)
   minimages = info.capabilities.min_image_count
