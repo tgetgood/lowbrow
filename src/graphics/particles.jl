@@ -10,8 +10,6 @@ import HLVK.init
 import DataStructures as ds
 import DataStructures: hashmap, into, emptyvector
 
-import Vulkan as vk
-
 struct Particle
   position::NTuple{2,Float32}
   velocity::NTuple{2,Float32}

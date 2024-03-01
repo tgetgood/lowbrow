@@ -10,7 +10,6 @@ import HLVK.TaskPipelines as tp
 import HLVK.init
 
 import DataStructures as ds
-import Vulkan as vk
 
 ##### Projection Uniform Buffer Object
 

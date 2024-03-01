@@ -8,7 +8,6 @@ import HLVK.vertex
 import HLVK.TaskPipelines as tp
 
 import DataStructures as ds
-import Vulkan as vk
 
 struct Vertex
   position::NTuple{3, Float32}
