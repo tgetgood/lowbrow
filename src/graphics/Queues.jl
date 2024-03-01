@@ -15,7 +15,6 @@ import Sync
 ################################################################################
 
 struct SharedQueue
-  queue::vk.Queue
   info::vk.DeviceQueueInfo2
   submissions::Channel
   kill::Channel
@@ -36,7 +35,7 @@ function sharedqueue(queue::vk.Queue, info::vk.DeviceQueueInfo2)
     end
   end
 
-  SharedQueue(queue, info, ch, kill)
+  SharedQueue(info, ch, kill)
 end
 
 function submit(queue::vk.Queue, submission::Submit2)
@@ -47,27 +46,20 @@ function submit(queue::vk.Queue, submission::vk.PresentInfoKHR)
   vk.queue_present_khr(queue, submission)
 end
 
+"""
+Submits work to a VkQueue on a dedicated thread to avoid contention. Waits for a
+result from the queue_submit or queue_present_khr and returns it to the caller.
+"""
 function submit(queue::SharedQueue, submissions, fence=C_NULL)
-  out = Channel(1)
+  out = Channel()
   put!(queue.submissions, (Submit2(submissions, fence), out))
-  return out
+  return take!(out)
 end
 
 function submit(queue::SharedQueue, submission::vk.PresentInfoKHR)
-  out = Channel(1)
+  out = Channel()
   put!(queue.submissions, (submission, out))
-  return out
-end
-
-"""
-Like `submit`, but parks until a return value is available.
-"""
-function submitsync(queue::SharedQueue, submission::vk.PresentInfoKHR)
-  take!(submit(queue, submission))
-end
-
-function submitsync(queue::SharedQueue, submissions, fence=C_NULL)
-  take!(submit(queue, submissions, fence))
+  return take!(out)
 end
 
 function teardown(p::SharedQueue)

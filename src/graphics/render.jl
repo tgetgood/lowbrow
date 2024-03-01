@@ -171,13 +171,9 @@ function draw(system, gqueue, pqueue, cmd, renderstate)
       [vk.SemaphoreSubmitInfo(rendersem, 0, 0), sig]
     )
 
-    # We need to wait for this submission before submitting to the presentation
-    # queue. This is because binary semaphores must be set to signal before
-    # anything can be set to wait on them. This restriction doesn't apply to
-    # timeline semaphores, but presentation can't take those.
-    q.submitsync(gqueue, [submission], fence)
+    q.submit(gqueue, [submission], fence)
 
-    preres = q.submitsync(
+    preres = q.submit(
       pqueue,
       vk.PresentInfoKHR(
         [rendersem],

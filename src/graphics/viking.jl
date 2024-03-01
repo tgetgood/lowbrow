@@ -84,7 +84,6 @@ prog = ds.hashmap(
         :topology, :triangles
       ),
       :descriptorsets, ds.hashmap(
-        :count, 3,
         :bindings, [
           ds.hashmap(
             :type, :uniform,
