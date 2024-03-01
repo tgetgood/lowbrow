@@ -446,26 +446,40 @@ function initpipeline(system, config)
   end
 end
 
-function getcache(dev, config)
-  key = *(
+function cachekey(config)
+ *(
     @__DIR__, "/../../cache/", string(config.name), "-", string(config.version)
   )
+end
 
-  if false
-    init = 0
+function getcache(dev, key)
+  if isfile(key)
+    size = stat(key).size
+    v = Vector{UInt8}(undef, size)
+    read!(key, v)
+
+    init = Ptr{Nothing}(pointer(v))
   else
+    size = 0
     init = Ptr{Nothing}()
   end
 
-  vk.unwrap(vk.create_pipeline_cache(dev, init))
+  vk.unwrap(vk.create_pipeline_cache(dev, init; initial_data_size=UInt32(size)))
 end
 
-function savecache(cache)
+function savecache(dev, cache, key)
+  size, ptr = vk.unwrap(vk.get_pipeline_cache_data(dev, cache))
+
+  v = unsafe_wrap(Array, Ptr{UInt8}(ptr), size; own=true)
+
+  write(key, v)
 end
 
 function buildpipelines(system, config)
+  key = cachekey(config)
+
   if get(config, :cache_pipelines, false)
-    system = ds.assoc(system, :pipeline_cache, getcache(system.device, config))
+    system = ds.assoc(system, :pipeline_cache, getcache(system.device, key))
   end
 
   ps = ds.into(
@@ -479,7 +493,7 @@ function buildpipelines(system, config)
   )
 
   if get(config, :cache_pipelines, false)
-    savecache(system.pipeline_cache)
+    savecache(system.device, system.pipeline_cache, key)
   end
 
   return ps

@@ -62,6 +62,8 @@ Static description of the program to be run. Pure data. Shouldn't invoke
 anything.
 """
 prog = ds.hashmap(
+  :name, "viking-room",
+  :version, v"0.2.0",
   :device, ds.hashmap(
     :features, ds.hashmap(
       v"1.0", ds.set(:sampler_anisotropy),
