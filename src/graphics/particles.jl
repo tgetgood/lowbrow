@@ -130,6 +130,7 @@ function load(config)
 end
 
 function main()
+  t9 = time()
   window.shutdown()
 
   system, config = init.setup(load(prog), window)
@@ -158,6 +159,7 @@ function main()
   t1 = time()
   t0 = t1
 
+  @info "Startup time: " * string(round(1000*(t1-t9))) * "ms"
   while true
     window.poll()
 

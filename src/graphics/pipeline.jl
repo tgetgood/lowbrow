@@ -43,8 +43,10 @@ end
 
 # TODO: Map this over multiple configs for multiple pipelines (minimise vk calls).
 function computepipeline(
-  dev, shaderconfig, descriptorsetlayout, pushconstantconfigs=[]
+  system, shaderconfig, descriptorsetlayout, pushconstantconfigs=[]
 )
+  dev = system.device
+
   pcrs = ds.into!([], map(pushconstantrange), pushconstantconfigs)
 
   pipelinelayout = vk.unwrap(vk.create_pipeline_layout(
@@ -62,7 +64,8 @@ function computepipeline(
     :bindpoint, :compute,
     :pipeline, vk.unwrap(vk.create_compute_pipelines(
       dev,
-      [vk.ComputePipelineCreateInfo(computeshader, pipelinelayout, -1)]
+      [vk.ComputePipelineCreateInfo(computeshader, pipelinelayout, -1)];
+      pipeline_cache=get(system, :pipeline_cache, C_NULL)
     ))[1][1]
   )
 end
@@ -255,7 +258,8 @@ function creategraphicspipeline(system, ext, config)
       dynamic_state,
       depth_stencil_state,
       render_pass=get(system, :renderpass)
-    )]
+    )];
+    pipeline_cache=get(system, :pipeline_cache, C_NULL)
   ))
 
   hashmap(:pipeline, ps[1][1], :viewports, viewports, :scissors, scissors,
