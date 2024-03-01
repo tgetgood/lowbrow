@@ -1,12 +1,11 @@
-import hardware as hw
-import resources as rd
-import framework as fw
-import Commands
-import render
 import Glfw as window
-import TaskPipelines as tp
-import Sync
-import init
+
+import HLVK.hardware as hw
+import HLVK.resources as rd
+import HLVK.Commands
+import HLVK.TaskPipelines as tp
+import HLVK.Sync
+import HLVK.init
 
 import DataStructures as ds
 import DataStructures: hashmap, into, emptyvector

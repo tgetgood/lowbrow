@@ -1,11 +1,11 @@
 ##### Simple rendered quadrilateral example.
 
-import init
-
 import Glfw as window
-import resources as rd
-import vertex
-import TaskPipelines as tp
+
+import HLVK.init
+import HLVK.resources as rd
+import HLVK.vertex
+import HLVK.TaskPipelines as tp
 
 import DataStructures as ds
 import Vulkan as vk

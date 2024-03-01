@@ -1,14 +1,15 @@
-import DataStructures as ds
-import uniform
 import Glfw as window
-import model
-import vertex
-import textures
-import resources as rd
-import framework as fw
-import TaskPipelines as tp
-import init
 
+import HLVK.uniform
+import HLVK.model
+import HLVK.vertex
+import HLVK.textures
+import HLVK.resources as rd
+import HLVK.framework as fw
+import HLVK.TaskPipelines as tp
+import HLVK.init
+
+import DataStructures as ds
 import Vulkan as vk
 
 ##### Projection Uniform Buffer Object

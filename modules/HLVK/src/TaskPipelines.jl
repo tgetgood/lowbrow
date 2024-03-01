@@ -398,13 +398,13 @@ function graphicspipeline(system, config)
         (renderstate, outch) = take!(inch)
 
         # FIXME: This will crash if we switch window managers.
-        if window.closep(win)
+        if system.wm.closep(win)
           put!(outch, :closed)
           break
         end
 
         # FIXME: This will also crash if we switch window managers.
-        if window.minimised(win)
+        if system.wm.minimised(win)
           put!(outch, :skip)
         else
           cmd = hw.commandbuffers(dev, commandpool, 1)[1]
@@ -447,7 +447,7 @@ end
 
 function cachekey(config)
  *(
-    @__DIR__, "/../../cache/", string(config.name), "-", string(config.version)
+    @__DIR__, "/../../../cache/", string(config.name), "-", string(config.version)
   )
 end
 
