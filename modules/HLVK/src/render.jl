@@ -89,7 +89,7 @@ function recorder(cmd, i, system, config)
       vk.PIPELINE_BIND_POINT_GRAPHICS,
       layout,
       0,
-      [descriptorsets[i]],
+      [descriptorsets[config.frame]],
       []
     )
   end
@@ -150,7 +150,7 @@ function draw(system, gqueue, pqueue, cmd, renderstate)
       des.binddescriptors(
         dev,
         ds.getin(renderstate, [:descriptorsets, :bindings]),
-        ds.getin(renderstate, [:descriptorsets, :sets])[image+1],
+        ds.getin(renderstate, [:descriptorsets, :sets])[renderstate.frame],
         get(renderstate, :binding)
       )
     end

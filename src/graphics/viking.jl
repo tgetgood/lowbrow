@@ -166,9 +166,10 @@ function main()
     # TODO: Some sort of framestate abstraction so that we don't have to
     # manually juggle this index.
     i = (i % frames) + 1
+
     uniform.setubo!(ubos[i], timerotate(get(config, :ubo)))
 
-    sig = take!(tp.run(graphics, renderstate))
+    sig = take!(tp.run(graphics, ds.assoc(renderstate, :frame, i)))
 
     if sig === :closed
       break
