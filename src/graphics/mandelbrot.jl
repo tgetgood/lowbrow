@@ -1,15 +1,15 @@
-import graphics
+import HLVK.hardware as hw
+import HLVK.resources as rd
+import HLVK.framework as fw
+import HLVK.init
+import HLVK.TaskPipelines as tp
+import HLVK.vertex
+
 import Glfw as window
-import hardware as hw
-import resources as rd
-import framework as fw
-import pipeline as gp
-import render as draw
 import eventsystem as es
 import mouse
 
 import DataStructures as ds
-import Vulkan as vk
 
 struct Vertex
   position::NTuple{2, Float32}
@@ -38,25 +38,27 @@ prog = ds.hashmap(
     :features, [] #[:shader_float_64]
   ),
   :window, ds.hashmap(:width, 1024, :height, 1024),
-  :render, ds.hashmap(
-    :texture_file, *(@__DIR__, "/../../assets/texture.jpg"),
-    :shaders, ds.hashmap(
-      :vertex, *(@__DIR__, "/../shaders/mand.vert"),
-      :fragment, *(@__DIR__, "/../shaders/mand.frag")
+  :pipelines, ds.hashmap(
+    :render, ds.hashmap(
+      :type, :graphics,
+      :texture_file, *(@__DIR__, "/../../assets/texture.jpg"),
+      :shaders, ds.hashmap(
+        :vertex, *(@__DIR__, "/../shaders/mand.vert"),
+        :fragment, *(@__DIR__, "/../shaders/mand.frag")
+      ),
+      :inputassembly, ds.hashmap(
+        :topology, :triangles
+      ),
+      # FIXME: push constants must be at least 16 bytes.
+      # Is it because of glsl 16 byte alignment?
+      # But why does 12 fail and 20 seem to work?
+      :pushconstants, [ds.hashmap(:stage, :fragment, :size, 16)],
+      :descriptorsets, ds.hashmap(
+        :bindings, [ds.hashmap(:type, :ssbo, :stage, :fragment)]
+      )
     ),
-    :inputassembly, ds.hashmap(
-      :topology, :triangles
-    ),
-    # FIXME: push constants must be at least 16 bytes.
-    # Is it because of glsl 16 byte alignment?
-    # But why does 12 fail and 20 seem to work?
-    :pushconstants, [ds.hashmap(:stage, :fragment, :size, 16)],
-    :descriptorsets, ds.hashmap(
-      :bindings, [ds.hashmap(:type, :ssbo, :stage, :fragment)]
-    )
-  ),
-  :compute, ds.hashmap(
     :bufferinit, ds.hashmap(
+      :type, :compute,
       :shader, ds.hashmap(:file, *(@__DIR__, "/../shaders/mand-region.comp")),
       :workgroups, [32,32,1],
       :pushconstants, [ds.hashmap(:size, 20)],
@@ -69,6 +71,7 @@ prog = ds.hashmap(
       )],
     ),
     :separator, ds.hashmap(
+      :type, :compute,
       :shader, ds.hashmap(:file, *(@__DIR__, "/../shaders/mand-iter.comp")),
       :workgroups, [32,32,1],
       :pushconstants, [ds.hashmap(:size, 16)],
@@ -217,11 +220,9 @@ function main()
 
   ## VK wrapper setup
 
-  config = graphics.configure(load(prog))
+  system, config = init.setup(load(prog))
 
-  frames = get(config, :concurrent_frames)
-
-  system = graphics.staticinit(config)
+  frames = system.spec.swapchain.images
 
   dev = get(system, :device)
 
@@ -231,29 +232,11 @@ function main()
 
   @info dsets
 
-  config = ds.updatein(config, [:render, :descriptorsets], merge, dsets)
-
-  system, config = graphics.instantiate(system, config)
-
-  config = fw.staticbuffers(system, config)
-
-  # FIXME: This is a trap I'm going to fall into over and over.
-  # REVIEW: I need to encapsulate pipelines as wholes. graphics and compute.
-  config = merge(config, get(config, :render))
-
-  hardwaredesc = ds.selectkeys(system, [:qf_properties])
+  vb, ib = vertex.buffers(system, config.verticies, config.indicies)
 
   ## Compute pipelines
 
-  init = fw.computepipeline(
-    dev,
-    merge(ds.getin(config, [:compute, :bufferinit]), hardwaredesc)
-  )
-
-  sep = fw.computepipeline(
-    dev,
-    merge(ds.getin(config, [:compute, :separator]), hardwaredesc)
-  )
+  pipelines = tp.buildpipelines(system, config)
 
   ## Render loop
   framecounter::UInt32 = 0
@@ -265,12 +248,17 @@ function main()
   # FIXME: hardcoded window size
   w::Tuple{UInt32, UInt32} = (1024, 1024)
 
-  renderstate = fw.assemblerender(system, config)
+  renderstate = ds.hashmap(
+    :descriptorsets, dsets,
+    :vertexbuffer, vb,
+    :indexbuffer, ib
+  )
 
   iters = 60
   t0 = time()
 
-  for i in 1:iters
+  while true
+    window.poll()
     framecounter += 1
 
     if new || current_frame === ds.emptymap
