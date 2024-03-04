@@ -50,16 +50,15 @@ prog = ds.hashmap(
       # FIXME: push constants must be at least 16 bytes.
       # Is it because of glsl 16 byte alignment?
       # But why does 12 fail and 20 seem to work?
+      # FIXME: Asymmetry here: list of pcs in graphics, single map in compute.
       :pushconstants, [ds.hashmap(:stage, :fragment, :size, 16)],
-      :descriptorsets, ds.hashmap(
-        :bindings, [ds.hashmap(:type, :ssbo, :stage, :fragment)]
-      )
+      :bindings, [ds.hashmap(:type, :ssbo, :stage, :fragment)]
     ),
     :bufferinit, ds.hashmap(
       :type, :compute,
       :shader, ds.hashmap(:file, *(@__DIR__, "/../shaders/mand-region.comp")),
       :workgroups, [32,32,1],
-      :pushconstants, [ds.hashmap(:size, 20)],
+      :pushconstants, ds.hashmap(:size, 20),
       :inputs, [],
       :outputs, [ds.hashmap(:type, :ssbo,
         :usage, :storage_buffer,
@@ -72,7 +71,7 @@ prog = ds.hashmap(
       :type, :compute,
       :shader, ds.hashmap(:file, *(@__DIR__, "/../shaders/mand-iter.comp")),
       :workgroups, [32,32,1],
-      :pushconstants, [ds.hashmap(:size, 16)],
+      :pushconstants, ds.hashmap(:size, 16),
       :inputs, [ds.hashmap(:type, :ssbo)],
       :outputs, [ds.hashmap(
         :type, :ssbo,
@@ -247,7 +246,6 @@ function main()
   w::Tuple{UInt32, UInt32} = (1024, 1024)
 
   renderstate = ds.hashmap(
-    # :descriptorsets, dsets,
     :vertexbuffer, vb,
     :indexbuffer, ib
   )
@@ -275,12 +273,12 @@ function main()
 
     gjoin = tp.run(pipelines.render, ds.assoc(renderstate,
       :pushconstants, [(w[1], w[2], UInt32(framecounter * itercount))],
-      :binding, current_frame
+      :bindings, current_frame
     ))
 
     sleep(0.1)
 
-    # currentssjjkframe = next_frame
+    # current_frame = next_frame
 
     # Check for updated inputs.
     #
@@ -303,4 +301,4 @@ function main()
   @info "Average fps: " * string(round(iters / (t1 - t0)))
 end
 
-# main()
+main()
