@@ -16,7 +16,7 @@ const initialpoolsize = 3
 function descriptors(dev, bindings, poolsize=initialpoolsize)
   if length(bindings) > 0
     layoutci = rd.descriptorsetlayout(bindings)
-    poolci = rd.descriptorpool(layoutci, poolsize * length(layoutci.bindings))
+    poolci = rd.descriptorpool(layoutci, poolsize * (1 + length(layoutci.bindings)))
 
     layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
 
