@@ -51,7 +51,7 @@ void main() {
     // float b = float(c&15)/15.0;
 
     // outColour = vec4(pixels[n].mu, 0.0, 1.0);
-    outColour = vec4(0.0, 0.0, float(c)/float(pcs.count) + 0.1, 1.0);
+    outColour = vec4(p.mu, float(c)/float(pcs.count) + 0.1, 1.0);
     // outColour = vec4(r,g,b, 1.0);
   }
 }

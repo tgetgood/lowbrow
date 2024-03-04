@@ -295,6 +295,14 @@ function main()
     if framecounter % 1000 == 0
       @info pcs
     end
+
+    sig = take!(gjoin)
+    if sig === :closed
+      break
+    elseif sig === :skip
+      sleep(0.08)
+    end
+
   end
 
   t1 = time()
