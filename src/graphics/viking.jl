@@ -83,18 +83,16 @@ prog = ds.hashmap(
       :inputassembly, ds.hashmap(
         :topology, :triangles
       ),
-      :descriptorsets, ds.hashmap(
-        :bindings, [
-          ds.hashmap(
-            :type, :uniform,
-            :stage, :vertex
-          ),
-          ds.hashmap(
-            :type, :combined_sampler,
-            :stage, :fragment
-          )
-        ]
-      )
+      :bindings, [
+        ds.hashmap(
+          :type, :uniform,
+          :stage, :vertex
+        ),
+        ds.hashmap(
+          :type, :combined_sampler,
+          :stage, :fragment
+        )
+      ]
     )
   ),
   :ubo, ds.hashmap(
@@ -126,14 +124,6 @@ function main()
   dev = system.device
   frames = system.spec.swapchain.images
 
-  dsets = fw.descriptors(
-    dev, config.pipelines.render.descriptorsets.bindings, frames
-  )
-
-  config = ds.updatein(
-    config, [:pipelines, :render, :descriptorsets], merge, dsets
-  )
-
   pipelines = tp.buildpipelines(system, config)
 
   system = ds.assoc(system, :pipelines, pipelines)
@@ -142,11 +132,7 @@ function main()
 
   ubos = uniform.allocatebuffers(system, MVP, frames)
 
-  fw.binddescriptors(
-    dev,
-    ds.getin(config, [:pipelines, :render, :descriptorsets]),
-    ds.into([], map(i -> [ubos[i], texture]), 1:frames)
-  )
+  bindings = map(x -> [x, texture], ubos)
 
   graphics = system.pipelines.render
 
@@ -154,9 +140,7 @@ function main()
 
   renderstate = ds.hashmap(
     :vertexbuffer, vb,
-    :indexbuffer, ib,
-    :descriptorsets, dsets,
-    :texture, texture
+    :indexbuffer, ib
   )
 
   i = 0
@@ -169,7 +153,7 @@ function main()
 
     uniform.setubo!(ubos[i], timerotate(get(config, :ubo)))
 
-    sig = take!(tp.run(graphics, ds.assoc(renderstate, :frame, i)))
+    sig = take!(tp.run(graphics, ds.assoc(renderstate, :bindings, bindings[i])))
 
     if sig === :closed
       break

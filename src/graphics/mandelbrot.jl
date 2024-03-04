@@ -1,6 +1,4 @@
 import HLVK.hardware as hw
-import HLVK.resources as rd
-import HLVK.framework as fw
 import HLVK.init
 import HLVK.TaskPipelines as tp
 import HLVK.vertex
@@ -22,7 +20,6 @@ end
 function load(config)
   config = ds.update(config, :verticies, x -> map(vert, x))
   config = ds.update(config, :indicies, x -> map(UInt16, x))
-  config = ds.assoc(config, :vertex_input_state, rd.vertex_input_state(Vertex))
 end
 
 struct Pixel
@@ -34,9 +31,6 @@ end
 
 prog = ds.hashmap(
   :name, "The Separator",
-  :device, ds.hashmap(
-    :features, [] #[:shader_float_64]
-  ),
   :window, ds.hashmap(:width, 1024, :height, 1024),
   :pipelines, ds.hashmap(
     :render, ds.hashmap(
@@ -45,6 +39,10 @@ prog = ds.hashmap(
       :shaders, ds.hashmap(
         :vertex, *(@__DIR__, "/../shaders/mand.vert"),
         :fragment, *(@__DIR__, "/../shaders/mand.frag")
+      ),
+      :vertex, ds.hashmap(
+        :type, Vertex,
+        :fields, [:position]
       ),
       :inputassembly, ds.hashmap(
         :topology, :triangles
@@ -220,17 +218,17 @@ function main()
 
   ## VK wrapper setup
 
-  system, config = init.setup(load(prog))
+  system, config = init.setup(load(prog), window)
 
   frames = system.spec.swapchain.images
 
   dev = get(system, :device)
 
-  dsets = des.descriptors(
-    dev, ds.getin(config, [:render, :descriptorsets, :bindings]), frames
-  )
+  # dsets = fw.descriptors(
+  #   dev, ds.getin(config, [:render, :descriptorsets, :bindings]), frames
+  # )
 
-  @info dsets
+  # @info dsets
 
   vb, ib = vertex.buffers(system, config.verticies, config.indicies)
 
@@ -249,7 +247,7 @@ function main()
   w::Tuple{UInt32, UInt32} = (1024, 1024)
 
   renderstate = ds.hashmap(
-    :descriptorsets, dsets,
+    # :descriptorsets, dsets,
     :vertexbuffer, vb,
     :indexbuffer, ib
   )
@@ -265,21 +263,24 @@ function main()
       @info "new"
       framecounter = 1
 
-      current_frame = fw.runcomputepipeline(system, init, [], topcs(w, coords))
+      ijoin = tp.run(pipelines.bufferinit, ([], topcs(w, coords)))
+      current_frame = take!(ijoin)
 
       new = false
     end
 
-    next_frame = fw.runcomputepipeline(
-      system, sep, current_frame, [(w[1], w[2], itercount)]
-    )
+    # next_frame = fw.runcomputepipeline(
+    #   system, sep, current_frame, [(w[1], w[2], itercount)]
+    # )
 
-    fw.rungraphicspipeline(system, ds.assoc(renderstate,
+    gjoin = tp.run(pipelines.render, ds.assoc(renderstate,
       :pushconstants, [(w[1], w[2], UInt32(framecounter * itercount))],
       :binding, current_frame
     ))
 
-    current_frame = next_frame
+    sleep(0.1)
+
+    # currentssjjkframe = next_frame
 
     # Check for updated inputs.
     #
@@ -302,4 +303,4 @@ function main()
   @info "Average fps: " * string(round(iters / (t1 - t0)))
 end
 
-main()
+# main()

@@ -36,7 +36,7 @@ function commandbuffers(system, config)
   )
 end
 
-function recorder(cmd, i, system, config)
+function recorder(cmd, i, system, dset, config)
   # REVIEW: This can probably be sped up a lot by moving all of the lookups out
   # of runtime.
   #
@@ -80,19 +80,18 @@ function recorder(cmd, i, system, config)
 
   vk.cmd_set_scissor(cmdbuf, scissors)
 
-  descriptorsets = ds.getin(config, [:descriptorsets, :sets], [])
   layout = system.pipelinelayout
 
-  if length(descriptorsets) > 0
+  # if length(dset) > 0
     vk.cmd_bind_descriptor_sets(
       cmdbuf,
       vk.PIPELINE_BIND_POINT_GRAPHICS,
       layout,
       0,
-      [descriptorsets[config.frame]],
+      [dset],
       []
     )
-  end
+  # end
 
   pcvs = get(config, :pushconstants, [])
 
@@ -126,7 +125,7 @@ function recorder(cmd, i, system, config)
   vk.unwrap(vk.end_command_buffer(cmdbuf))
 end
 
-function draw(system, gqueue, pqueue, cmd, renderstate)
+function draw(system, gqueue, pqueue, cmd, dset, renderstate)
   dev = get(system, :device)
   timeout = typemax(Int64)
   (imagesem, rendersem, fence) = get(cmd, :locks)
@@ -146,16 +145,7 @@ function draw(system, gqueue, pqueue, cmd, renderstate)
     #  Don't record over unsubmitted buffer
     vk.reset_fences(dev, [fence])
 
-    if ds.containsp(renderstate, :binding)
-      des.binddescriptors(
-        dev,
-        ds.getin(renderstate, [:descriptorsets, :bindings]),
-        ds.getin(renderstate, [:descriptorsets, :sets])[renderstate.frame],
-        get(renderstate, :binding)
-      )
-    end
-
-    recorder(cmd, image + 1, system, renderstate)
+    recorder(cmd, image + 1, system, dset, renderstate)
 
     sig = Sync.ssi(dev)
 

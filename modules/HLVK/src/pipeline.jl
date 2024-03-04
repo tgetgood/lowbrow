@@ -6,6 +6,7 @@ import DataStructures: getin, emptymap, hashmap, emptyvector, into, mapindexed
 
 import ..hardware as hw
 import ..resources: shaderstagebits
+import ..resources as rd
 
 function glslc(src, out)
   run(`glslc $src -o $out`)
@@ -230,6 +231,16 @@ function creategraphicspipeline(system, ext, config)
   )
 
   vertex_input_state = config.render.vertex_input_state
+  if vertex_input_state === nothing
+    v = config.render.vertex
+    T = v.type
+    if ds.containsp(v, :fields)
+      fields = v.fields
+    else
+      fields = fieldnames(T)
+    end
+    vertex_input_state = rd.vertex_input_state(T, fields)
+  end
 
   layout = pipelinelayout(system, config)
 

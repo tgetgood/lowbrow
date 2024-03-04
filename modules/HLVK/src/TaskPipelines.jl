@@ -350,15 +350,26 @@ end
 function graphicspipeline(system, config)
   dev = system.device
   win = system.window
+  bcount = system.spec.swapchain.images
 
   name = config.name
   qf = system.spec.queues.queue_families.graphics
   gqueue = get(system.queues, name)
   pqueue = system.queues.presentation
 
-  bindings = []
+  # REVIEW: Would outputs from a render really work like this? In reality you
+  # want things like the depth buffer, framebuffer, etc.. These things are
+  # already implicit inputs that need to be accessed separately (and the
+  # renderpass may need to be modified to make them available).
+  # bindings = vcat(get(config, :inputs, []), get(config, :outputs, []))
+  #
+  # For now, I'm just going to stick with the old name
+  bindings = get(config, :bindings, [])
+
   layoutci = rd.descriptorsetlayout(bindings)
   layout = vk.unwrap(vk.create_descriptor_set_layout(dev, layoutci))
+
+  dsets = fw.descriptors(dev, bindings, bcount)
 
   commandpool = hw.commandpool(dev, qf)
 
@@ -375,7 +386,9 @@ function graphicspipeline(system, config)
   system = merge(system, pipe.renderpass(system, config))
 
   gpch = thread() do
-    pipe.creategraphicspipeline(system, extent, ds.hashmap(name, config))
+    pipe.creategraphicspipeline(system, extent, ds.hashmap(name, ds.associn(
+      config, [:descriptorsets, :layout], layout)
+    ))
   end
 
   system = merge(system, take!(swch))
@@ -389,11 +402,15 @@ function graphicspipeline(system, config)
   inch = Channel()
   killch = Channel()
 
+  buffer = 0
+  dsetbindings::Vector{Any} = map(_ -> nothing, 1:bcount)
+
   Threads.@spawn begin
     framecounter = 0
     t = time()
     try
       while !isready(killch)
+        buffer = (buffer % bcount) + 1
         framecounter += 1
         (renderstate, outch) = take!(inch)
 
@@ -407,10 +424,18 @@ function graphicspipeline(system, config)
         if system.wm.minimised(win)
           put!(outch, :skip)
         else
+          data = renderstate.bindings
+          if dsetbindings[buffer] !== data
+            # TODO: Performance warnings flag! macro?
+            @info "rebinding descriptorset"
+            fw.binddescriptors(dev, bindings, dsets.sets[buffer], data)
+            dsetbindings[buffer] = data
+          end
+
           cmd = hw.commandbuffers(dev, commandpool, 1)[1]
           co = ds.assoc(render.syncsetup(system), :commandbuffer, cmd)
 
-          gsig = render.draw(system, gqueue, pqueue, co, renderstate)
+          gsig = render.draw(system, gqueue, pqueue, co, dsets.sets[buffer], renderstate)
 
           @async begin
             Sync.wait_semaphore(dev, gsig)
