@@ -435,7 +435,9 @@ function graphicspipeline(system, config)
           cmd = hw.commandbuffers(dev, commandpool, 1)[1]
           co = ds.assoc(render.syncsetup(system), :commandbuffer, cmd)
 
-          gsig = render.draw(system, gqueue, pqueue, co, dsets.sets[buffer], renderstate)
+          dset = ds.containsp(dsets, :sets) ? dsets.sets[buffer] : nothing
+
+          gsig = render.draw(system, gqueue, pqueue, co, dset, renderstate)
 
           @async begin
             Sync.wait_semaphore(dev, gsig)

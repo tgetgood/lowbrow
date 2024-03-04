@@ -82,7 +82,7 @@ function recorder(cmd, i, system, dset, config)
 
   layout = system.pipelinelayout
 
-  # if length(dset) > 0
+  if dset !== nothing
     vk.cmd_bind_descriptor_sets(
       cmdbuf,
       vk.PIPELINE_BIND_POINT_GRAPHICS,
@@ -91,7 +91,7 @@ function recorder(cmd, i, system, dset, config)
       [dset],
       []
     )
-  # end
+  end
 
   pcvs = get(config, :pushconstants, [])
 

@@ -4,8 +4,6 @@ import HLVK.uniform
 import HLVK.model
 import HLVK.vertex
 import HLVK.textures
-import HLVK.resources as rd
-import HLVK.framework as fw
 import HLVK.TaskPipelines as tp
 import HLVK.init
 
@@ -47,10 +45,7 @@ function timerotate(u)
 end
 
 function load(config)
-  ds.associn(ds.update(config, :ubo, ubo),
-    [:pipelines, :render, :vertex_input_state],
-    rd.vertex_input_state(model.Vertex)
-  )
+  ds.update(config, :ubo, ubo)
 end
 
 ##### Main definition
@@ -76,6 +71,7 @@ prog = ds.hashmap(
   :texture_file, *(@__DIR__, "/../../assets/viking_room.png"),
   :pipelines, ds.hashmap(
     :render, ds.hashmap(
+      :vertex, ds.hashmap(:type, model.Vertex),
       :shaders, ds.hashmap(
         :vertex, *(@__DIR__, "/../shaders/viking.vert"),
         :fragment, *(@__DIR__, "/../shaders/viking.frag")

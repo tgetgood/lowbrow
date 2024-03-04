@@ -1,7 +1,6 @@
 import Glfw as window
 
 import HLVK.hardware as hw
-import HLVK.resources as rd
 import HLVK.Commands
 import HLVK.TaskPipelines as tp
 import HLVK.Sync
@@ -106,6 +105,10 @@ prog = hashmap(
     ),
     :render, ds.hashmap(
       :type, :graphics,
+      :vertex, ds.hashmap(
+        :type, Particle,
+        :fields, [:position, :colour]
+      ),
       :inputassembly, ds.hashmap(
         :topology, :points,
         :restart, false
@@ -118,19 +121,11 @@ prog = hashmap(
   )
 )
 
-function load(config)
-  ds.associn(
-    config,
-    [:pipelines, :render, :vertex_input_state],
-    rd.vertex_input_state(Particle, [:position, :colour])
-  )
-end
-
 function main()
   t9 = time()
   window.shutdown()
 
-  system, config = init.setup(load(prog), window)
+  system, config = init.setup(prog, window)
 
   # REVIEW: building the pipelines is not in the purview of init, but it this is
   # just boilerplate that should be wrapped up somehow.

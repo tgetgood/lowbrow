@@ -41,8 +41,7 @@ prog = ds.hashmap(
         :fragment, *(@__DIR__, "/../shaders/mand.frag")
       ),
       :vertex, ds.hashmap(
-        :type, Vertex,
-        :fields, [:position]
+        :type, Vertex
       ),
       :inputassembly, ds.hashmap(
         :topology, :triangles

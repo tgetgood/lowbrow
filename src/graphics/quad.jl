@@ -3,7 +3,6 @@
 import Glfw as window
 
 import HLVK.init
-import HLVK.resources as rd
 import HLVK.vertex
 import HLVK.TaskPipelines as tp
 
@@ -22,8 +21,7 @@ function load(config)
   ds.updatein(config, [:pipelines, :render],
     x -> ds.assoc(x,
       :verticies, map(vert, x.verticies),
-      :indicies, map(UInt16, x.indicies),
-      :vertex_input_state, rd.vertex_input_state(Vertex)
+      :indicies, map(UInt16, x.indicies)
     )
   )
 end
@@ -32,6 +30,7 @@ prog = ds.hashmap(
   :name, "Quad",
   :pipelines, ds.hashmap(
     :render, ds.hashmap(
+      :vertex, ds.hashmap(:type, Vertex),
       :shaders, ds.hashmap(
         :vertex, *(@__DIR__, "/../shaders/quad.vert"),
         :fragment, *(@__DIR__, "/../shaders/quad.frag")
