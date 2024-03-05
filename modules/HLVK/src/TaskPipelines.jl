@@ -164,6 +164,9 @@ struct LeakyAllocator <: PipelineAllocator
   semaphores
 end
 
+function teardown(p::TransferPipeline)
+end
+
 function teardown(p::AsyncPipeline)
   @async begin
     try
@@ -427,7 +430,7 @@ function graphicspipeline(system, config)
           data = renderstate.bindings
           if dsetbindings[buffer] !== data
             # TODO: Performance warnings flag! macro?
-            @info "rebinding descriptorset"
+            # @info "rebinding descriptorset"
             fw.binddescriptors(dev, bindings, dsets.sets[buffer], data)
             dsetbindings[buffer] = data
           end

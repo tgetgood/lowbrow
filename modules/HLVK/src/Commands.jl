@@ -50,13 +50,13 @@ function fromdevicelocal(system, T, buffer)
 
   staging = hw.transferbuffer(system, size)
 
-  join = q.submitcommands(system.device, system.queues.host_transfer) do cmd
+  post, _ = q.submitcommands(
+    system.device, system.queues.host_transfer, get(buffer, :wait, [])
+  ) do cmd
     vk.cmd_copy_buffer(
       cmd, buffer.buffer, staging.buffer, [vk.BufferCopy(0, 0, staging.size)]
     )
   end
-
-  (post, _) = take!(join)
 
   Sync.wait_semaphore(dev, post)
 

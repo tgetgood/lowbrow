@@ -9,7 +9,7 @@ struct Pixel {
 
 layout(push_constant) uniform constants {
   uvec2 window;
-  int itercount;
+  uint itercount;
 } pcs;
      
 layout(std140, binding = 0) readonly restrict buffer PixelSSBOIn {

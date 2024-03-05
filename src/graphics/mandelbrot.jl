@@ -10,7 +10,7 @@ import mouse
 import DataStructures as ds
 
 struct Vertex
-  position::NTuple{2, Float32}
+  position::NTuple{2,Float32}
 end
 
 function vert(pos)
@@ -25,8 +25,8 @@ end
 struct Pixel
   done::UInt32
   count::UInt32
-  mu::NTuple{2, Float32}
-  z::NTuple{2, Float32}
+  mu::NTuple{2,Float32}
+  z::NTuple{2,Float32}
 end
 
 prog = ds.hashmap(
@@ -56,11 +56,12 @@ prog = ds.hashmap(
     :bufferinit, ds.hashmap(
       :type, :compute,
       :shader, ds.hashmap(:file, *(@__DIR__, "/../shaders/mand-region.comp")),
-      :workgroups, [32,32,1],
+      :workgroups, [32, 32, 1],
       :pushconstants, ds.hashmap(:size, 20),
       :inputs, [],
-      :outputs, [ds.hashmap(:type, :ssbo,
-        :usage, :storage_buffer,
+      :outputs, [ds.hashmap(
+        :type, :ssbo,
+        :usage, [:transfer_src, :storage_buffer],
         :size, sizeof(Pixel) * 1024 * 1024,
         :memoryflags, :device_local,
         :queues, [:compute, :graphics]
@@ -69,12 +70,12 @@ prog = ds.hashmap(
     :separator, ds.hashmap(
       :type, :compute,
       :shader, ds.hashmap(:file, *(@__DIR__, "/../shaders/mand-iter.comp")),
-      :workgroups, [32,32,1],
+      :workgroups, [32, 32, 1],
       :pushconstants, ds.hashmap(:size, 16),
       :inputs, [ds.hashmap(:type, :ssbo)],
       :outputs, [ds.hashmap(
         :type, :ssbo,
-        :usage, :storage_buffer,
+        :usage, [:transfer_src, :storage_buffer],
         :size, sizeof(Pixel) * 1024 * 1024,
         :memoryflags, :device_local,
         :queues, [:compute, :graphics]
@@ -113,7 +114,7 @@ prog = ds.hashmap(
 ### Mouse event handlers
 
 function normalisezoom(z)
-  exp(-z/100)
+  exp(-z / 100)
 end
 
 function recentrezoom(Δzoom, offset, zoomcentre)
@@ -177,19 +178,14 @@ function pixel_buffers(system, frames, winsize)
 end
 
 function topcs(window, coords)
-  offset::Tuple{Float32, Float32} = get(coords, :offset)
+  offset::Tuple{Float32,Float32} = get(coords, :offset)
   zoom::Float32 = normalisezoom(get(coords, :zoom))
   pcs = [(window[1], window[2], offset[1], offset[2], zoom)]
-  @info pcs
   pcs
 end
 
 function main()
-  # cleanup
-  # window.shutdown()
-
   ## UI setup
-
   es.init()
 
   drag = ds.stream(
@@ -222,15 +218,7 @@ function main()
 
   dev = get(system, :device)
 
-  # dsets = fw.descriptors(
-  #   dev, ds.getin(config, [:render, :descriptorsets, :bindings]), frames
-  # )
-
-  # @info dsets
-
   vb, ib = vertex.buffers(system, config.verticies, config.indicies)
-
-  ## Compute pipelines
 
   pipelines = tp.buildpipelines(system, config)
 
@@ -242,14 +230,12 @@ function main()
   current_frame = []
 
   # FIXME: hardcoded window size
-  w::Tuple{UInt32, UInt32} = (1024, 1024)
+  w::Tuple{UInt32,UInt32} = (1024, 1024)
 
   renderstate = ds.hashmap(
     :vertexbuffer, vb,
     :indexbuffer, ib
   )
-
-  iters = 60
 
   while true
     window.poll()
@@ -263,21 +249,18 @@ function main()
       ijoin = tp.run(pipelines.bufferinit, ([], topcs(w, coords)))
       current_frame = take!(ijoin)
 
+      ex = fromdevicelocal(system, Pixel, current_frame[1])
+
       new = false
     end
 
-    # next_frame = fw.runcomputepipeline(
-    #   system, sep, current_frame, [(w[1], w[2], itercount)]
-    # )
+    sep = tp.run(pipelines.separator, (current_frame, [(w[1], w[2], itercount)]))
 
+    # @info framecounter
     gjoin = tp.run(pipelines.render, ds.assoc(renderstate,
-      :pushconstants, [(w[1], w[2], UInt32(framecounter * itercount))],
+      :pushconstants, [(w[1], w[2], UInt32(framecounter))],
       :bindings, current_frame
     ))
-
-    sleep(0.1)
-
-    # current_frame = next_frame
 
     # Check for updated inputs.
     #
@@ -290,19 +273,29 @@ function main()
     # new = new || wtemp != winsize
     # winsize = wtemp
 
-
-    if framecounter % 1000 == 0
-      @info pcs
-    end
+    # sleep(0.01)
 
     sig = take!(gjoin)
     if sig === :closed
       break
     elseif sig === :skip
       sleep(0.08)
-    end
+    else
+      next_frame = take!(sep)
 
+      Threads.@spawn begin
+        Sync.wait_semaphores(system.device, [sig, next_frame.wait])
+        current_frame
+        @info "discard"
+      end
+
+      current_frame = next_frame
+    end
   end
+
+  ds.mapvals(tp.teardown, pipelines)
+  window.shutdown()
+  GC.gc()
 end
 
-main()
+# main()
