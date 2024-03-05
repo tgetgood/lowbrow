@@ -186,7 +186,7 @@ end
 
 function main()
   # cleanup
-  window.shutdown()
+  # window.shutdown()
 
   ## UI setup
 
@@ -236,7 +236,7 @@ function main()
 
   ## Render loop
   framecounter::UInt32 = 0
-  itercount::UInt32 = 50
+  itercount::UInt32 = 500
 
   new = true
   current_frame = []
@@ -250,7 +250,6 @@ function main()
   )
 
   iters = 60
-  t0 = time()
 
   while true
     window.poll()
@@ -260,6 +259,7 @@ function main()
       @info "new"
       framecounter = 1
 
+      @info topcs(w, coords)
       ijoin = tp.run(pipelines.bufferinit, ([], topcs(w, coords)))
       current_frame = take!(ijoin)
 
@@ -303,9 +303,6 @@ function main()
     end
 
   end
-
-  t1 = time()
-  @info "Average fps: " * string(round(iters / (t1 - t0)))
 end
 
 main()

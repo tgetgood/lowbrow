@@ -35,9 +35,9 @@ void main() {
   uint n = i + j * pcs.window[0];
   uint N = pcs.window[0] * pcs.window[1];
 
-  if (n >= N) {
-    discard;
-  } else {
+  // if (n >= N) {
+  //   discard;
+  // } else {
     Pixel p = pixels[n];
   
     uint c = pixels[n].count;
@@ -53,5 +53,5 @@ void main() {
     // outColour = vec4(pixels[n].mu, 0.0, 1.0);
     outColour = vec4(p.mu, float(c)/float(pcs.count) + 0.1, 1.0);
     // outColour = vec4(r,g,b, 1.0);
-  }
+  // }
 }
