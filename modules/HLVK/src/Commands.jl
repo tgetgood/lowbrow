@@ -47,26 +47,25 @@ Copy outputs of compute shaders back to cpu ram. Returns Vector<T>.
 function fromdevicelocal(system, T, buffer)
   size = get(buffer, :size)
   dev = get(system, :device)
+  len = Int(size/sizeof(T))
 
-  staging = hw.transferbuffer(system, size)
-
-  post, _ = q.submitcommands(
-    system.device, system.queues.host_transfer, get(buffer, :wait, [])
-  ) do cmd
-    vk.cmd_copy_buffer(
-      cmd, buffer.buffer, staging.buffer, [vk.BufferCopy(0, 0, staging.size)]
-    )
-  end
-
-  Sync.wait_semaphore(dev, post)
-
-  out = Vector{T}(undef, Int(size / sizeof(T)))
+  staging = hw.transferbuffer(system, buffer.size)
 
   memptr::Ptr{T} = vk.unwrap(vk.map_memory(
     dev, get(staging, :memory), 0, size
   ))
 
-  unsafe_copyto!(memptr, pointer(out), length(out))
+  post, _ = q.submitcommands(
+    dev, system.queues.host_transfer, get(buffer, :wait, [])
+  ) do cmd
+    vk.cmd_copy_buffer(
+      cmd, buffer.buffer, staging.buffer, [vk.BufferCopy(0, 0, buffer.size)]
+    )
+  end
+
+  Sync.wait_semaphore(dev, post)
+
+  out = copy(unsafe_wrap(Array, memptr, len))
 
   vk.unmap_memory(dev, get(staging, :memory))
 

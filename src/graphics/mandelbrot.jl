@@ -6,6 +6,7 @@ import HLVK.vertex
 import Glfw as window
 import eventsystem as es
 import mouse
+import HLVK.Commands: fromdevicelocal
 
 import DataStructures as ds
 
@@ -61,7 +62,10 @@ prog = ds.hashmap(
       :inputs, [],
       :outputs, [ds.hashmap(
         :type, :ssbo,
-        :usage, [:transfer_src, :storage_buffer],
+        :usage, :storage_buffer,
+        :eltype, Pixel,
+        :length, 2^20,
+        # TODO: Calculate size for uniform and ssbo via eltype and length.
         :size, sizeof(Pixel) * 1024 * 1024,
         :memoryflags, :device_local,
         :queues, [:compute, :graphics]
@@ -75,7 +79,7 @@ prog = ds.hashmap(
       :inputs, [ds.hashmap(:type, :ssbo)],
       :outputs, [ds.hashmap(
         :type, :ssbo,
-        :usage, [:transfer_src, :storage_buffer],
+        :usage, :storage_buffer,
         :size, sizeof(Pixel) * 1024 * 1024,
         :memoryflags, :device_local,
         :queues, [:compute, :graphics]
@@ -110,6 +114,34 @@ prog = ds.hashmap(
   ],
   :indicies, [0, 3, 2, 2, 1, 0,]
 )
+
+function addusages(x::Symbol, xs...)
+  ds.set(x, xs...).elements
+end
+
+function addusages(x, xs...)
+  into(ds.set(xs...), x).elements
+end
+
+function enabletransfer(config)
+  map(x -> ds.update(x, :usage, addusages, :transfer_src, :transfer_dst), config)
+end
+
+function debugpipeline(system, config, name)
+  config = ds.assoc(get(config.pipelines, name), :name, name)
+
+  config = ds.update(config, :inputs, enabletransfer)
+  config = ds.update(config, :outputs, enabletransfer)
+
+  tp.initpipeline(system, config)
+end
+
+function debugrun(system, p, inputs, T)
+  ijoin = tp.run(p, inputs)
+  outputs = take!(ijoin)
+
+  fromdevicelocal(system, T, outputs[1])
+end
 
 ### Mouse event handlers
 

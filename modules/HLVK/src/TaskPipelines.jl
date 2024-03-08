@@ -178,13 +178,7 @@ function teardown(p::AsyncPipeline)
 end
 
 function passresources(a::LeakyAllocator)
-  sem = vk.unwrap(vk.create_semaphore(
-    a.dev,
-    vk.SemaphoreCreateInfo(
-      next=vk.SemaphoreTypeCreateInfo(vk.SEMAPHORE_TYPE_TIMELINE, UInt(1))
-    )))
-
-  post = vk.SemaphoreSubmitInfo(sem, UInt(2), 0)
+  post = Sync.ssi(a.dev)
 
   dset = vk.unwrap(vk.allocate_descriptor_sets(
     a.dev,

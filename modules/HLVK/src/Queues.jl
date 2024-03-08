@@ -206,6 +206,7 @@ function submitcommands(cb, dev::vk.Device, queue::SharedQueue, wait=[], signal=
   )[1]
 
   post = Sync.ssi(dev)
+
   vk.begin_command_buffer(cmd, vk.CommandBufferBeginInfo())
 
   cb(cmd)
