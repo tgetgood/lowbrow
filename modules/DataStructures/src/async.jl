@@ -79,7 +79,7 @@ end
 # So it looks like each subscriber needs a dropping policy.
 
 
-# Julia sucks a recursion, so loopify everything
+# Julia sucks at recursion, so loopify everything
 function ireduce(f, init, ch::Channel)
   v = init
   try
