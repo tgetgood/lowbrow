@@ -8,6 +8,9 @@ import eventsystem as es
 import mouse
 import HLVK.Commands: fromdevicelocal
 
+# For development
+import Vulkan as vk
+
 import DataStructures as ds
 
 struct Vertex
@@ -33,6 +36,12 @@ end
 prog = ds.hashmap(
   :name, "The Separator",
   :window, ds.hashmap(:width, 1024, :height, 1024),
+  :device, ds.hashmap(
+    :features, ds.hashmap(
+      v"1.0.0", [:pipeline_statistics_query]
+    ),
+    :extensions, ["VK_EXT_mesh_shader"]
+  ),
   :pipelines, ds.hashmap(
     :render, ds.hashmap(
       :type, :graphics,
@@ -115,6 +124,22 @@ prog = ds.hashmap(
   :indicies, [0, 3, 2, 2, 1, 0,]
 )
 
+##### Debugging tools
+
+## Queries
+
+function qp(system)
+  pool = vk.create_query_pool(
+    system.device,
+    vk.QUERY_TYPE_PIPELINE_STATISTICS,
+    1;
+    pipeline_statistics=vk.QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
+    vk.QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT
+  )
+end
+
+## Debug pipelines (inputs and outputs visible to cpu).
+
 function addusages(x::Symbol, xs...)
   ds.set(x, xs...).elements
 end
@@ -196,24 +221,14 @@ function takelast(init, ch)
   MemoChannel(init, ch)
 end
 
-function pixel_buffers(system, frames, winsize)
-  ds.into(
-    ds.emptyvector,
-    map(_ -> hw.buffer(system, ds.hashmap(
-      :usage, :storage_buffer,
-      :size, sizeof(Pixel) * winsize.width * winsize.height,
-      :memoryflags, :device_local,
-      :queues, [:compute]
-    ))),
-    1:frames
-  )
-end
-
 function topcs(window, coords)
   offset::Tuple{Float32,Float32} = get(coords, :offset)
   zoom::Float32 = normalisezoom(get(coords, :zoom))
   pcs = [(window[1], window[2], offset[1], offset[2], zoom)]
   pcs
+end
+
+function initpixels(win, coords)
 end
 
 function main()
