@@ -47,8 +47,11 @@ function string(x::Symbol)
   end
 end
 
+const symhash = hash("#Symbol")
+const keyhash = hash("#Keyword")
+
 function hash(x::Symbol)
-  hash(string(x))
+  xor(symhash, hash(string(x)))
 end
 
 function ==(x::Symbol, y::Symbol)
@@ -65,7 +68,7 @@ function string(x::Keyword)
 end
 
 function hash(x::Keyword)
-  hash(string(x))
+  xor(keyhash, hash(string(x)))
 end
 
 function ==(x::Keyword, y::Keyword)

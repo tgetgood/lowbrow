@@ -16,6 +16,10 @@ abstract type PersistentVector <: Vector end
 struct EmptyVector <: PersistentVector
 end
 
+const vh = 0x444d4fd0f6256ef1
+
+# hash(v::EmptyVector) = vh
+
 struct VectorLeaf{T} <: PersistentVector
   elements::Base.Vector{T}
 end
@@ -39,6 +43,8 @@ struct VectorNode{T} <: PersistentVector where T <: PersistentVector
   # But, due to alignment using u8 saves no space and creates extra work.
   depth::Int64
 end
+
+hash(v::PersistentVector) = reduce(xor, vh, map(hash, v))
 
 function vectornode(els::Base.Vector, count, depth)
   VectorNode(els, count, depth)
@@ -436,11 +442,6 @@ function iterate(_::Vector, state)
 end
 
 ##### Equality
-
-# FIXME: Hashing the type is not stable between runs. Not critical just yet,
-# but it will be. I want hashes to be sufficiently stable that they can go on
-# the wire. Basically hash values and never hash memory addresses.
-hash(v::T) where T <: PersistentVector = xor(hash(T), hash(v.elements))
 
 function Base.:(==)(x::VectorLeaf, y::VectorLeaf)
   x.elements == y.elements

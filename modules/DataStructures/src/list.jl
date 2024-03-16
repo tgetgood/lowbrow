@@ -6,9 +6,15 @@ abstract type List end
 # side, but indexing is flipped by the length so that we start reading at the
 # right side as well.
 
+# FIXME: This is very old and doesn't play well with Julia's type system.
+
 struct VectorList <: List
   contents::Vector
 end
+
+const vlh = 0x06ce3ebcedd51feb
+
+hash(x::VectorList) = xor(vlh, hash(x.contents))
 
 struct VectorListSeq <: List
   contents::Vector
