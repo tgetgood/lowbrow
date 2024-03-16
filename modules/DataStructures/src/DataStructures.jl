@@ -24,7 +24,7 @@ include("./async.jl")
 include("./juliatypes.jl")
 
 # Sequential
-export first, rest, take, drop, reduce, transduce, into, map, filter, interpose, dup, cat, partition, seq, seqcompose, zip, split, interleave, inject, takewhile, dropwhile
+export first, rest, take, drop, reduce, transduce, into, map, filter, remove, interpose, dup, cat, partition, seq, seqcompose, zip, split, interleave, inject, takewhile, dropwhile
 
 # Vectors
 export emptyvector, nth, vec, vector
@@ -43,7 +43,7 @@ export emptyset, disj, set
 export Queue, queue, emptyqueue, closedp, emptystream, put!, Stream, stream
 
 # Generic
-export conj, count, empty, emptyp, nil, keyword, name, symbol, withmeta, meta, every
+export conj, count, empty, emptyp, nil, keyword, name, symbol, symbol, withmeta, meta, every
 
 # Types
 export Keyword, Map, Vector, MapEntry, List

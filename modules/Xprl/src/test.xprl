@@ -1,0 +1,10 @@
+(def fib
+  (fn fib [x]
+    (eval (if (eval (< (eval x) 2))
+            1
+            (eval (+ (eval (fib (eval (- (eval x) 1))))
+                     (eval (fib (eval (- (eval x) 2))))))))))
+
+;; That ignores the environment. I'm going to have to fix that.
+
+(fib 5)
