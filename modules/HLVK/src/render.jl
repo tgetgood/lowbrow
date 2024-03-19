@@ -51,11 +51,6 @@ function recorder(cmd, i, system, dset, config)
 
   graphics_pipeline = system.pipeline
 
-  vk.unwrap(vk.begin_command_buffer(
-    cmdbuf,
-    vk.CommandBufferBeginInfo()
-  ))
-
   vk.cmd_begin_render_pass(
     cmdbuf,
     vk.RenderPassBeginInfo(
@@ -122,7 +117,6 @@ function recorder(cmd, i, system, dset, config)
 
   vk.cmd_end_render_pass(cmdbuf)
 
-  vk.unwrap(vk.end_command_buffer(cmdbuf))
 end
 
 function draw(system, gqueue, pqueue, cmd, dset, renderstate)
@@ -145,7 +139,23 @@ function draw(system, gqueue, pqueue, cmd, dset, renderstate)
     #  Don't record over unsubmitted buffer
     vk.reset_fences(dev, [fence])
 
+    vk.unwrap(vk.begin_command_buffer(
+      cmd.commandbuffer,
+      vk.CommandBufferBeginInfo()
+    ))
+
+    if get(renderstate, :querypool) !== nothing
+      vk.cmd_reset_query_pool(cmd.commandbuffer, renderstate.querypool, 0, 1)
+      vk.cmd_begin_query(cmd.commandbuffer, renderstate.querypool, 0)
+    end
+
     recorder(cmd, image + 1, system, dset, renderstate)
+
+    if get(renderstate, :querypool) !== nothing
+      vk.cmd_end_query(cmd.commandbuffer, renderstate.querypool, 0)
+    end
+
+    vk.unwrap(vk.end_command_buffer(cmd.commandbuffer))
 
     sig = Sync.ssi(dev)
 

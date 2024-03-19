@@ -10,6 +10,7 @@ import HLVK.Commands: fromdevicelocal
 
 # For development
 import Vulkan as vk
+import Vulkan.LibVulkan as lv
 
 import DataStructures as ds
 
@@ -129,14 +130,29 @@ prog = ds.hashmap(
 ## Queries
 
 function qp(system)
-  pool = vk.create_query_pool(
+  pool = vk.unwrap(vk.create_query_pool(
     system.device,
     vk.QUERY_TYPE_PIPELINE_STATISTICS,
     1;
+    # REVIEW: Creation and access of a querypool are tightly coupled since the
+    # number of 1 bits here determines the size of the query result.
+    #
+    # N.B.: The order of the returned counters is from low bit to high bit of
+    # this bitmask.
     pipeline_statistics=vk.QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
     vk.QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT
-  )
+  ))
 end
+
+function querypoolresults(device, pool)
+  d = Vector{UInt64}(undef, 2)
+  vk.get_query_pool_results(
+    device, pool, 0, 1, sizeof(d), Ptr{Cvoid}(pointer(d)), sizeof(d);
+    flags=vk.QUERY_RESULT_64_BIT | vk.QUERY_RESULT_WAIT_BIT
+  )
+  return d
+end
+
 
 ## Debug pipelines (inputs and outputs visible to cpu).
 
