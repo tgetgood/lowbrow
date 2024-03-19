@@ -33,6 +33,6 @@ void main() {
     vec2 coords = vec2(float(i)/w, float(j)/h);
     vec2 mu = pcs.zoom * (pcs.offset + coords);
 
-    pixels[n] = Pixel(i, j, mu, vec2(0.0, 0.0));
+    pixels[n] = Pixel(i, i*j, mu, vec2(0.0, 0.0));
   }
 }
