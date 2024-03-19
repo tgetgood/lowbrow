@@ -366,7 +366,7 @@ function readall(stream::BufferedStream)
         try
             push!(forms, read(stream))
         catch EOFError
-            return ds.remove(isnothing, forms)
+            return remove(isnothing, forms)
         end
     end
 end
