@@ -113,7 +113,7 @@ end
 
 function window(name, config)
   glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
-  glfw.WindowHint(glfw.RESIZABLE, get(config, :resizable))
+  glfw.WindowHint(glfw.RESIZABLE, get(config, :resizable, false))
   glfw.WindowHint(glfw.REFRESH_RATE, get(config, :refresh, glfw.DONT_CARE))
 
   window = glfw.CreateWindow(get(config, :width), get(config, :height), name)
