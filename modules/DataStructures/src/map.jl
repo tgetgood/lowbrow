@@ -28,7 +28,7 @@ function Base.:(==)(x::EmptyMap, y::EmptyMap)
 end
 
 # Clojure uses 8 and I don't want to dig into it just yet.
-const arraymapsizethreashold = 8
+const arraymapsizethreashold = 16
 
 struct PersistentArrayMap <: Map
   kvs::Base.Vector{Any}
@@ -287,8 +287,18 @@ end
   if k === :kvs
     return getfield(m, :kvs)
   else
-    get(m, k)
+    get(m, k, nothing)
   end
+end
+
+function get(m::PersistentArrayMap, k, default=nothing)
+  vs = getfield(m, :kvs)
+  for i in 1:2:length(vs)-1
+    if vs[i] == k
+      return vs[i + 1]
+    end
+  end
+  return default
 end
 
 first(m::PersistentArrayMap) = MapEntry(m.kvs[1], m.kvs[2])
