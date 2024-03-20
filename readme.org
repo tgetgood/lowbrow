@@ -31,16 +31,38 @@ terminal. That's about it.
 
    Possible solution: have `checkdevice` take a map of tests and return a map of
    results. Then, when a device is rejected, we have a clear reason why.
+
+   Better solution: Finally refactored the entire hardware negotiation system to
+   actually negotiate, that is, pass in a data description of what you want, get
+   back a data description of what's possible on the hardware, decide whether to
+   go ahead or abort. This is nice in that it allows the programmer to initially
+   ask the impossible without crashing the system (so long as they don't
+   actually try to do it), and then back off until they meet the hardware
+   somewhere in the middle. When that's actually possible, of course.
 ** [2023-12-19 Tue 22:47]
    Bug involving descriptorsets not being set properly comes down to a magic
    line of code where I merge config with one of its submaps.
 
    Why? I have no idea. I suspect this is a half finished refactor.
+
+   The real reason turns out to be keeping handles around to prevent GC. I need
+   to take charge of freeing vk objects eventually. But I'm resisting as long as
+   possible.
 * To Do List
-** Switch to Synchronization2
+** DONE Switch to Synchronization2
+   CLOSED: [2024-03-20 Wed 12:50]
 ** wrap images to make transitions easier
    Vulkan doesn't rememeber anything for you, which makes life unduly difficult.
-** find some way to order queue submissions
+** DONE find some way to order queue submissions
+   CLOSED: [2024-03-20 Wed 12:50]
+   - Note taken on [2024-03-20 Wed 12:50] \\
+     wrapping pipelines in tasks that can only be communicated with via channels,
+     combined with wrapping buffers with semaphores indicating when they'll be safe
+     to read seems to work pretty well.
+
+     Of course there's still a memory leak in the well named "LeakyAllocator" to fix.
+
+     Lots to do.
    Manually juggling semaphores is error prone and just feels wrong. What we
    need is a way to establish finish-before-start relations, topologically sort
    those, and then automate the barriers/semaphores/fences
@@ -63,4 +85,12 @@ terminal. That's about it.
 
    Something like a clj record could be a nice interim solution, but really, if
    you want to work with C you need *closed* types, which clojure rejects pretty
-   uniformly.
+   uniformly. You also need C compatible memory layouts.
+
+   So why not embrace C structs, but wrap them in logic so that they can be
+   accessed and maybe even extended as if they were maps (of course they won't
+   still be structs then).
+
+   The dream is to be able to spot maps with stable structure and transform them
+   into structs as part of jit compilation. This is probably only really useful
+   in hotspots, but would be a really cool optimisation to pull off.
