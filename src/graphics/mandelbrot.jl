@@ -2,6 +2,7 @@ import HLVK.hardware as hw
 import HLVK.init
 import HLVK.TaskPipelines as tp
 import HLVK.vertex
+import HLVK.Sync
 
 import Glfw as window
 import eventsystem as es
@@ -301,6 +302,7 @@ function main()
   )
 
   while true
+  # for i in 1:20
     window.poll()
     framecounter += 1
 
@@ -308,11 +310,10 @@ function main()
       @info "new"
       framecounter = 1
 
-      @info topcs(w, coords)
       ijoin = tp.run(pipelines.bufferinit, ([], topcs(w, coords)))
       current_frame = take!(ijoin)
 
-      ex = fromdevicelocal(system, Pixel, current_frame[1])
+      # ex = fromdevicelocal(system, Pixel, current_frame[1])
 
       new = false
     end
@@ -321,7 +322,7 @@ function main()
 
     # @info framecounter
     gjoin = tp.run(pipelines.render, ds.assoc(renderstate,
-      :pushconstants, [(w[1], w[2], UInt32(framecounter))],
+      :pushconstants, [(w[1], w[2], UInt32(framecounter*itercount))],
       :bindings, current_frame
     ))
 
@@ -336,7 +337,7 @@ function main()
     # new = new || wtemp != winsize
     # winsize = wtemp
 
-    # sleep(0.01)
+    sleep(0.001)
 
     sig = take!(gjoin)
     if sig === :closed
@@ -345,11 +346,14 @@ function main()
       sleep(0.08)
     else
       next_frame = take!(sep)
-
       Threads.@spawn begin
-        Sync.wait_semaphores(system.device, [sig, next_frame.wait])
-        current_frame
-        @info "discard"
+        try
+          Sync.wait_semaphores(system.device, vcat([sig], next_frame[1].wait))
+          finalize(current_frame)
+          # @info "discard"
+        catch e
+          ds.handleerror(e)
+        end
       end
 
       current_frame = next_frame
@@ -361,4 +365,4 @@ function main()
   GC.gc()
 end
 
-# main()
+main()
