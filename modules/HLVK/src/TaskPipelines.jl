@@ -336,10 +336,9 @@ function computepipeline(system, config)
 end
 
 function run(p::AsyncPipeline, inputs)
-  # Create a fresh output channel for each set of inputs. I'm not convinced this
-  # is the right way to do it, but it lets multiple people submit work and only
-  # be able to see their own results.
-  out = Channel()
+  # This channel is buffered to prevent slow consumers from blocking the gpu
+  # pipeline.
+  out = Channel(1)
   put!(p.input, (inputs, out))
   return out
 end

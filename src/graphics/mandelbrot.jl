@@ -42,7 +42,7 @@ prog = ds.hashmap(
     :features, ds.hashmap(
       v"1.0.0", [:pipeline_statistics_query]
     ),
-    :extensions, ["VK_EXT_mesh_shader"]
+    :extensions, []
   ),
   :pipelines, ds.hashmap(
     :render, ds.hashmap(
@@ -92,6 +92,8 @@ prog = ds.hashmap(
         :type, :ssbo,
         :usage, :storage_buffer,
         :size, sizeof(Pixel) * 1024 * 1024,
+        :eltype, Pixel,
+        :length, 2^20,
         :memoryflags, :device_local,
         :queues, [:compute, :graphics]
       )],
@@ -302,7 +304,7 @@ function main()
   )
 
   while true
-  # for i in 1:20
+  # for i in 1:3
     window.poll()
     framecounter += 1
 
@@ -365,4 +367,4 @@ function main()
   GC.gc()
 end
 
-main()
+# main()
