@@ -56,8 +56,8 @@ float floatConstruct( uint m ) {
 void main() {
   // outColour = vec4(texture(sam, texCoord).rgb, 1.0);
   // outColour = vec4(texCoord, 1.0, 1.0);
-  uint i = uint(round(texCoord.x * float(pcs.window[0] - 1)));
-  uint j = uint(round(texCoord.y * float(pcs.window[1] - 1)));
+  uint i = uint(gl_FragCoord.x - 0.5);
+  uint j = uint(gl_FragCoord.y - 0.5);
 
   // if (i < j) {
   //   discard;
@@ -83,7 +83,7 @@ void main() {
     // float b = float(c&15)/15.0;
 
     // outColour = vec4(pixels[n].mu, 0.0, 1.0);
-    outColour = vec4(0.0, 0.0, floatConstruct(c), 1.0);
+    outColour = vec4(0.0, 0.0, floatConstruct(c)/float(pcs.count), 1.0);
     // outColour = vec4(r,g,b, 1.0);
   // }
 }
