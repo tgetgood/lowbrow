@@ -47,7 +47,7 @@ void main() {
         float zrs = z[0]*z[0];
         float zis = z[1]*z[1];
         // This done check lags one step behind the computation.
-        if (zrs + zis < threshold) {
+        if (zrs + zis > threshold) {
           done = 1;
           break;
         }
