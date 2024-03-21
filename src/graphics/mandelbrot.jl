@@ -305,12 +305,14 @@ function main()
   )
 
   while true
-  # for i in 1:3
+  # for i in 1:10
     window.poll()
     framecounter += 1
 
+    sleep(0.1)
     if new || current_frame === ds.emptymap
-      @info "new"
+      # @info "new"
+      @info coords
       framecounter = 1
 
       ijoin = tp.run(pipelines.bufferinit, ([], topcs(w, coords)))
@@ -340,8 +342,6 @@ function main()
     # new = new || wtemp != winsize
     # winsize = wtemp
 
-    sleep(0.001)
-
     sig = take!(gjoin)
     if sig === :closed
       break
@@ -368,4 +368,4 @@ function main()
   GC.gc()
 end
 
-# main()
+main()
