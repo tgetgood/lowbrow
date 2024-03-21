@@ -265,13 +265,14 @@ function main()
     ds.interleave(es.getstreams(:position, :scroll))
   )
 
+
   viewport = ds.stream(
-    ds.scan(viewframe, ds.hashmap(:zoom, 0, :offset, (0.5, 0.5))),
+    ds.scan(viewframe, ds.hashmap(:zoom, -70, :offset, (-0.5, -0.5))),
     ds.interleave(ds.hashmap(:scroll, zoom, :drag, drag))
   )
 
   viewstate = takelast(
-    ds.hashmap(:zoom, 0, :offset, (0, 0)),
+    ds.hashmap(:zoom, -70, :offset, (-0.25, -0.5)),
     ds.subscribe(viewport; buffer=1)
   )
 
@@ -304,12 +305,12 @@ function main()
     :indexbuffer, ib
   )
 
-  while true
-  # for i in 1:10
+  # while true
+  for i in 1:2
     window.poll()
     framecounter += 1
 
-    sleep(0.1)
+    # sleep(0.1)
     if new || current_frame === ds.emptymap
       # @info "new"
       @info coords
@@ -364,8 +365,8 @@ function main()
   end
 
   ds.mapvals(tp.teardown, pipelines)
-  window.shutdown()
-  GC.gc()
+  # window.shutdown()
+  # GC.gc()
 end
 
 main()
