@@ -1,4 +1,5 @@
-#version 450
+#version 460
+#extension GL_EXT_scalar_block_layout : enable
 
 struct Pixel {
   uint done;
@@ -12,11 +13,11 @@ layout(push_constant) uniform constants {
   uint itercount;
 } pcs;
      
-layout(std140, binding = 0) readonly restrict buffer PixelSSBOIn {
+layout(std430, binding = 0) readonly restrict buffer PixelSSBOIn {
    Pixel pixelsIn[ ];
 };
 
-layout(std140, binding = 1) writeonly restrict buffer PixelSSBOOut {
+layout(std430, binding = 1) writeonly restrict buffer PixelSSBOOut {
    Pixel pixelsOut[ ];
 };
 

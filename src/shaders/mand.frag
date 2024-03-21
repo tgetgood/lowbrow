@@ -1,4 +1,5 @@
-#version 450
+#version 460
+#extension GL_EXT_scalar_block_layout : enable
 
 struct Pixel {
   uint done;
@@ -18,7 +19,7 @@ layout(location = 0) in vec2 texCoord;
 
 layout(location = 0) out vec4 outColour;
 
-layout(std140, binding = 0) readonly restrict buffer PixelSSBOIn {
+layout(std430, binding = 0) readonly restrict buffer PixelSSBOIn {
    Pixel pixels[ ];
 };
 
@@ -65,13 +66,14 @@ void main() {
 
   uint n = i + j * pcs.window[0];
   uint N = pcs.window[0] * pcs.window[1];
+  
 
   // if (n >= N) {
   //   discard;
   // } else {
     Pixel p = pixels[n];
   
-    uint c = pixels[n].count;
+    // uint c = pixels[n].count;
     // uint c = pcs.count;
 
     // if (c < 100000) {
@@ -83,7 +85,7 @@ void main() {
     // float b = float(c&15)/15.0;
 
     // outColour = vec4(pixels[n].mu, 0.0, 1.0);
-    outColour = vec4(0.0, 0.0, floatConstruct(c), 1.0);
+    outColour = vec4(p.mu, floatConstruct(p.count)/float(pcs.count), 1.0);
     // outColour = vec4(r,g,b, 1.0);
   // }
 }

@@ -72,6 +72,12 @@ function fromdevicelocal(system, T, buffer)
   return out
 end
 
+function fromdevicelocal(system, buffer)
+  @assert ds.containsp(buffer.config, :eltype)
+
+  fromdevicelocal(system, buffer.config.eltype, buffer)
+end
+
 ################################################################################
 ##### Image Manipulation. Should definitely become its own module.
 ################################################################################

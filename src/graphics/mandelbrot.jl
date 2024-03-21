@@ -39,6 +39,7 @@ prog = ds.hashmap(
   :name, "The Separator",
   :window, ds.hashmap(:width, 1024, :height, 1024),
   :device, ds.hashmap(
+    :extensions, ["VK_KHR_scalar_block_layout"],
     :features, ds.hashmap(
       v"1.0.0", [:pipeline_statistics_query]
     ),
@@ -164,7 +165,7 @@ function addusages(x::Symbol, xs...)
 end
 
 function addusages(x, xs...)
-  into(ds.set(xs...), x).elements
+  ds.into(ds.set(xs...), x).elements
 end
 
 function enabletransfer(config)
@@ -180,11 +181,11 @@ function debugpipeline(system, config, name)
   tp.initpipeline(system, config)
 end
 
-function debugrun(system, p, inputs, T)
+function debugrun(system, p, inputs)
   ijoin = tp.run(p, inputs)
   outputs = take!(ijoin)
 
-  fromdevicelocal(system, T, outputs[1])
+  fromdevicelocal(system, outputs[1])
 end
 
 ### Mouse event handlers
