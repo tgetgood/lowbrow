@@ -37,7 +37,7 @@ end
 
 prog = ds.hashmap(
   :name, "The Separator",
-  :window, ds.hashmap(:width, 1024, :height, 1024),
+  :window, ds.hashmap(:width, 1024, :height, 1024, :refresh, 100),
   :device, ds.hashmap(
     :extensions, ["VK_KHR_scalar_block_layout"],
     :features, ds.hashmap(
@@ -292,7 +292,7 @@ function main()
 
   ## Render loop
   framecounter::UInt32 = 0
-  itercount::UInt32 = 500
+  itercount::UInt32 = 2^5
 
   new = true
   current_frame = []
@@ -306,7 +306,7 @@ function main()
   )
 
   # while true
-  for i in 1:2
+  for i in 1:3
     window.poll()
     framecounter += 1
 
@@ -365,8 +365,9 @@ function main()
   end
 
   ds.mapvals(tp.teardown, pipelines)
-  # window.shutdown()
-  # GC.gc()
+  window.shutdown()
+  GC.gc()
 end
+
 
 main()
