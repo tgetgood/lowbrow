@@ -2,9 +2,9 @@ abstract type Map <: Sequential end
 
 abstract type MapNode end
 
-struct MapEntry <: MapNode
-  key::Any
-  value::Any
+struct MapEntry{K, V} <: MapNode
+  key::K
+  value::V
 end
 
 function key(x::MapEntry)
@@ -15,7 +15,7 @@ function val(x::MapEntry)
   x.value
 end
 
-function Base.:(==)(x::MapEntry, y::MapEntry)
+function Base.:(==)(x::MapEntry{K, V}, y::MapEntry{K, V}) where {K, V}
   x.key == y.key && x.value == y.value
 end
 
@@ -27,11 +27,11 @@ function Base.:(==)(x::EmptyMap, y::EmptyMap)
   true
 end
 
-# Clojure uses 8 and I don't want to dig into it just yet.
+# 16 was a good value before optimising. Need to retest afterwards.
 const arraymapsizethreashold = 16
 
-struct PersistentArrayMap <: Map
-  kvs::Base.Vector{Any}
+struct PersistentArrayMap{K, V} <: Map
+  kvs::Base.Vector{MapEntry{K, V}}
 end
 
 struct EmptyMarker <: MapNode end
@@ -100,7 +100,7 @@ count(m::EmptyMarker) = 0
 count(m::PersistentHashNode) = m.count
 count(m::MapEntry) = 1
 count(m::EmptyMap) = 0
-count(m::PersistentArrayMap) = div(length(m.kvs), 2) # inline kvs
+count(m::PersistentArrayMap) = length(getfield(m, :kvs))
 count(m::PersistentHashMap) = m.root.count
 
 emptyp(m::Map) = count(m) == 0
@@ -256,8 +256,8 @@ merge(x::Nothing, y::Map) = y
 merge(x::Map, y::Nothing) = x
 
 assoc(x::Nothing, k::Nothing, v) = throw("nothing is not a valid map key.")
-assoc(x::Nothing, k, v) = PersistentArrayMap([k, v])
-assoc(m::EmptyMap, k, v) = PersistentArrayMap([k, v])
+assoc(x::Nothing, k, v) = PersistentArrayMap([MapEntry(k, v)])
+assoc(m::EmptyMap, k, v) = PersistentArrayMap([MapEntry(k, v)])
 
 conj(m::EmptyMap, e::MapEntry) = assoc(m, key(e), val(e))
 
@@ -291,76 +291,103 @@ end
   end
 end
 
-function get(m::PersistentArrayMap, k, default=nothing)
+function get(m::PersistentArrayMap{K, V}, k::K, default=nothing) where {K, V}
   vs = getfield(m, :kvs)
-  for i in 1:2:length(vs)-1
-    if vs[i] == k
-      return vs[i + 1]
+  for i in 1:length(vs)
+    if vs[i].key == k
+      return vs[i].value
     end
   end
   return default
 end
 
-first(m::PersistentArrayMap) = MapEntry(m.kvs[1], m.kvs[2])
+first(m::PersistentArrayMap) = getfield(m, :kvs)[1]
 
 """
-Returns (v, i) where `v` is the value associated with key `k` in `m` and `i` is
-an index of `k` in `m` (what that means depends on the concrete type of `m`).
-
-i == :notfound if k is not a key in m.
+Returns the index of k within the underlying vector of arraymap m. 0 for not found.
 """
-function getindexed(m::PersistentArrayMap, k, default=nil)
-  i = 1
-  while i < length(m.kvs)
-    if m.kvs[i] == k
-      return m.kvs[i+1], i
+getindex(m::PersistentArrayMap, k) = 0
+function getindex(m::PersistentArrayMap{K, V}, k::K) where {K, V}
+  kvs = getfield(m, :kvs)
+  for i in 1:length(kvs)
+    if kvs[i].key == k
+      return i
     end
-    i += 2
   end
-  return default, :notfound
+  return 0
+end
+
+function get(m::PersistentArrayMap, k, default=nothing)
+  i = getindex(m, k)
+  if i === 0
+    default
+  else
+    getfield(m, :kvs)[i].value
+  end
 end
 
 function conj(m::PersistentArrayMap, e::MapEntry)
-  assoc(m, e.key, e.value)
+  assoc(m, e)
 end
 
-function assoc(m::PersistentArrayMap, k, v)
-  (_, i) = getindexed(m, k)
-  if i === :notfound
+function assoc(m::PersistentArrayMap{K, V}, k::K, v::V) where {K, V}
+  i = getindex(m, k)
+  if i === 0
     if count(m) >= arraymapsizethreashold
       assoc(into(emptyhashmap, m), k, v)
     else
-      PersistentArrayMap(push!(copy(m.kvs), k, v))
+      kvs = getfield(m, :kvs)
+      len = length(kvs)
+      newkvs = Base.Vector{MapEntry{K, V}}(undef, len + 1)
+      for i in 1:len
+        newkvs[i] = kvs[i]
+      end
+      newkvs[len + 1] = MapEntry(k, v)
+      PersistentArrayMap(newkvs)
     end
   else
-    kvs = []
-    append!(kvs, m.kvs[1:i-1], m.kvs[i+2:end])
-    push!(kvs, k, v)
-    PersistentArrayMap(kvs)
+    kvs = getfield(m, :kvs)
+    len = length(kvs)
+    newkvs = Base.Vector{MapEntry{K, V}}(undef, length(kvs))
+    for j in 1:i-1
+      newkvs[j] = kvs[j]
+    end
+    newkvs[i] = MapEntry(k, v)
+    for j in i+1:len
+      newkvs[j] = kvs[j]
+    end
+    PersistentArrayMap(newkvs)
   end
 end
 
 function dissoc(m::PersistentArrayMap, k)
-  (_, i) = getindexed(m, k)
-  if i === :notfound
+  i = getindex(m, k)
+  if i === 0
     m
   else
-    kvs = []
-    append!(kvs, m.kvs[1:i-1], m.kvs[i+2:end])
-    PersistentArrayMap(kvs)
+
+    kvs = getfield(m, :kvs)
+    newkvs = Base.Vector{eltype(kvs)}(undef, length(kvs) - 1)
+    for j in 1:i-1
+      newkvs[j] = kvs[j]
+    end
+    for j in i+1:length(kvs)
+      newkvs[j-1] = kvs[j]
+    end
+    PersistentArrayMap(newkvs)
   end
 end
 
 function seq(m::PersistentArrayMap)
   # Array maps have limited length, so I'm not worried about realising them as
   # vectors.
-  map(i -> MapEntry(m.kvs[i], m.kvs[i+1]), 1:2:length(m.kvs))
+  getfield(m, :kvs)
 end
 
 # These have limited size, so the simplicity of this method trumps efficiency
 merge(x::PersistentArrayMap, y::PersistentArrayMap) = into(x, y)
 
-function Base.:(==)(x::PersistentArrayMap, y::PersistentArrayMap)
+function Base.:(==)(x::PersistentArrayMap{K, V}, y::PersistentArrayMap{K, V}) where K where V
   if x === y
     return true
   elseif count(x) !== count(y)
@@ -557,7 +584,7 @@ function iterate(m::PersistentArrayMap, k)
   if k > count(m)
     nothing
   else
-    MapEntry(m.kvs[2*k-1], m.kvs[2*k]), k+1
+    getfield(m, :kvs)[k], k + 1
   end
 end
 

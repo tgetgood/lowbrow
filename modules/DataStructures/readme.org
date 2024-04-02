@@ -977,6 +977,102 @@
       Memory estimate: 560 bytes, allocs estimate: 11.
 ***** merge
       I don't even want to talk about it
+*** Typed Map Entries
+    Just make MapEntry, MapEntry{K, V}
+**** arraymap get
+     BenchmarkTools.Trial: 10000 samples with 998 evaluations.
+     Range (min … max):  14.519 ns … 29.069 ns  ┊ GC (min … max): 0.00% … 0.00%
+     Time  (median):     14.529 ns              ┊ GC (median):    0.00%
+     Time  (mean ± σ):   14.611 ns ±  0.765 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+     █
+     █▂▁▁▂▁▁▁▁▁▁▁▁▁▂▁▁▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▂▂▂▂▂▂▁▂▂▂▁▁▂▂▂▁▁▁▂▂▂▂▂▂▂ ▂
+     14.5 ns         Histogram: frequency by time        17.4 ns <
+
+     Memory estimate: 0 bytes, allocs estimate: 0.
+
+     julia> @benchmark get(m, 15)
+     BenchmarkTools.Trial: 10000 samples with 998 evaluations.
+     Range (min … max):  17.024 ns … 32.505 ns  ┊ GC (min … max): 0.00% … 0.00%
+     Time  (median):     17.285 ns              ┊ GC (median):    0.00%
+     Time  (mean ± σ):   17.394 ns ±  0.833 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+     █ ▄                                                       ▁
+     █▁█▁█▃▃▁▁▁▄▃▁▁▄▃▄▅▆▄▅▅▄▃▄▅▄▄▃▃▃▁▁▁▁▃▁▁▁▁▁▁▁▃▁▁▃▁▁▄▁▁▁▃▁▁▁▄▅ █
+     17 ns        Histogram: log(frequency) by time      23.9 ns <
+
+     Memory estimate: 0 bytes, allocs estimate: 0.
+
+     julia> @benchmark get(m, 31)
+     BenchmarkTools.Trial: 10000 samples with 997 evaluations.
+     Range (min … max):  18.766 ns … 108.276 ns  ┊ GC (min … max): 0.00% … 0.00%
+     Time  (median):     20.782 ns               ┊ GC (median):    0.00%
+     Time  (mean ± σ):   21.029 ns ±   2.449 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+     ▂  ▄  █                                                   ▁
+     ▇▃▁█▄▁█▅▄█▄▄▁▄▄▅▄▆▆▆▅▅▄▄▃▄▃▁▃▄▁▃▁▁▃▄▃▅▄▇▆▆▆▅▄▆▄▄▄▄▃▄▄▄▄▃▄▄▄▃ █
+     18.8 ns       Histogram: log(frequency) by time      31.9 ns <
+
+     Memory estimate: 0 bytes, allocs estimate: 0.
+
+     Now we're approaching jl vectors. 20x is too much gain, for a small
+     change... Of course a lot of stuff is broken at the moment.
+**** arraymap assoc
+     julia> @benchmark assoc(m, 2, 2)
+     BenchmarkTools.Trial: 10000 samples with 992 evaluations.
+     Range (min … max):  37.541 ns … 626.347 ns  ┊ GC (min … max): 0.00% … 87.17%
+     Time  (median):     39.153 ns               ┊ GC (median):    0.00%
+     Time  (mean ± σ):   40.560 ns ±  21.497 ns  ┊ GC (mean ± σ):  2.45% ±  4.31%
+
+     ▆█▂
+     ▂▄▄▅█████▅▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▂▂▂▂▁▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂ ▃
+     37.5 ns         Histogram: frequency by time         51.5 ns <
+
+     Memory estimate: 112 bytes, allocs estimate: 2.
+
+     julia> @benchmark assoc(m, 17, 18)
+     BenchmarkTools.Trial: 10000 samples with 990 evaluations.
+     Range (min … max):  43.909 ns … 613.905 ns  ┊ GC (min … max): 0.00% … 82.51%
+     Time  (median):     46.486 ns               ┊ GC (median):    0.00%
+     Time  (mean ± σ):   49.248 ns ±  28.114 ns  ┊ GC (mean ± σ):  3.62% ±  5.86%
+
+     ▄█▇▂▁  ▁▂                                                    ▂
+     █████▇▆███▇▅▆▆▄▆▃▅▅▁▃▄▄▅▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▃▁▆ █
+     43.9 ns       Histogram: log(frequency) by time       127 ns <
+
+     Memory estimate: 224 bytes, allocs estimate: 2.
+
+     julia> @benchmark assoc(m, 3, 5)
+     BenchmarkTools.Trial: 10000 samples with 991 evaluations.
+     Range (min … max):  41.161 ns … 544.153 ns  ┊ GC (min … max): 0.00% … 81.18%
+     Time  (median):     43.552 ns               ┊ GC (median):    0.00%
+     Time  (mean ± σ):   46.014 ns ±  23.614 ns  ┊ GC (mean ± σ):  3.14% ±  5.63%
+
+     ▅█▆▁▁     ▁▁                                                ▁
+     ███████▆▅▅▆███▇▆▆▆▆▅▅▅▅▅▅▆▄▅▅▅▁▄▄▃▄▁▃▁▃▁▄▄▄▁▁▄▄▄▄▁▁▁▃▁▁▁▁▁▁▃ █
+     41.2 ns       Histogram: log(frequency) by time      96.2 ns <
+
+     Memory estimate: 208 bytes, allocs estimate: 2.
+
+     julia> @benchmark assoc(m, 15, 11)
+     BenchmarkTools.Trial: 10000 samples with 989 evaluations.
+     Range (min … max):  47.492 ns … 578.540 ns  ┊ GC (min … max): 0.00% … 73.07%
+     Time  (median):     49.950 ns               ┊ GC (median):    0.00%
+     Time  (mean ± σ):   54.261 ns ±  32.212 ns  ┊ GC (mean ± σ):  4.39% ±  7.08%
+
+     ▇█▂▁ ▂                                                       ▁
+     ███████▆▆▅▅▅▄▁▁▁▁▁▁▁▁▁▁▁▁▁▃▁▁▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▃▁▃▅▆▆█▇ █
+     47.5 ns       Histogram: log(frequency) by time       179 ns <
+
+     Memory estimate: 352 bytes, allocs estimate: 2.
+
+     julia> @benchmark assoc(m, :a, 0)
+     ERROR: StackOverflowError: Type upgrades not yet implemented.
+
+     Again a suspicious level of improvement, almost O(1), which is absurd.
+
+     Now that could mean that my previous impl was just bad, which is
+     possible. I'm still learning the language, after all.
 * Ideas / devlog
 ** IO and events
    Something I really want to work out is having all IO being either input or
