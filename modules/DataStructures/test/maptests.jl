@@ -152,3 +152,54 @@ end
 
   @test mapkeys(k -> k*"s", m) == hashmap("As", 1, "Bs", 2)
 end
+
+# This doesn't actually work as a function, but wrapping the code keeps it from running along side the tests
+function mapbenchmarks()
+  # Array maps
+
+  @benchmark reduce(conj, emptymap, [[1,2], [3,4], [5,6], [7,8]])
+  @benchmark into(emptymap, partition(2), 1:8)
+  @benchmark into(emptymap, partition(2), 1:32)
+
+  m = into(emptymap, partition(2), 1:32)
+
+  @info typeof(m)
+
+  @benchmark get(m, 1)
+  @benchmark get(m, 15)
+  @benchmark get(m, 31)
+
+  m = hashmap(1,1)
+
+  @benchmark assoc(m, 2, 2)
+
+  m = into(emptymap, partition(2), 1:16)
+
+  @benchmark assoc(m, 17, 18)
+
+  @benchmark assoc(m, 3, 5)
+
+  m = into(emptymap, partition(2), 1:32)
+
+  @benchmark assoc(m, 15, 11)
+
+  @benchmark assoc(m, :a, 0)
+
+  m1 = into(emptymap, partition(2), 1:16)
+  m2 = into(emptymap, partition(2), 17:32)
+  m3 = into(emptymap, partition(2), 9:22)
+
+  @benchmark merge(m1, m2)
+  @benchmark merge(m1, m3)
+
+  # hashmaps
+  @benchmark into(emptyhashmap, partition(2), 1:16)
+
+  m = into(emptyhashmap, partition(2), 1:32)
+
+  @benchmark get(m, 1)
+  @benchmark get(m, 31)
+
+  @benchmark assoc(m, 17, 4)
+  @benchmark assoc(m, 170, 4)
+end

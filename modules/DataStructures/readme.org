@@ -707,6 +707,276 @@
    262144:   0.260248 seconds (7.25 M allocations: 252.915 MiB, 9.14% gc time)
    524288:   0.516125 seconds (14.49 M allocations: 504.806 MiB, 8.50% gc time)
    1048576:   1.030130 seconds (28.98 M allocations: 1008.589 MiB, 8.89% gc time)
+** Fast Maps
+   Maps have until recently been "good enough". I'm starting to get some issues
+   with looking up elements in maps in a render loop being too much overhead. I
+   will probably switch those hotspots to structs eventually, but I still need
+   to fix this.
+
+   First of all, there should be no allocation when looking up a key in a map. I
+   should also start using typed map entries so that values can be inlined as
+   much as possible. Keys are overwhelmingly often of a predictable, homogeneous
+   type, so let's use that.
+*** Baseline
+**** Array maps
+***** construction
+      julia> @benchmark reduce(conj, emptymap, [[1,2], [3,4], [5,6], [7,8]])
+      BenchmarkTools.Trial: 10000 samples with 192 evaluations.
+      Range (min … max):  515.318 ns …   8.651 μs  ┊ GC (min … max): 0.00% … 87.83%
+      Time  (median):     536.359 ns               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   568.772 ns ± 426.706 ns  ┊ GC (mean ± σ):  5.00% ±  6.13%
+
+      ▁▂▂▄▇█▆
+      ▂▃▄▅▇████████▄▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▂▂▂▂▂▂▂ ▃
+      515 ns           Histogram: frequency by time          648 ns <
+
+      Memory estimate: 1.11 KiB, allocs estimate: 20.
+
+      julia> @benchmark into(emptymap, partition(2), 1:8)
+      BenchmarkTools.Trial: 10000 samples with 10 evaluations.
+      Range (min … max):  1.608 μs … 220.839 μs  ┊ GC (min … max): 0.00% … 98.05%
+      Time  (median):     1.675 μs               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   1.820 μs ±   4.113 μs  ┊ GC (mean ± σ):  4.46% ±  1.96%
+
+      ▂▆██▇▆▅▅▄▄▃▂▁                                ▁▁             ▂
+      ██████████████▆▇▆▆▅▆▅▅▅▆▆▅▇▆▅▅▄▄▄▅▇██▇▇▆▄▅▄▇█████▆▅▅▆▇▇█▇▆▅ █
+      1.61 μs      Histogram: log(frequency) by time       2.6 μs <
+
+      Memory estimate: 1.86 KiB, allocs estimate: 51.
+
+      julia> @benchmark into(emptymap, partition(2), 1:32)
+      BenchmarkTools.Trial: 10000 samples with 3 evaluations.
+      Range (min … max):  7.993 μs … 485.922 μs  ┊ GC (min … max): 0.00% … 96.16%
+      Time  (median):     8.483 μs               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   9.253 μs ±  12.640 μs  ┊ GC (mean ± σ):  4.21% ±  3.04%
+
+      ▄▆███▇▆▄▃                             ▁                    ▂
+      ███████████▇▆▅▆▆▆▆▅▄▅▃▅▅▅▅▄▆▅▅▅▇▇▆███████████▇██▇█▇▇▇▇▇▇▆▇▆ █
+      7.99 μs      Histogram: log(frequency) by time      13.7 μs <
+
+      Memory estimate: 14.94 KiB, allocs estimate: 195.
+
+      clearly need to override `into` for empty maps.
+***** get
+      julia> m = into(emptymap, partition(2), 1:32)
+
+      julia> @benchmark get(m, 1)
+      BenchmarkTools.Trial: 10000 samples with 995 evaluations.
+      Range (min … max):  28.020 ns … 55.358 ns  ┊ GC (min … max): 0.00% … 0.00%
+      Time  (median):     28.775 ns              ┊ GC (median):    0.00%
+      Time  (mean ± σ):   28.933 ns ±  1.543 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+      ▄    █                                                      ▁
+      █▁▁▁▁█▃▁▁▁▁▁▃▁▃▄▄▄▄▇▆▆▅▅▆▆▄▄▃▃▃▁▁▁▁▃▁▁▁▁▁▃▃▁▁▁▃▁▁▄▁▄▁▆█▅▅▆▆ █
+      28 ns        Histogram: log(frequency) by time      36.1 ns <
+
+      Memory estimate: 0 bytes, allocs estimate: 0.
+
+      julia> @benchmark get(m, 15)
+      BenchmarkTools.Trial: 10000 samples with 923 evaluations.
+      Range (min … max):  112.775 ns … 397.827 ns  ┊ GC (min … max): 0.00% … 0.00%
+      Time  (median):     115.277 ns               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   115.034 ns ±   4.079 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+      ▅   █        █                            ▁         ▁         ▂
+      █▁▁▃█▁▃▁▄▅▄▅▅███▇█▆▆▇▆▅▆███▇▆▇▇▆▅▄▄▄▁▃▅▅▄▄█████▇▆▇▇█████▇▇▇█▇ █
+      113 ns        Histogram: log(frequency) by time        124 ns <
+
+      Memory estimate: 0 bytes, allocs estimate: 0.
+
+      julia> @benchmark get(m, 31)
+      BenchmarkTools.Trial: 10000 samples with 516 evaluations.
+      Range (min … max):  216.359 ns … 342.446 ns  ┊ GC (min … max): 0.00% … 0.00%
+      Time  (median):     222.696 ns               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   223.888 ns ±   4.282 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+      ▁▁      ▁▃▅▆██▅▅▃▁    ▁▁▁ ▁                   ▁▁▂▂▁▁▁▁    ▂
+      ▄▄▅▇██▇▇▄▄▇▆██████████▅▇▇███████▆▆▅▄▄▄▄▅▄▄▃▁▄▁▁▅▇▇█████████▇▇ █
+      216 ns        Histogram: log(frequency) by time        239 ns <
+
+      Memory estimate: 0 bytes, allocs estimate: 0.
+
+      Not bad, but I'll reckon we can do better.
+***** assoc
+      m = hashmap(1,1)
+
+      julia> @benchmark assoc(m, 2, 2)
+      BenchmarkTools.Trial: 10000 samples with 957 evaluations.
+      Range (min … max):   89.771 ns …  2.026 μs  ┊ GC (min … max): 0.00% … 91.89%
+      Time  (median):      93.470 ns              ┊ GC (median):    0.00%
+      Time  (mean ± σ):   100.064 ns ± 91.065 ns  ┊ GC (mean ± σ):  5.37% ±  5.56%
+
+      ▅▆▇█▇▄▃▂▁  ▁▁▂▂▂▁                                           ▂
+      ███████████████████▇▇▆▆▄▄▃▁▃▄▁▁▁▄▁▁▁▃▃▁▁▁▁▁▃▁▁▃▁▁▃▁▁▁▄▅▆▇▆▇▆ █
+      89.8 ns       Histogram: log(frequency) by time       140 ns <
+
+      Memory estimate: 176 bytes, allocs estimate: 4.
+
+      m = into(emptymap, partition(2), 1:16)
+
+      julia> @benchmark assoc(m, 17, 18)
+      BenchmarkTools.Trial: 10000 samples with 651 evaluations.
+      Range (min … max):  185.562 ns …  1.175 μs  ┊ GC (min … max): 0.00% … 76.18%
+      Time  (median):     196.069 ns              ┊ GC (median):    0.00%
+      Time  (mean ± σ):   207.018 ns ± 64.560 ns  ┊ GC (mean ± σ):  3.14% ±  7.77%
+
+      ▇█
+      ██▆▃▃▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▂▂▂▂▁▁▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▂▂▂ ▂
+      186 ns          Histogram: frequency by time          713 ns <
+
+      Memory estimate: 880 bytes, allocs estimate: 4.
+
+      julia> @benchmark assoc(m, 3, 5)
+      BenchmarkTools.Trial: 10000 samples with 383 evaluations.
+      Range (min … max):  249.454 ns …   3.443 μs  ┊ GC (min … max): 0.00% … 90.92%
+      Time  (median):     257.235 ns               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   276.523 ns ± 218.079 ns  ┊ GC (mean ± σ):  6.06% ±  7.01%
+
+      ▂▄▆▇████▇▇▆▅▅▄▄▃▃▂▂▂▁▁ ▁      ▁▁▂▃▂▁▁▁▁  ▁                  ▃
+      ▅▇██████████████████████████▇█▇█████████████▇▇▇▇▇▇▆▆▇▆▆▆▄▅▃▁▅ █
+      249 ns        Histogram: log(frequency) by time        301 ns <
+
+      Memory estimate: 736 bytes, allocs estimate: 8.
+
+      So appending at the end is much faster than changing the middle. That
+      shouldn't be such a difference.
+
+      m = into(emptymap, partition(2), 1:32)
+
+      julia> @benchmark assoc(m, 15, 11)
+      BenchmarkTools.Trial: 10000 samples with 225 evaluations.
+      Range (min … max):  334.227 ns …   5.012 μs  ┊ GC (min … max): 0.00% … 87.13%
+      Time  (median):     343.733 ns               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   364.682 ns ± 221.426 ns  ┊ GC (mean ± σ):  4.00% ±  6.02%
+
+      ▅█▆▃▂  ▁▂▂                                                    ▁
+      ██████▆████▇▇▅▅▄▁▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▃▁▁▁▁▁▃▅▆▆▆▅▄▃▃▃▁▄ █
+      334 ns        Histogram: log(frequency) by time        680 ns <
+
+      Memory estimate: 976 bytes, allocs estimate: 8.
+
+      julia> @benchmark assoc(m, :a, 0)
+      BenchmarkTools.Trial: 10000 samples with 4 evaluations.
+      Range (min … max):  7.058 μs … 228.857 μs  ┊ GC (min … max): 0.00% … 93.52%
+      Time  (median):     7.353 μs               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   7.681 μs ±   4.941 μs  ┊ GC (mean ± σ):  1.60% ±  2.47%
+
+      ▃▆██▇▅▂                                                     ▂
+      ███████▇▆▇▇▆▇▆▅▅▅▄▅▃▂▄▄▃▄▄▆▇▇█▅▆▆▄▅▅▅▅▆▄▅▅▆▆▅▄▆▆▅▅▆▇▆▄▄▅▄▄▅ █
+      7.06 μs      Histogram: log(frequency) by time      12.3 μs <
+
+      Memory estimate: 9.52 KiB, allocs estimate: 177.
+
+      Upgrading to hashmaps is a disaster. There's also too much allocation
+      happening at every stage here.
+***** merge
+      m1 = into(emptymap, partition(2), 1:16)
+      m2 = into(emptymap, partition(2), 17:32)
+      m3 = into(emptymap, partition(2), 9:22)
+
+      julia> @benchmark merge(m1, m2)
+      BenchmarkTools.Trial: 10000 samples with 9 evaluations.
+      Range (min … max):  2.636 μs … 68.770 μs  ┊ GC (min … max): 0.00% … 92.24%
+      Time  (median):     3.000 μs              ┊ GC (median):    0.00%
+      Time  (mean ± σ):   3.211 μs ±  2.266 μs  ┊ GC (mean ± σ):  2.58% ±  3.65%
+
+      ▃▅▅▇██▇▄▁                                                 ▂
+      ██████████▇▇▇▆▆▃▃▅▅▆▇█▇▇▇▇▆▅▄▄▄▄▃▄▄▃▃▁▃▄▁▄▅▄▄▆▇▇█▇█████▇█▇ █
+      2.64 μs      Histogram: log(frequency) by time     6.24 μs <
+
+      Memory estimate: 8.75 KiB, allocs estimate: 54.
+
+      julia> @benchmark merge(m1, m3)
+      BenchmarkTools.Trial: 10000 samples with 9 evaluations.
+      Range (min … max):  2.541 μs … 140.629 μs  ┊ GC (min … max): 0.00% … 95.10%
+      Time  (median):     2.739 μs               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   2.976 μs ±   3.853 μs  ┊ GC (mean ± σ):  4.32% ±  3.30%
+
+      ▃▆▇█▇▆▅▃▂▁                                                 ▂
+      ▇███████████▇▇▇▆▆▄▅▅▃▁▃▃▁▁▅▇▇█▇▆▆▆▆▅▄▄▅▄▄▅▆▅▄▇▇▇█▇▇███▇▇▇▆▇ █
+      2.54 μs      Histogram: log(frequency) by time      5.02 μs <
+
+      Memory estimate: 6.31 KiB, allocs estimate: 64.
+
+      So merge performance is abominable, but seems to be independent of
+      intersection testing.
+**** Hash maps
+***** construction
+      julia> @benchmark into(emptyhashmap, partition(2), 1:16)
+      BenchmarkTools.Trial: 10000 samples with 5 evaluations.
+      Range (min … max):  6.046 μs … 255.145 μs  ┊ GC (min … max): 0.00% … 95.89%
+      Time  (median):     6.360 μs               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   6.755 μs ±   6.458 μs  ┊ GC (mean ± σ):  2.63% ±  2.70%
+
+      ▄▇▇██▇▆▅▃▂▁                                      ▁▁▂ ▁▁▂▁▁ ▂
+      ████████████▇█▇█▇█▇▆▆▆▅▆▅▅▅▅▁▄▁▆▆▆▇██▇█▇▅▆▆▄▇█▇▇▇▇█████████ █
+      6.05 μs      Histogram: log(frequency) by time      9.54 μs <
+
+      Memory estimate: 7.31 KiB, allocs estimate: 170.
+
+      julia> @benchmark into(emptyhashmap, partition(2), 1:32)
+      BenchmarkTools.Trial: 10000 samples with 1 evaluation.
+      Range (min … max):  11.890 μs …  1.276 ms  ┊ GC (min … max): 0.00% … 97.44%
+      Time  (median):     12.630 μs              ┊ GC (median):    0.00%
+      Time  (mean ± σ):   13.206 μs ± 20.433 μs  ┊ GC (mean ± σ):  2.62% ±  1.68%
+
+      ▃▇█▅▁
+      ▂▄█████▆▄▃▃▂▂▂▂▂▂▂▂▁▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▂▂▂ ▃
+      11.9 μs         Histogram: frequency by time        21.2 μs <
+
+      Memory estimate: 14.31 KiB, allocs estimate: 330.
+
+      Way too much allocation.
+***** get
+      julia> @benchmark get(m, 1)
+      BenchmarkTools.Trial: 10000 samples with 379 evaluations.
+      Range (min … max):  248.050 ns …  2.532 μs  ┊ GC (min … max): 0.00% … 87.96%
+      Time  (median):     252.456 ns              ┊ GC (median):    0.00%
+      Time  (mean ± σ):   256.135 ns ± 55.794 ns  ┊ GC (mean ± σ):  0.59% ±  2.44%
+
+      ▁▂▄▆▇██▇▆▆▆▅▃▁   ▁▁▁▁                     ▁▂▂▁▁▁▁           ▃
+      ▆███████████████▇███████▇▇▆▅▆▄▅▅▁▄▅▃▁▅▅▅▆▇▇████████████▇▇▆▆▇ █
+      248 ns        Histogram: log(frequency) by time       282 ns <
+
+      Memory estimate: 96 bytes, allocs estimate: 4.
+
+      julia> @benchmark get(m, 31)
+      BenchmarkTools.Trial: 10000 samples with 372 evaluations.
+      Range (min … max):  249.194 ns …  2.471 μs  ┊ GC (min … max): 0.00% … 87.23%
+      Time  (median):     255.110 ns              ┊ GC (median):    0.00%
+      Time  (mean ± σ):   257.698 ns ± 52.549 ns  ┊ GC (mean ± σ):  0.52% ±  2.28%
+
+      ▂▃▄▅▆▇▇▇▇███▇▅▄▂▁                              ▁▁▁ ▁        ▃
+      ▆███████████████████▇███████▆▇▆▅▃▆▄▄▂▅▃▂▂▅▆▇▇██████████▇▇██▇ █
+      249 ns        Histogram: log(frequency) by time       283 ns <
+
+      Memory estimate: 96 bytes, allocs estimate: 4.
+***** assoc
+      julia> @benchmark assoc(m, 17, 4)
+      BenchmarkTools.Trial: 10000 samples with 193 evaluations.
+      Range (min … max):  506.016 ns …   5.230 μs  ┊ GC (min … max): 0.00% … 83.37%
+      Time  (median):     531.767 ns               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   547.224 ns ± 182.230 ns  ┊ GC (mean ± σ):  1.59% ±  4.22%
+
+      ▂▄▆▇██▇▄▃▂   ▂▂▂▃▂▁                                          ▂
+      ▇███████████▇████████▇▇▆▅▄▆▆▄▅▅▆▇▅▅▅▃▃▄▃▅▆▇▅▁▅▄▃▄▁▃▁▁▄▃▁▁▅▃▇▇ █
+      506 ns        Histogram: log(frequency) by time        769 ns <
+
+      Memory estimate: 592 bytes, allocs estimate: 12.
+
+      julia> @benchmark assoc(m, 170, 4)
+      BenchmarkTools.Trial: 10000 samples with 200 evaluations.
+      Range (min … max):  406.805 ns …   4.930 μs  ┊ GC (min … max): 0.00% … 84.87%
+      Time  (median):     425.055 ns               ┊ GC (median):    0.00%
+      Time  (mean ± σ):   435.945 ns ± 170.479 ns  ┊ GC (mean ± σ):  1.85% ±  4.23%
+
+      ▁▂▄▅███▇▄▂
+      ▁▁▁▁▂▃▄▅▇██████████▇▅▃▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▁▂▂▂▂▁▁▁▁▁▁▁▁▁ ▃
+      407 ns           Histogram: frequency by time          483 ns <
+
+      Memory estimate: 560 bytes, allocs estimate: 11.
+***** merge
+      I don't even want to talk about it
 * Ideas / devlog
 ** IO and events
    Something I really want to work out is having all IO being either input or

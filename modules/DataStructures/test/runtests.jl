@@ -4,6 +4,7 @@ using DataStructures
 import DataStructures as ds
 import DataStructures: conj, count, nodelength, vec, VectorLeaf, VectorNode, EmptyVector, Vector, sibling, vectornode, vectorleaf, depth, emptyhashmap, reduce, arraymapsizethreashold, conj!, zip, intoemptyvec, groupby
 
+import BenchmarkTools: @benchmark
 # TODO: Look into dev modules to separate these tests as the suite gets
 # larger. Not really a problem yet, but I have pasting files together.
 #
