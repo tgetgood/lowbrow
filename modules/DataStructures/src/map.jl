@@ -15,7 +15,7 @@ function val(x::MapEntry)
   x.value
 end
 
-function Base.:(==)(x::MapEntry{K, V}, y::MapEntry{K, V}) where {K, V}
+function Base.:(==)(x::MapEntry, y::MapEntry)
   x.key == y.key && x.value == y.value
 end
 
@@ -85,7 +85,7 @@ rest(s::HashSeq) = HashSeq(s.hash, s.current + 1)
 
 # This is a kludge. These hashes need to be cached somehow or they'll kill all
 # hope of performance.
-nth(h::HashSeq, n) = first(HashSeq(h.hash, h.current+n))
+nth(h::HashSeq, n) = first(HashSeq(h.hash, h.current+n-1))
 
 ##### General methods
 
@@ -273,8 +273,8 @@ function getindexed(m::EmptyMap, k)
 end
 
 Base.:(==)(x::EmptyMap, y::EmptyMap) = true
-Base.:(==)(x::EmptyMap, y::Map) = false
-Base.:(==)(x::Map, y::EmptyMap) = false
+Base.:(==)(x::EmptyMap, y::Map) = emptyp(y)
+Base.:(==)(x::Map, y::EmptyMap) = emptyp(x)
 
 ##### Array Maps
 
@@ -399,7 +399,7 @@ function seq(m::PersistentArrayMap)
   vec(getfield(m, :kvs))
 end
 
-# These have limited size, so the simplicity of this method trumps efficiency
+# TODO: This is too slow.
 merge(x::PersistentArrayMap, y::PersistentArrayMap) = into(x, y)
 
 # REVIEW: This is n^2, but could be n*log(n) if we sorted and iterated. However,
@@ -431,6 +431,23 @@ end
   else
     get(m, k)
   end
+end
+
+function get(m::PersistentHashMap, k, default=nothing)
+  h = hashseq(k)
+  getinternal(m.root, k, h, default)
+end
+
+function getinternal(m::PersistentHashNode, k, hs, default)
+  getinternal(m.ht[first(hs) + 1], k, rest(hs), default)
+end
+
+function getinternal(m::MapEntry, k, hs, default)
+  ifelse(m.key == k, m.value, default)
+end
+
+function getinternal(m::EmptyMarker, k, hs, default)
+  default
 end
 
 function getindexed(m::MapEntry, k, default, l)
@@ -516,15 +533,13 @@ function merge(x::PersistentHashMap, y::PersistentHashMap)
   PersistentHashMap(addtomap(x.root, y.root, 1))
 end
 
-merge(x::PersistentArrayMap, y::PersistentHashMap ) = into(y, x)
+# TODO: Make merge reasonably fast. There's way too much throwaway allocation
+# from using `into` naively.
+merge(x::PersistentArrayMap, y::PersistentHashMap) = into(y, x)
 merge(x::PersistentHashMap,  y::PersistentArrayMap) = into(x, y)
 
 merge() = emptymap
 
-# TODO: There's a more efficient way to merge N hashmaps in one downward
-# pass. Currently I'm not seeing merge performance as any kind of bottleneck,
-# but this is the kind of thing a more mature datastructures lib would think
-# about.
 merge(xs::Map...) = reduce(merge, xs)
 
 function mergewith(f, m1, m2)
@@ -586,10 +601,13 @@ function Base.:(==)(x::PersistentArrayMap, y::PersistentHashMap)
 end
 
 function Base.:(==)(x::PersistentHashMap, y::PersistentArrayMap)
-  if count(x) !== count(y)
+  if count(x) != count(y)
     return false
   else
-    every(k -> get(x, k) == get(y, k), keys(y))
+    # REVIEW: Maps shouldn't contain `nothing` as a value, but I'm not guarding
+    # against it properly...
+    notfound = gensym()
+    every(e -> get(x, e.key, notfound) == e.value, getfield(y, :kvs))
   end
 end
 
