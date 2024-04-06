@@ -978,7 +978,7 @@
 ***** merge
       I don't even want to talk about it
 *** Typed Map Entries
-    Just make MapEntry, MapEntry{K, V}
+    Just make MapEntry, MapEntry{K, V}. That's enough for substantial gain.
 **** arraymap get
      BenchmarkTools.Trial: 10000 samples with 998 evaluations.
      Range (min … max):  14.519 ns … 29.069 ns  ┊ GC (min … max): 0.00% … 0.00%
@@ -1073,6 +1073,34 @@
 
      Now that could mean that my previous impl was just bad, which is
      possible. I'm still learning the language, after all.
+**** hashmap get
+     We get a small improvement here as well. Likely due to fewer loads.
+
+     julia> @benchmark get(m, 1)
+     BenchmarkTools.Trial: 10000 samples with 540 evaluations.
+     Range (min … max):  209.781 ns …  1.502 μs  ┊ GC (min … max): 0.00% … 77.25%
+     Time  (median):     214.631 ns              ┊ GC (median):    0.00%
+     Time  (mean ± σ):   217.030 ns ± 35.088 ns  ┊ GC (mean ± σ):  0.51% ±  2.64%
+
+     ▁▃▃▅▆▇████▇▅▃▁     ▁▁▁                   ▁▂▂▁▁▁▁▁        ▃
+     ▂▂▅█████████████████▇██████▇▇▇▇▄▅▄▄▃▃▄▃▄▅▄▆▆▇█████████▇███▇▇ █
+     210 ns        Histogram: log(frequency) by time       234 ns <
+
+     Memory estimate: 96 bytes, allocs estimate: 4.
+
+     julia> @benchmark get(m, 31)
+     BenchmarkTools.Trial: 10000 samples with 560 evaluations.
+     Range (min … max):  207.234 ns …  1.605 μs  ┊ GC (min … max): 0.00% … 84.26%
+     Time  (median):     214.994 ns              ┊ GC (median):    0.00%
+     Time  (mean ± σ):   218.012 ns ± 41.303 ns  ┊ GC (mean ± σ):  0.60% ±  2.74%
+
+     ▁▂██▆▃▄▃
+     ▂▁▁▁▂▂▃▃▄▇██████████▇▅▄▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂ ▃
+     207 ns          Histogram: frequency by time          238 ns <
+
+     Memory estimate: 96 bytes, allocs estimate: 4.
+
+     Note, I haven't gone back and rewritten hashmap get to not allocate.
 * Ideas / devlog
 ** IO and events
    Something I really want to work out is having all IO being either input or
