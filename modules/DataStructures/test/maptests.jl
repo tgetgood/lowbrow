@@ -188,9 +188,22 @@ function mapbenchmarks()
   m1 = into(emptymap, partition(2), 1:16)
   m2 = into(emptymap, partition(2), 17:32)
   m3 = into(emptymap, partition(2), 9:22)
+  m4 = hashmap(:a, 1f0, :b, 2f0, :c, 1f2, :d, 1f-10)
+  m5 = hashmap(:a, 1, :b, 22, :c, 4, :d, 7)
 
-  @benchmark merge(m1, m2)
+  @benchmark merge(m1, m1)
+  @benchmark merge(m, m)
   @benchmark merge(m1, m3)
+  @benchmark merge(m1, m2)
+  @benchmark merge(m, m3)
+  @benchmark merge(m1, m2, m3)
+  @benchmark merge(merge(m1, m2), m3)
+
+  @benchmark merge(m1, m4)
+  @benchmark merge(m4, m3)
+  @benchmark merge(m1, m3, m4)
+  @benchmark merge(m1, m4, m3)
+  @benchmark merge(merge(m1, m4), m3)
 
   # hashmaps
   @benchmark into(emptyhashmap, partition(2), 1:16)

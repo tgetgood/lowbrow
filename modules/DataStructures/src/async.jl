@@ -33,13 +33,13 @@ pure.
 """
 function swap!(a::Atom, f, args...)
   i = 0
-  # REVIEW: is 2^8 too many tries before failing? Probably.
+  # REVIEW: is 2^16 too many tries before failing? Probably.
   # TODO: jl has a builtin ExponentialBackOff iterator. Use it.
 
   # REVIEW: Atoms don't need any coordination between threads. All we need to
   # know is that the call to replacefield! worked in *this* thread. So
   # :monotonic is correct. I'm almost certain of that statement...
-  while i < 2^8
+  while i < 2^16
     i += 1
     current = deref(a)
     next = f(current, args...)

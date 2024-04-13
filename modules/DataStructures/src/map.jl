@@ -98,14 +98,14 @@ end
 
 empty(m::Map) = emptymap
 
-count(m::EmptyMarker) = 0
-count(m::PersistentHashNode) = m.count
-count(m::MapEntry) = 1
-count(m::EmptyMap) = 0
-count(m::PersistentArrayMap) = length(getfield(m, :kvs))
-count(m::PersistentHashMap) = m.root.count
+@inline count(m::EmptyMarker) = 0
+@inline count(m::PersistentHashNode) = m.count
+@inline count(m::MapEntry) = 1
+@inline count(m::EmptyMap) = 0
+@inline count(m::PersistentArrayMap) = length(getfield(m, :kvs))
+@inline count(m::PersistentHashMap) = m.root.count
 
-emptyp(m::Map) = count(m) == 0
+@inline emptyp(m::Map) = count(m) == 0
 
 conj(m::Map, v::Vector) = conj(m, MapEntry(v[1], v[2]))
 
@@ -272,6 +272,8 @@ function getindexed(m::EmptyMap, k)
   nothing, :notfound
 end
 
+@inline containsp(m::EmptyMap, k) = false
+
 Base.:(==)(x::EmptyMap, y::EmptyMap) = true
 Base.:(==)(x::EmptyMap, y::Map) = emptyp(y)
 Base.:(==)(x::Map, y::EmptyMap) = emptyp(x)
@@ -288,6 +290,8 @@ end
 
 first(m::PersistentArrayMap) = getfield(m, :kvs)[1]
 
+eltype(m::PersistentArrayMap{K, V}) where {K, V} = MapEntry{K, V}
+
 """
 Returns the index of k within the underlying vector of arraymap m. 0 for not found.
 """
@@ -299,6 +303,10 @@ function getindex(m::PersistentArrayMap, k)
     end
   end
   return 0
+end
+
+@inline function containsp(m::PersistentArrayMap, k)
+  getindex(m, k) != 0
 end
 
 function get(m::PersistentArrayMap, k, default=nothing)
@@ -399,8 +407,108 @@ function seq(m::PersistentArrayMap)
   vec(getfield(m, :kvs))
 end
 
-# TODO: This is too slow.
-merge(x::PersistentArrayMap, y::PersistentArrayMap) = into(x, y)
+@inline function mapfromunique(kvs)
+  if length(kvs) <= arraymapsizethreashold
+    PersistentArrayMap(kvs)
+  else
+    throw("no fast hashmap constructor")
+    # fasthashmap(kvs)
+  end
+end
+
+function merge(x::PersistentArrayMap{K, V}, y::PersistentArrayMap{K, V}) where {K, V}
+  a, b = ifelse(count(x) < count(y), (x, y), (y, x))
+
+  vs = Base.Vector{MapEntry{K,V}}(undef, count(x) + count(y))
+
+  as = getfield(a, :kvs)
+  bs = getfield(b, :kvs)
+  for i in 1:count(a)
+    vs[i] = as[i]
+  end
+
+  i = count(a)
+
+  for e in bs
+    if containsp(a, e.key)
+      continue
+    else
+      i += 1
+      vs[i] = e
+    end
+  end
+
+  if i == length(vs)
+    ws = vs
+  else
+    ws = vs[1:i]
+  end
+
+  mapfromunique(ws)
+end
+
+# FIXME: There's too much repetition here.
+function merge(x::PersistentArrayMap{K, V}, y::PersistentArrayMap{L, W}) where {K, V, L, W}
+  a, b = ifelse(count(x) < count(y), (x, y), (y, x))
+
+  S = typejoin(K, L)
+  T = typejoin(V, W)
+
+  vs = Base.Vector{MapEntry{S,T}}(undef, count(x) + count(y))
+
+  as = getfield(a, :kvs)
+  bs = getfield(b, :kvs)
+
+  if eltype(a) == MapEntry{S,T}
+    for i in 1:count(a)
+      vs[i] = as[i]
+    end
+  else
+    for i in 1:count(a)
+      vs[i] = MapEntry{S,T}(as[i].key, as[i].value)
+    end
+  end
+
+  i = count(a)
+
+  if eltype(b) == MapEntry{S,T}
+    for e in bs
+      if containsp(a, e.key)
+        continue
+      else
+        i += 1
+        vs[i] = e
+      end
+    end
+  else
+    for e in bs
+      if containsp(a, e.key)
+        continue
+      else
+        i += 1
+        vs[i] = MapEntry{S,T}(e.key, e.value)
+      end
+    end
+  end
+
+  if i == length(vs)
+    ws = vs
+  else
+    ws = vs[1:i]
+  end
+
+  mapfromunique(ws)
+end
+
+# function merge(ms::PersistentArrayMap{K, V}...) where {K, V}
+#   vs = unique(vcat(Base.map(x -> getfield(x, :kvs), ms)...))
+
+#   if length(vs) <= arraymapsizethreashold
+#     PersistentArrayMap(vs)
+#   else
+#     into(emptymap, vs)
+#   end
+# end
 
 # REVIEW: This is n^2, but could be n*log(n) if we sorted and iterated. However,
 # in my basic benchmarks this takes ~70ns for maps of size 16 regardless of key

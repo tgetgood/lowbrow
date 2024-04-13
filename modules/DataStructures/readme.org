@@ -1073,6 +1073,30 @@
 
      Now that could mean that my previous impl was just bad, which is
      possible. I'm still learning the language, after all.
+**** arraymap merge
+     julia> @benchmark merge(m1, m2)
+     BenchmarkTools.Trial: 10000 samples with 10 evaluations.
+     Range (min … max):  1.549 μs … 198.823 μs  ┊ GC (min … max): 0.00% … 97.83%
+     Time  (median):     1.647 μs               ┊ GC (median):    0.00%
+     Time  (mean ± σ):   1.977 μs ±   4.571 μs  ┊ GC (mean ± σ):  5.55% ±  2.39%
+
+     ▂▆██▇▅▂                    ▁▁  ▁▂▂▁ ▁▂▂▂▁ ▁▂▃▁  ▁▁▁▁        ▂
+     ████████▅▅▆▆▆▆▆▆▆▄▄▅▇▇█▇▆████▇▇█████████████████████▇▇▇█▇▇▆ █
+     1.55 μs      Histogram: log(frequency) by time      3.15 μs <
+
+     Memory estimate: 2.84 KiB, allocs estimate: 43.
+
+     julia> @benchmark merge(m1, m3)
+     BenchmarkTools.Trial: 10000 samples with 10 evaluations.
+     Range (min … max):  1.307 μs … 253.757 μs  ┊ GC (min … max): 0.00% … 98.43%
+     Time  (median):     1.402 μs               ┊ GC (median):    0.00%
+     Time  (mean ± σ):   1.658 μs ±   4.784 μs  ┊ GC (mean ± σ):  5.69% ±  1.97%
+
+     ▃▆██▆▄▂                  ▁     ▂▂▁   ▁▂▃▂▁   ▂▂▂           ▂
+     ▇████████▆▄▅▄▄▅▄▅▅▇▅▄▄▂▄▅██▇▅▅▅█████▆▆████████████▇▆▇███▇▄▅ █
+     1.31 μs      Histogram: log(frequency) by time       2.6 μs <
+
+     Memory estimate: 2.08 KiB, allocs estimate: 38.
 **** hashmap get
      We get a small improvement here as well. Likely due to fewer loads.
 
@@ -1101,6 +1125,88 @@
      Memory estimate: 96 bytes, allocs estimate: 4.
 
      Note, I haven't gone back and rewritten hashmap get to not allocate.
+*** C style merge impl
+    Very dumb, but easy for compilers:
+
+    m = into(emptymap, partition(2), 1:32)
+    m1 = into(emptymap, partition(2), 1:16)
+    m2 = into(emptymap, partition(2), 17:32)
+    m3 = into(emptymap, partition(2), 9:22)
+
+    julia> @benchmark merge(m1, m1)
+    BenchmarkTools.Trial: 10000 samples with 954 evaluations.
+    Range (min … max):   95.862 ns … 582.558 ns  ┊ GC (min … max): 0.00% … 68.26%
+    Time  (median):     100.159 ns               ┊ GC (median):    0.00%
+    Time  (mean ± σ):   106.289 ns ±  39.240 ns  ┊ GC (mean ± σ):  3.29% ±  7.62%
+
+    █▇▄▁                                                          ▁
+    ████▇▄▃▄▄▄▃▃▃▅▄▃▅▃▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▅▆▇▇▅▄▃▃▁▁▃▁▃▁▁▃▁▁▃▁▃▁▁▃▅▆ █
+    95.9 ns       Histogram: log(frequency) by time        415 ns <
+
+    Memory estimate: 544 bytes, allocs estimate: 3.
+
+    julia> @benchmark merge(m, m)
+    BenchmarkTools.Trial: 10000 samples with 832 evaluations.
+    Range (min … max):  148.862 ns … 713.871 ns  ┊ GC (min … max): 0.00% … 57.10%
+    Time  (median):     153.909 ns               ┊ GC (median):    0.00%
+    Time  (mean ± σ):   161.659 ns ±  46.506 ns  ┊ GC (mean ± σ):  3.39% ±  8.29%
+
+    █▆▄▃▂                                                         ▁
+    █████▇▅▃▄▅▄▃▁▁▁▁▄▄▃▅▃▅▄▄▃▃▃▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▅▇█ █
+    149 ns        Histogram: log(frequency) by time        499 ns <
+
+    Memory estimate: 928 bytes, allocs estimate: 3.
+
+    julia> @benchmark merge(m1, m3)
+    BenchmarkTools.Trial: 10000 samples with 943 evaluations.
+    Range (min … max):  103.745 ns … 670.425 ns  ┊ GC (min … max): 0.00% … 56.68%
+    Time  (median):     108.247 ns               ┊ GC (median):    0.00%
+    Time  (mean ± σ):   112.871 ns ±  35.509 ns  ┊ GC (mean ± σ):  3.16% ±  7.60%
+
+    █▆▄▁                                                          ▁
+    ████▇▄▄▃▁▁▁▁▁▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▃▁▁▁▃▄▃▁▃▁▁▁▁▁▁▁▁▁▁▁▁▁▃▁▃▃▆ █
+    104 ns        Histogram: log(frequency) by time        424 ns <
+
+    Memory estimate: 560 bytes, allocs estimate: 3.
+
+    julia> @benchmark merge(m1, m2)
+    BenchmarkTools.Trial: 10000 samples with 966 evaluations.
+    Range (min … max):  81.285 ns … 583.220 ns  ┊ GC (min … max): 0.00% … 65.82%
+    Time  (median):     83.667 ns               ┊ GC (median):    0.00%
+    Time  (mean ± σ):   88.010 ns ±  31.063 ns  ┊ GC (mean ± σ):  2.58% ±  6.44%
+
+    ██▃ ▃▃▁                                                      ▂
+    ███████▇▄▅▅▁▁▁▁▁▁▁▁▁▁▁▁▁▃▁▁▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▇█▇▆ █
+    81.3 ns       Histogram: log(frequency) by time       215 ns <
+
+    Memory estimate: 352 bytes, allocs estimate: 2.
+
+    julia> @benchmark merge(m, m3)
+    BenchmarkTools.Trial: 10000 samples with 909 evaluations.
+    Range (min … max):  122.763 ns … 633.378 ns  ┊ GC (min … max): 0.00% … 64.58%
+    Time  (median):     126.142 ns               ┊ GC (median):    0.00%
+    Time  (mean ± σ):   133.789 ns ±  47.043 ns  ┊ GC (mean ± σ):  3.75% ±  8.52%
+
+    █▄▄                                                           ▁
+    ████▇▄▄▁▃▄▄▃▄▄▁▁▃▁▃▃▃▅▁▃▁▁▁▁▁▁▁▁▁▁▁▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▃▄▆▆▄▄▄▅▇▇ █
+    123 ns        Histogram: log(frequency) by time        459 ns <
+
+    Memory estimate: 800 bytes, allocs estimate: 3.
+
+    julia> @benchmark merge(m1, m2, m3)
+    BenchmarkTools.Trial: 10000 samples with 334 evaluations.
+    Range (min … max):  263.566 ns …   2.741 μs  ┊ GC (min … max): 0.00% … 87.55%
+    Time  (median):     278.329 ns               ┊ GC (median):    0.00%
+    Time  (mean ± σ):   292.044 ns ± 130.735 ns  ┊ GC (mean ± σ):  3.96% ±  7.42%
+
+    ▂▆█▇█▅▃▁▂▂▃▂▁                                                 ▂
+    ██████████████▇▆▅▆▆▆▅▅▃▃▃▄▄▄▃▁▁▁▃▁▁▁▁▁▁▁▃▄▃▁▁▁▄▁▃▁▃▁▃▁▃▃▃▃▃▄▃ █
+    264 ns        Histogram: log(frequency) by time        500 ns <
+
+    Memory estimate: 1.17 KiB, allocs estimate: 6.
+
+   Huge improvement (>20x). Curiously, using iterators, reduce, and vcat got me
+   only a 2x improvement. There's a lot of allocation going on there.
 * Ideas / devlog
 ** IO and events
    Something I really want to work out is having all IO being either input or
