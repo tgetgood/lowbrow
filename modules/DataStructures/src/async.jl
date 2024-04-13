@@ -17,7 +17,7 @@ end
 Doesn't necessarily set the atom. Check the return value.
 """
 function trycas!(a::Atom, current, next)
-  replacefield!(a, :value, current, next, :monotonic)
+  replacefield!(a, :value, current, next, :release, :acquire)
 end
 
 """

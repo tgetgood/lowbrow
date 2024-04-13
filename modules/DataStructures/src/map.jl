@@ -500,16 +500,6 @@ function merge(x::PersistentArrayMap{K, V}, y::PersistentArrayMap{L, W}) where {
   mapfromunique(ws)
 end
 
-# function merge(ms::PersistentArrayMap{K, V}...) where {K, V}
-#   vs = unique(vcat(Base.map(x -> getfield(x, :kvs), ms)...))
-
-#   if length(vs) <= arraymapsizethreashold
-#     PersistentArrayMap(vs)
-#   else
-#     into(emptymap, vs)
-#   end
-# end
-
 # REVIEW: This is n^2, but could be n*log(n) if we sorted and iterated. However,
 # in my basic benchmarks this takes ~70ns for maps of size 16 regardless of key
 # order (using Random.shuffle). That's suspicious, but I'm going to leave this
