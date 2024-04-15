@@ -3,6 +3,13 @@ mutable struct Atom
 end
 
 function deref(a::Atom)
+  # REVIEW: I'm pretty sure :monotonic is correct. All writes are coordinated,
+  # but the only guarantee when reading an atom is that you'll get a value that
+  # was valid at some time before (including) now.
+  #
+  # :acquire would ensure that we get a more recent value when there's a lot of
+  # write contention, but it could also reduce throughput. How does one go about
+  # testing that?
   getfield(a, :value, :monotonic)
 end
 
@@ -17,7 +24,7 @@ end
 Doesn't necessarily set the atom. Check the return value.
 """
 function trycas!(a::Atom, current, next)
-  replacefield!(a, :value, current, next, :release, :acquire)
+  replacefield!(a, :value, current, next, :acquire_release)
 end
 
 """
@@ -35,10 +42,6 @@ function swap!(a::Atom, f, args...)
   i = 0
   # REVIEW: is 2^16 too many tries before failing? Probably.
   # TODO: jl has a builtin ExponentialBackOff iterator. Use it.
-
-  # REVIEW: Atoms don't need any coordination between threads. All we need to
-  # know is that the call to replacefield! worked in *this* thread. So
-  # :monotonic is correct. I'm almost certain of that statement...
   while i < 2^16
     i += 1
     current = deref(a)
@@ -52,7 +55,7 @@ function swap!(a::Atom, f, args...)
 end
 
 function reset!(a::Atom, value)
-  setfield!(a, :value, value, :monotonic)
+  setfield!(a, :value, value, :release)
 end
 
 ##### Julia Channels
