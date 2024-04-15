@@ -144,7 +144,7 @@ function qp(system)
     # N.B.: The order of the returned counters is from low bit to high bit of
     # this bitmask.
     pipeline_statistics=vk.QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
-    vk.QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT
+                        vk.QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT
   ))
 end
 
@@ -292,10 +292,9 @@ function main()
 
   ## Render loop
   framecounter::UInt32 = 0
-  itercount::UInt32 = 2^5
+  itercount::UInt32 = 2^8
 
   new = true
-  current_frame = []
 
   # FIXME: hardcoded window size
   w::Tuple{UInt32,UInt32} = (1024, 1024)
@@ -305,69 +304,79 @@ function main()
     :indexbuffer, ib
   )
 
-  # while true
-  for i in 1:3
-    window.poll()
-    framecounter += 1
-
-    # sleep(0.1)
-    if new || current_frame === ds.emptymap
-      # @info "new"
-      @info coords
-      framecounter = 1
-
-      ijoin = tp.run(pipelines.bufferinit, ([], topcs(w, coords)))
-      current_frame = take!(ijoin)
-
-      # ex = fromdevicelocal(system, Pixel, current_frame[1])
-
-      new = false
-    end
-
-    sep = tp.run(pipelines.separator, (current_frame, [(w[1], w[2], itercount)]))
-
-    # @info framecounter
-    gjoin = tp.run(pipelines.render, ds.assoc(renderstate,
-      :pushconstants, [(w[1], w[2], UInt32(framecounter*itercount))],
-      :bindings, current_frame
-    ))
-
-    # Check for updated inputs.
-    #
-    # This is way too pedantic, there has to be a cleaner way to talk about such
-    # a common pattern.
-    ctemp = take!(viewstate)
-    new = ctemp !== coords
-    coords = ctemp
-    # wtemp = window.size(w)
-    # new = new || wtemp != winsize
-    # winsize = wtemp
-
-    sig = take!(gjoin)
-    if sig === :closed
-      break
-    elseif sig === :skip
-      sleep(0.08)
-    else
-      next_frame = take!(sep)
-      Threads.@spawn begin
-        try
-          Sync.wait_semaphores(system.device, vcat([sig], next_frame[1].wait))
-          finalize(current_frame)
-          # @info "discard"
-        catch e
-          ds.handleerror(e)
-        end
+  try
+    while true
+      window.poll()
+      if window.closep(system.window)
+        break
       end
 
-      current_frame = next_frame
+      framecounter += 1
+
+      if new
+        new = false
+        @info coords
+        framecounter = 1
+
+        ijoin = tp.run(pipelines.bufferinit, ([], topcs(w, coords)))
+        blank_frame = take!(ijoin)
+
+        # ex = fromdevicelocal(system, Pixel, blank_frame[1])
+
+        render_frame = take!(tp.run(
+          pipelines.separator, (blank_frame, [(w[1], w[2], itercount)])
+        ))
+
+        # @info framecounter
+        gjoin = tp.run(pipelines.render, ds.assoc(renderstate,
+          :pushconstants, [(w[1], w[2], UInt32(framecounter * itercount))],
+          :bindings, render_frame
+        ))
+
+        # TODO: Doing this via reference counting is 100% feasible. So why aren't I?
+        Sync.freeafter(
+          system.device, reduce(vcat, map(x -> x.wait, render_frame)),
+          blank_frame
+        )
+
+        sig = take!(gjoin)
+        if sig === :closed
+          # FIXME: This is pretty ugly.
+          throw("finished")
+        elseif sig === :skip
+          sleep(0.08)
+        else
+          Sync.freeafter(system.device, [sig], render_frame)
+        end
+
+      else
+        # Check for updated inputs twice per frame.
+        # REVIEW: How does this trade latency against wasting cpu power?
+        sleep(0.08)
+
+        # This is way too pedantic, there has to be a cleaner way to talk about such
+        # a common pattern.
+        ctemp = take!(viewstate)
+        new = ctemp !== coords
+        coords = ctemp
+
+        # FIXME: Window resizing is deeply busted atm.
+        # wtemp = window.size(w)
+        # new = new || wtemp != winsize
+        # winsize = wtemp
+      end
     end
+  catch e
+    if e != "finished"
+      @error e
+    end
+  finally
+    # This isn't so bad on exit, is it?
+    vk.device_wait_idle(system.device)
+    ds.mapvals(tp.teardown, pipelines)
+    window.shutdown()
+    GC.gc()
   end
-
-  ds.mapvals(tp.teardown, pipelines)
-  window.shutdown()
-  GC.gc()
 end
-
 
 main()

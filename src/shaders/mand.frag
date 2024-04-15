@@ -66,24 +66,24 @@ void main() {
 
   Pixel p = pixels[n];
 
-  // uint c = pixels[n].count;
+  uint c = pixels[n].count;
   // uint c = pcs.count;
 
   // if (c < 100000) {
   //   discard;
   // }
 
-  // float r = float((c&0xff0000)>>16)/255.0;
-  // float g = float((c&0xff00)>>8)/255.0;
-  // float b = float(c&255)/255.0;
+  float r = float((c&0xff0000)>>16)/255.0;
+  float g = float((c&0xff00)>>8)/255.0;
+  float b = float(c&255)/255.0;
 
   // outColour = vec4(pixels[n].mu, 0.0, 1.0);
-  // outColour = vec4(0.0, 0.0, float(c)/float(pcs.count), 1.0);
-  // outColour = vec4(r,g,b, 1.0);
+  // outColour = vec4(0.0, 0.0, floatConstruct(c), 1.0);
+  outColour = vec4(r,g,b, 1.0);
 
-  if (p.done == 1) {
-    outColour = vec4(1.0, 1.0, 1.0, 1.0);
-  } else {
-    outColour = vec4(0.0, 0.0, 0.0, 1.0);
-  }
+  // if (p.done == 1) {
+  //   outColour = vec4(1.0, 1.0, 1.0, 1.0);
+  // } else {
+  //   outColour = vec4(0.0, 0.0, 0.0, 1.0);
+  // }
 }
