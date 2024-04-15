@@ -159,6 +159,10 @@ function draw(system, gqueue, pqueue, cmd, dset, renderstate)
 
     sig = Sync.ssi(dev)
 
+    bwait = ds.into!(
+      [], map(x -> get(x, :wait, [])) ∘ ds.cat(), renderstate.bindings
+    )
+
     vwait = ds.getin(renderstate, [:vertexbuffer, :wait], [])
 
     imagewait = vk.SemaphoreSubmitInfo(
@@ -167,7 +171,7 @@ function draw(system, gqueue, pqueue, cmd, dset, renderstate)
     )
 
     submission = vk.SubmitInfo2(
-      ds.conj(vwait, imagewait),
+      vcat(bwait, vwait, [imagewait]),
       [vk.CommandBufferSubmitInfo(get(cmd, :commandbuffer), 0)],
       [vk.SemaphoreSubmitInfo(rendersem, 0, 0), sig]
     )
