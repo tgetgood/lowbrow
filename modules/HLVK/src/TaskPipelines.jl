@@ -145,6 +145,9 @@ function record(cb, p::TransferPipeline, wait=[], signal=[])
 
 end
 
+function teardown(p::TransferPipeline)
+end
+
 ################################################################################
 ##### Compute Pipelines
 ################################################################################
@@ -162,9 +165,6 @@ struct LeakyAllocator <: PipelineAllocator
   cmdsbuffs
   outputs
   semaphores
-end
-
-function teardown(p::TransferPipeline)
 end
 
 function teardown(p::AsyncPipeline)

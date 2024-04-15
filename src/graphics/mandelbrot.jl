@@ -341,8 +341,7 @@ function main()
 
         sig = take!(gjoin)
         if sig === :closed
-          # FIXME: This is pretty ugly.
-          throw("finished")
+          break
         elseif sig === :skip
           sleep(0.08)
         else
@@ -365,10 +364,6 @@ function main()
         # new = new || wtemp != winsize
         # winsize = wtemp
       end
-    end
-  catch e
-    if e != "finished"
-      @error e
     end
   finally
     # This isn't so bad on exit, is it?
