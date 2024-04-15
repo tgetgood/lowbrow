@@ -411,8 +411,8 @@ end
   if length(kvs) <= arraymapsizethreashold
     PersistentArrayMap(kvs)
   else
-    throw("no fast hashmap constructor")
-    # fasthashmap(kvs)
+    # TODO: This can be made a lot faster.
+    into(emptyhashmap, kvs)
   end
 end
 
