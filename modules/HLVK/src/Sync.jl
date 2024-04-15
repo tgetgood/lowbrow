@@ -1,5 +1,7 @@
 module Sync
 
+import ..Helpers: thread
+
 import Vulkan as vk
 import DataStructures as ds
 
@@ -41,6 +43,15 @@ function wait_semaphores(
     ),
     timeout
   )
+end
+
+function freeafter(device, sems, resources...)
+  thread() do
+    Sync.wait_semaphores(device, sems)
+    for r in resources
+      finalize(r)
+    end
+  end
 end
 
 end
