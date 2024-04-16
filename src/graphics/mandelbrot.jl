@@ -326,6 +326,7 @@ function main()
           pipelines.separator, (blank_frame, [(w[1], w[2], itercount)])
         ))
 
+        # TODO: Doing this via reference counting is 100% feasible. So why aren't I?
         Sync.freeafter(
           system.device, reduce(vcat, map(x -> x.wait, current_frame)),
           blank_frame
@@ -343,7 +344,6 @@ function main()
         ))
 
         next_frame = take!(cjoin)
-        # TODO: Doing this via reference counting is 100% feasible. So why aren't I?
 
         sig = take!(gjoin)
         if sig === :closed
