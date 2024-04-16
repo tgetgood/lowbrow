@@ -291,8 +291,8 @@ function main()
 
   ## Render loop
   framecounter::UInt32 = 0
-  itercount::UInt32 = 2^10
-  maxframes::UInt32 = 2^0
+  itercount::UInt32 = 2^6
+  maxframes::UInt32 = 2^24
 
   new = true
   current_frame = []
@@ -308,6 +308,7 @@ function main()
   try
     while true
       window.poll()
+      sleep(0.01)
       if window.closep(system.window)
         break
       end
@@ -325,7 +326,8 @@ function main()
           pipelines.separator, (blank_frame, [(w[1], w[2], itercount)])
         ))
 
-        # TODO: Doing this via reference counting is 100% feasible. So why aren't I?
+        # TODO: Doing this via reference counting is 100% feasible. So why
+        # aren't I?
         Sync.freeafter(
           system.device, reduce(vcat, map(x -> x.wait, current_frame)),
           blank_frame
@@ -382,3 +384,15 @@ function main()
 end
 
 main()
+
+# Known bugs:
+#
+# coroutine starvation: eventually, the iter compute task pipeline stalls and
+# the whole app hangs
+#
+# Zoom is not centred correctly around cursor position
+#
+# colours are kind of wonky (inconsistent)
+#
+# The swapchain replacement segfault is really starting to kill the interactive
+# experience.

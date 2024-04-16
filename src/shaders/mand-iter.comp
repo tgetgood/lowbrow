@@ -56,6 +56,8 @@ void main() {
       }
 
       pixelsOut[n] = Pixel(done, count, mu, z);
+    } else {
+      pixelsOut[n] = p;
     }
   }
 }
