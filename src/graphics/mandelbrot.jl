@@ -292,9 +292,11 @@ function main()
 
   ## Render loop
   framecounter::UInt32 = 0
-  itercount::UInt32 = 2^8
+  itercount::UInt32 = 2^16
+  maxframes::UInt32 = 2^0
 
   new = true
+  current_frame = []
 
   # FIXME: hardcoded window size
   w::Tuple{UInt32,UInt32} = (1024, 1024)
@@ -315,29 +317,33 @@ function main()
 
       if new
         new = false
-        @info coords
         framecounter = 1
+        @info coords
 
-        ijoin = tp.run(pipelines.bufferinit, ([], topcs(w, coords)))
-        blank_frame = take!(ijoin)
+        blank_frame = take!(tp.run(pipelines.bufferinit, ([], topcs(w, coords))))
 
-        # ex = fromdevicelocal(system, Pixel, blank_frame[1])
-
-        render_frame = take!(tp.run(
+        current_frame = take!(tp.run(
           pipelines.separator, (blank_frame, [(w[1], w[2], itercount)])
         ))
 
-        # @info framecounter
-        gjoin = tp.run(pipelines.render, ds.assoc(renderstate,
-          :pushconstants, [(w[1], w[2], UInt32(framecounter * itercount))],
-          :bindings, render_frame
-        ))
-
-        # TODO: Doing this via reference counting is 100% feasible. So why aren't I?
         Sync.freeafter(
-          system.device, reduce(vcat, map(x -> x.wait, render_frame)),
+          system.device, reduce(vcat, map(x -> x.wait, current_frame)),
           blank_frame
         )
+      end
+
+      if framecounter <= maxframes
+        cjoin = tp.run(
+          pipelines.separator, (current_frame, [(w[1], w[2], itercount)])
+        )
+
+        gjoin = tp.run(pipelines.render, ds.assoc(renderstate,
+          :pushconstants, [(w[1], w[2], UInt32(framecounter * itercount))],
+          :bindings, current_frame
+        ))
+
+        next_frame = take!(cjoin)
+        # TODO: Doing this via reference counting is 100% feasible. So why aren't I?
 
         sig = take!(gjoin)
         if sig === :closed
@@ -345,25 +351,27 @@ function main()
         elseif sig === :skip
           sleep(0.08)
         else
-          Sync.freeafter(system.device, [sig], render_frame)
+          Sync.freeafter(
+            system.device,
+            ds.into!([sig], map(x -> get(x, :wait, [])) ∘ ds.cat(), next_frame),
+            current_frame
+          )
+          current_frame = next_frame
         end
-
       else
-        # Check for updated inputs twice per frame.
-        # REVIEW: How does this trade latency against wasting cpu power?
         sleep(0.08)
-
-        # This is way too pedantic, there has to be a cleaner way to talk about such
-        # a common pattern.
-        ctemp = take!(viewstate)
-        new = ctemp !== coords
-        coords = ctemp
-
-        # FIXME: Window resizing is deeply busted atm.
-        # wtemp = window.size(w)
-        # new = new || wtemp != winsize
-        # winsize = wtemp
       end
+
+      # This is way too pedantic, there has to be a cleaner way to talk about such
+      # a common pattern.
+      ctemp = take!(viewstate)
+      new = ctemp !== coords
+      coords = ctemp
+
+      # FIXME: Window resizing is deeply busted atm.
+      # wtemp = window.size(w)
+      # new = new || wtemp != winsize
+      # winsize = wtemp
     end
   finally
     # This isn't so bad on exit, is it?
