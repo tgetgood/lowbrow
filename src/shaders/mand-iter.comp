@@ -52,7 +52,7 @@ void main() {
           break;
         }
         z = vec2(zrs - zis - mu[0], 2.0*z[0]*z[1] - mu[1]);
-        count += 1;
+        count++;
       }
 
       pixelsOut[n] = Pixel(done, count, mu, z);
