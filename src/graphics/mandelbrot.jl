@@ -265,9 +265,8 @@ function main()
     ds.interleave(es.getstreams(:position, :scroll))
   )
 
-
   viewport = ds.stream(
-    ds.scan(viewframe, ds.hashmap(:zoom, -70, :offset, (-0.5, -0.5))),
+    ds.scan(viewframe, ds.hashmap(:zoom, -70, :offset, (-0.25, -0.5))),
     ds.interleave(ds.hashmap(:scroll, zoom, :drag, drag))
   )
 
@@ -292,7 +291,7 @@ function main()
 
   ## Render loop
   framecounter::UInt32 = 0
-  itercount::UInt32 = 2^16
+  itercount::UInt32 = 2^10
   maxframes::UInt32 = 2^0
 
   new = true

@@ -97,7 +97,7 @@ end
 function mouseposcb(w, x, y)
   try
     s = size(w)
-    events.mousepositionupdate((x / s.width, y / s.height) .* 2 .- 1)
+    events.mousepositionupdate((x / s.width, y / s.height) .* -2 .+ 1)
   catch e
     ds.handleerror(e)
   end
