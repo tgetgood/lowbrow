@@ -1,4 +1,4 @@
-import Glfw as window
+import UI.Glfw as window
 
 import HLVK.hardware as hw
 import HLVK.Commands
@@ -68,7 +68,6 @@ prog = hashmap(
   :vulkan_req, ds.hashmap(
     :version, v"1.3"
   ),
-  # TODO: Rectify this :device/:device_req split
   :device, ds.hashmap(
     :features, ds.hashmap(
       v"1.2", ds.set(:timeline_semaphore),

@@ -4,16 +4,16 @@ import HLVK.TaskPipelines as tp
 import HLVK.vertex
 import HLVK.Sync
 
-import Glfw as window
-import eventsystem as es
-import mouse
+import UI.Glfw as window
+import UI.eventsystem as es
+import UI.mouse as mouse
 import HLVK.Commands: fromdevicelocal
 
-# For development
+import DataStructures as ds
+
+# For development only
 import Vulkan as vk
 import Vulkan.LibVulkan as lv
-
-import DataStructures as ds
 
 struct Vertex
   position::NTuple{2,Float32}

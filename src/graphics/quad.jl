@@ -1,6 +1,5 @@
 ##### Simple rendered quadrilateral example.
-
-import Glfw as window
+import UI.Glfw as window
 
 import HLVK.init
 import HLVK.vertex

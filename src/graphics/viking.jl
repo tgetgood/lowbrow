@@ -1,4 +1,4 @@
-import Glfw as window
+import UI.Glfw as window
 
 import HLVK.uniform
 import HLVK.model

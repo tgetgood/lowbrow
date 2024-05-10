@@ -4,7 +4,7 @@ import Vulkan as vk
 import GLFW.GLFW as glfw
 import DataStructures as ds
 
-import eventsystem as events
+import ..eventsystem as events
 
 function size(window)
   glfw.GetFramebufferSize(window)
@@ -134,6 +134,7 @@ function window(name, config)
   window, resized(ch)
 end
 
+# FIXME: This module has Vulkan as a dependency because of this one function.
 function surface(instance, window)
   # REVIEW: GLFW creates a valid VK_KHR_Surface and returns a raw C pointer to it.
   # The jl vulkan wrapper I'm using needs a managed object, so I need to create

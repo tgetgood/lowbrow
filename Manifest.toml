@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.2"
+julia_version = "1.10.3"
 manifest_format = "2.0"
-project_hash = "96387d5153f891bbf38d19c26058b44d044b039d"
+project_hash = "41a7fb11c0935ba0bf421167b0125ae13b066c2c"
 
 [[deps.AbstractTrees]]
 git-tree-sha1 = "2d9c9a55f9c93e8887ad391fbae72f8ef55e1177"
@@ -148,7 +148,7 @@ weakdeps = ["Dates", "LinearAlgebra"]
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.1.0+0"
+version = "1.1.1+0"
 
 [[deps.CompositionsBase]]
 git-tree-sha1 = "802bb88cd69dfd1509f6670416bd4434015693ad"
@@ -894,6 +894,16 @@ weakdeps = ["Random", "Test"]
 
     [deps.TranscodingStreams.extensions]
     TestExt = ["Test", "Random"]
+
+[[deps.UI]]
+path = "modules/UI"
+uuid = "c2f10eda-9c24-4d96-bf9e-fd1f9619da91"
+version = "0.1.0"
+
+    [deps.UI.deps]
+    DataStructures = "5b4e18e7-32b5-4e80-a6f6-a40e821bb4ab"
+    GLFW = "f7f18e0c-5ee9-5ccd-a5bf-e8befd85ed98"
+    Vulkan = "9f14b124-c50e-4008-a7d4-969b3a6cd68a"
 
 [[deps.URIs]]
 git-tree-sha1 = "67db6cc7b3821e19ebe75791a9dd19c9b1188f2b"
