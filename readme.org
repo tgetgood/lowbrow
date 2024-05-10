@@ -47,8 +47,6 @@ all over the place. I'm alergic to =include= statements.
     # Run a demo
     include("src/graphics/quad.jl")
 
-    # Run tests
-    Pkg.test()
   #+END_SRC
 
   Running a demo will create a window. Closing that window will break out of the
