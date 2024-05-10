@@ -4,21 +4,65 @@ The name comes from the fact that I was going to play with writing a toy
 browser. It has since gone in several very different directions, all of which
 are tending to lower and lower levels.
 
-DataStructures is a persistent data structure library (mostly a partial copy of
-Clojure's data structures). The initial implementation worked well but performed
-abysmally, recent rewrites have improved things, but performance is acceptable
-at best. This subproject alternates between developing the language I want to
-program a game engine in and low level fiddling to make them fast enough to use
-in a game engine.
 
-HLVK (High Level Vulkan) is a toy game engine. It works, most of the time, and
-performs reasonably when working. The demos are all very simple, and there is an
-unbounded list of features that are useful, or would be informative to
-implement.
+modules/DataStructures is a persistent data structure library (mostly a partial
+copy of Clojure's data structures). The initial implementation worked well but
+performed abysmally, recent rewrites have improved things, but performance is
+acceptable at best. This subproject alternates between developing the language I
+want to program a game engine in and low level fiddling to make them fast enough
+to use in a game engine.
+
+modules/HLVK (High Level Vulkan) is a toy game engine. It works, most of the
+time, and performs reasonably when working. The demos are all very simple, and
+there is an unbounded list of features that are useful, or would be informative
+to implement.
 
 src/browser is the humblest beginnings of a working browser. It can fetch HTML
 and dump it to a terminal. That's about it. I didn't want to use GTK, and I've
 always wanted to learn Vulkan properly, so this hobby project took a hard turn.
+
+Internal modules are in the "modules" directory and included in the main project
+as dev dependencies. This isn't exactly idiomatic, but I'm still experimenting
+with ways modularise the code that doesn't involve =include= statements lying
+all over the place. I'm alergic to =include= statements.
+* Usage
+  Demos of the graphics portion are in the "src/graphics" folder. Each file has a
+  =main= entry point.
+
+  Note, you must have libglfw and libvulkan in your $LD_LIBRARY_PATH for julia
+  to find them. These are generally installed via your OS package manager as
+  GLFW and Vulkan respectively. I may one day bundle them, but not now.
+
+  To run one of the demos, run a julia repl and enter the following:
+
+  #+BEGIN_SRC julia
+    # First time project setup
+    import Pkg
+    Pkg.activate("./") # Assumes you're running the repl from project root.
+    Pkg.instantiate()
+
+    # Optional, takes a while but speeds up subsequent runs
+    Pkg.precompile()
+
+    # Run a demo
+    include("src/graphics/quad.jl")
+
+    # Run tests
+    Pkg.test()
+  #+END_SRC
+
+  Running a demo will create a window. Closing that window will break out of the
+  render loop and return control to the repl. You can thus use the same repl to
+  try different demos.
+
+  This initial JIT compile time is substantial, so do try and reuse the repl
+  whenever possible. I've briefly looked into profiling the compile time, but
+  can't find any useful information. That'll be an adventure when I get around
+  to it.
+
+  Warning: the cleanup code currently contains a race condition which sometimes
+  frees objects in the wrong order and causes a segfault. I apologise if that
+  ruins your morning. I'm looking into it.
 * Fail notes
 ** [2023-12-19 Tue]
    Just spent 20 minutes debugging a null pointer error through the mandlebrot
@@ -69,7 +113,7 @@ always wanted to learn Vulkan properly, so this hobby project took a hard turn.
    is not an issue yet, but it's not a hard thing to fix.
 
    Note: use VkBufferMemoryBarrier(2)
-** Embrace the VkRender struct :opt:
+** Embrace the VkRender struct                                         :opt:
    Having a fixed struct sort of violates my basic principle of accumulating
    state to create a uniform API.
 
