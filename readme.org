@@ -1,25 +1,28 @@
 #+TITLE: Bundle of Experiments
 
 The name comes from the fact that I was going to play with writing a toy
-browser. It has since gone in several very different directions.
+browser. It has since gone in several very different directions, all of which
+are tending to lower and lower levels.
 
-./modules/DataStructures contains a rewrite of the persistent datastructures
-— HAMTs and Hickey's vectors, mostly — from xprl, along with a transducers api
-intended for use both with those and julia channels; the end goal being to have
-a library to write functional UIs without the downsides of FRP (probably with
-its own downsides). This ought to me moved to its own repo.
+DataStructures is a persistent data structure library (mostly a partial copy of
+Clojure's data structures). The initial implementation worked well but performed
+abysmally, recent rewrites have improved things, but performance is acceptable
+at best. This subproject alternates between developing the language I want to
+program a game engine in and low level fiddling to make them fast enough to use
+in a game engine.
 
-./src/graphics contains a jumble of high level Vulkan wrappers and
-demos/examples to test them out. ./src/graphics/viking.jl &
-src/graphics/particles.jl run examples from vulkan-tutorial.com, whereas
-src/graphics/mandlebrot.jl runs an example of an interactive demo (using GLFW).
+HLVK (High Level Vulkan) is a toy game engine. It works, most of the time, and
+performs reasonably when working. The demos are all very simple, and there is an
+unbounded list of features that are useful, or would be informative to
+implement.
 
-src/browser is < 1% of a working browser. It can fetch HTML and dump it to a
-terminal. That's about it.
+src/browser is the humblest beginnings of a working browser. It can fetch HTML
+and dump it to a terminal. That's about it. I didn't want to use GTK, and I've
+always wanted to learn Vulkan properly, so this hobby project took a hard turn.
 * Fail notes
 ** [2023-12-19 Tue]
-   Just spent 20 minutes debugging a null pointer error through mandlebrot,
-   graphics, and hardware.
+   Just spent 20 minutes debugging a null pointer error through the mandlebrot
+   demo and HLVK.
 
    The core issue was that vk couldn't create a device because I wanted a
    feature that wasn't available on the hardware. That did not — and does not —
@@ -46,29 +49,19 @@ terminal. That's about it.
    Why? I have no idea. I suspect this is a half finished refactor.
 
    The real reason turns out to be keeping handles around to prevent GC. I need
-   to take charge of freeing vk objects eventually. But I'm resisting as long as
-   possible.
+   to take charge of freeing vk objects myself eventually. But I'm resisting as
+   long as possible.
 * To Do List
-** DONE Switch to Synchronization2
-   CLOSED: [2024-03-20 Wed 12:50]
-** wrap images to make transitions easier
+** wrap images to make transitions easier                       :ergonomics:
    Vulkan doesn't rememeber anything for you, which makes life unduly difficult.
-** DONE find some way to order queue submissions
-   CLOSED: [2024-03-20 Wed 12:50]
-   - Note taken on [2024-03-20 Wed 12:50] \\
-     wrapping pipelines in tasks that can only be communicated with via channels,
-     combined with wrapping buffers with semaphores indicating when they'll be safe
-     to read seems to work pretty well.
+** fix resizing                                                        :bug:
+   Segfault when shrinking windows. Resizing is just disabled at present.
+** Segfault on complete teardown and recreation                        :bug:
+   Specifically the swapchain destructor segfaults.
 
-     Of course there's still a memory leak in the well named "LeakyAllocator" to fix.
-
-     Lots to do.
-   Manually juggling semaphores is error prone and just feels wrong. What we
-   need is a way to establish finish-before-start relations, topologically sort
-   those, and then automate the barriers/semaphores/fences
-** fix resizing bug
-   "bug" being segfault when shrinking windows.
-** exclusive buffers
+   Almost never the first time, but always within 5 or 6 tries. Handles aren't
+   being freed in the correct order most likely.
+** exclusive buffers                                                   :opt:
    currently images are generally sharing mode exclusive and there's transition
    logic to load them then hand them off to graphics. It's not bad.
 
@@ -76,7 +69,7 @@ terminal. That's about it.
    is not an issue yet, but it's not a hard thing to fix.
 
    Note: use VkBufferMemoryBarrier(2)
-** Embrace the VkRender struct
+** Embrace the VkRender struct :opt:
    Having a fixed struct sort of violates my basic principle of accumulating
    state to create a uniform API.
 
@@ -94,3 +87,13 @@ terminal. That's about it.
    The dream is to be able to spot maps with stable structure and transform them
    into structs as part of jit compilation. This is probably only really useful
    in hotspots, but would be a really cool optimisation to pull off.
+** Deadlock in mandlebrot example                                      :bug:
+   When interacting with the graphic long enough, eventually the return channel
+   from the compute pipeline never receives a value and the render loop hangs.
+
+   No errors appear to happen on any of the threads, though I could be failing
+   to catch something.
+** Mesh Shader Example                                                 :demo:
+** Ray Tracing Example                                                 :demo:
+* Copyright
+  © 2024 Thomas Getgood
