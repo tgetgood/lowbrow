@@ -9,8 +9,8 @@ modules/DataStructures is a persistent data structure library (mostly a partial
 copy of Clojure's data structures). The initial implementation worked well but
 performed abysmally, recent rewrites have improved things, but performance is
 acceptable at best. This subproject alternates between developing the language I
-want to program a game engine in and low level fiddling to make them fast enough
-to use in a game engine.
+want to program a game in and low level fiddling to make it fast enough to use
+in a game engine.
 
 modules/HLVK (High Level Vulkan) is a toy game engine. It works, most of the
 time, and performs reasonably when working. The demos are all very simple, and
