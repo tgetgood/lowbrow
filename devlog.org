@@ -1,0 +1,37 @@
+Log of choices and interesting events.
+
+I'm not very thorough at keeping these, but if what's here prevents a future
+mistake, it will have proven worthwhile.
+
+* Fail notes
+** [2023-12-19 Tue]
+   Just spent 20 minutes debugging a null pointer error through the mandlebrot
+   demo and HLVK.
+
+   The core issue was that vk couldn't create a device because I wanted a
+   feature that wasn't available on the hardware. That did not — and does not —
+   cause any error. In fact, none of the checks in hardware.checkdevice trigger
+   any sort of error, they just return null.
+
+   The null also propagated up through pdevice and caused the npe in
+   createdevice when it tried to read out the queues.
+
+   Possible solution: have `checkdevice` take a map of tests and return a map of
+   results. Then, when a device is rejected, we have a clear reason why.
+
+   Better solution: Finally refactored the entire hardware negotiation system to
+   actually negotiate, that is, pass in a data description of what you want, get
+   back a data description of what's possible on the hardware, decide whether to
+   go ahead or abort. This is nice in that it allows the programmer to initially
+   ask the impossible without crashing the system (so long as they don't
+   actually try to do it), and then back off until they meet the hardware
+   somewhere in the middle. When that's actually possible, of course.
+** [2023-12-19 Tue 22:47]
+   Bug involving descriptorsets not being set properly comes down to a magic
+   line of code where I merge config with one of its submaps.
+
+   Why? I have no idea. I suspect this is a half finished refactor.
+
+   The real reason turns out to be keeping handles around to prevent GC. I need
+   to take charge of allocating and freeing vk objects myself eventually. But
+   I'm resisting as long as possible.
