@@ -445,6 +445,18 @@ function graphicspipeline(system, config)
         end
       end
       @info "Average fps: " * string(round(framecounter / (time() - t)))
+      # TODO: I'm not sure if this fixes the finaliser segfault, but now I'm
+      # having trouble replicating whereas it was pretty consistent previously.
+      #
+      # It doesn't make a lot of sense though, because the problem should have
+      # been that the swapchain was being freed before everything else. Maybe it
+      # was just to framebuffers?
+      # map(finalize, [
+      #   dsets,
+      #   commandpool,
+      #   system.framebuffers,
+      #   system.swapchain,
+      # ])
     catch e
       print(stderr, "\n Error in pipeline thread: " * string(name) * "\n")
       ds.handleerror(e)

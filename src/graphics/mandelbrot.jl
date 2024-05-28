@@ -59,7 +59,7 @@ prog = ds.hashmap(
       :inputassembly, ds.hashmap(
         :topology, :triangles
       ),
-      # FIXME: push constants must be at least 16 bytes.
+      # Push constants must be at least 16 bytes.
       # Is it because of glsl 16 byte alignment?
       # But why does 12 fail and 20 seem to work?
       # FIXME: Asymmetry here: list of pcs in graphics, single map in compute.
@@ -375,9 +375,12 @@ function main()
       # winsize = wtemp
     end
   finally
-    # This isn't so bad on exit, is it?
+    # Block until GPU is idle! This isn't so bad on exit, is it?
     vk.device_wait_idle(system.device)
     ds.mapvals(tp.teardown, pipelines)
+    finalize(system.swapchain)
+    finalize(system.surface)
+    finalize(system.device)
     window.shutdown()
     GC.gc()
   end
