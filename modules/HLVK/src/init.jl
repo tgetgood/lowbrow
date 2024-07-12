@@ -32,7 +32,7 @@ defaults = ds.hashmap(
     :name, "unnamed",
   ),
   :instance, ds.hashmap(
-    :vulkan_version, v"1.3"
+    :vulkan_version, v"1.3.276"
   ),
   :device, ds.hashmap(
     :features, ds.hashmap(
@@ -144,15 +144,10 @@ function instancerequirements(config)
   if api_version_supported < api_version_requested
     @warn "Vulkan api version " * string(api_version_requested) *
       " requested, but the driver only supports " * string(api_version_supported)
+    api_version = api_version_supported
+  else
+    api_version = api_version_requested
   end
-  # We don't have much flexibility here: the driver supports a single version.
-  # If that's higher than what we want, we're probably fine. If it's lower, then
-  # there's a chance we're in trouble, but we're still likely going to be fine.
-  #
-  # That's kind of nice, but hard to handle. The best I can really do is put a
-  # warning here and wait for something to blow up somewhere down the line (or
-  # not). I don't much like that.
-  api_version = api_version_supported
 
   spec = ds.assoc(appmeta,
     :version, api_version,
