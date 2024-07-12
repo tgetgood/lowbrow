@@ -15,11 +15,11 @@ import ..Presentation
 
 VS = Union{Vector, ds.Vector}
 
+mergeconfig() = ds.emptymap
+mergeconfig(x) = x
 mergeconfig(x, y) = y
 mergeconfig(x::ds.Map, y::ds.Map) = ds.mergewith(mergeconfig, x, y)
 mergeconfig(x::VS, y::VS) = ds.into(y, x)
-mergeconfig() = ds.emptymap
-mergeconfig(x) = x
 mergeconfig(x, ys...) = ds.reduce(mergeconfig, x, ys)
 
 defaults = ds.hashmap(
@@ -32,7 +32,7 @@ defaults = ds.hashmap(
     :name, "unnamed",
   ),
   :instance, ds.hashmap(
-    :vulkan_version, v"1.3.276"
+    :vulkan_version, v"1.3"
   ),
   :device, ds.hashmap(
     :features, ds.hashmap(
@@ -125,7 +125,7 @@ function instancerequirements(config)
 
   info = hw.instanceinfo()
   ic = config.instance
-  api_version = ic.vulkan_version
+  api_version_requested = ic.vulkan_version
 
   layers = torel(:layer_name, get(ic, :layers, []))
   extensions = torel(:extension_name, get(ic, :extensions, []))
@@ -139,13 +139,20 @@ function instancerequirements(config)
     extensions, supported_extensions, :extension_name, "extensions"
   )
 
-  version = info.version
+  api_version_supported = info.version
 
-  if version < api_version
-    @warn "Vulkan api version " * string(api_version) *
-      " requested, but the driver only supports " * string(version)
-    api_version = version
+  if api_version_supported < api_version_requested
+    @warn "Vulkan api version " * string(api_version_requested) *
+      " requested, but the driver only supports " * string(api_version_supported)
   end
+  # We don't have much flexibility here: the driver supports a single version.
+  # If that's higher than what we want, we're probably fine. If it's lower, then
+  # there's a chance we're in trouble, but we're still likely going to be fine.
+  #
+  # That's kind of nice, but hard to handle. The best I can really do is put a
+  # warning here and wait for something to blow up somewhere down the line (or
+  # not). I don't much like that.
+  api_version = api_version_supported
 
   spec = ds.assoc(appmeta,
     :version, api_version,
