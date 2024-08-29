@@ -1,6 +1,8 @@
 module Reader
 
-using DataStructures
+import DataStructures as ds
+
+import ..Forms: ListForm
 
 struct BufferedStream
     stream::IO
@@ -76,7 +78,7 @@ end
 function splitsymbolic(x::String)
     parts = split(x, '/')
     if length(parts) === 1
-        return [nil, parts[1]]
+        return [ds.nil, parts[1]]
     elseif length(parts) > 2
         throw("malformed symbol")
     end
@@ -85,19 +87,19 @@ end
 
 function readkeyword(x)
     if x == ":/"
-        keyword("/")
+        ds.keyword("/")
     else
         ns, name = splitsymbolic(x[2:end])
-        keyword(ns, name)
+        ds.keyword(ns, name)
     end
 end
 
 function readsymbol(x)
     if x == "/"
-        symbol("/")
+        ds.symbol("/")
     else
         ns, name = splitsymbolic(x)
-        symbol(ns, name)
+        ds.symbol(ns, name)
     end
 end
 
@@ -137,11 +139,12 @@ function readsubforms(stream, until)
 end
 
 function readlist(stream, opts)
-    list(readsubforms(stream, ')')...)
+  v = readsubforms(stream, ')')
+  ListForm(ds.emptymap, v[1], ds.vec(v[2:end]))
 end
 
 function readvector(stream, opts)
-    vector(readsubforms(stream, ']')...)
+    ds.vector(readsubforms(stream, ']')...)
 end
 
 specialchars = Dict(
@@ -241,7 +244,7 @@ function readmap(stream, opts)
     elements = readsubforms(stream, '}')
     @assert length(elements) % 2 === 0 "a map literal must contain an even number of entries"
 
-    res = emptymap
+    res = ds.emptymap
     for i in 1:div(length(elements), 2)
         res = assoc(res, popfirst!(elements), popfirst!(elements))
     end
@@ -282,10 +285,10 @@ end
 function readmeta(stream, opts)
     meta = read(stream, opts)
     val = read(stream, opts)
-    if isa(meta, Map)
+    if isa(meta, ds.Map)
         withmeta(val, meta)
     else
-        withmeta(val, assoc(emptymap, meta, true))
+        withmeta(val, assoc(ds.emptymap, meta, true))
     end
 end
 
@@ -366,7 +369,7 @@ function readall(stream::BufferedStream)
         try
             push!(forms, read(stream))
         catch EOFError
-            return remove(isnothing, forms)
+            return ds.remove(isnothing, forms)
         end
     end
 end
@@ -375,4 +378,11 @@ function readall(x::IO)
   readall(tostream(x))
 end
 
+function repall(x)
+  for f in readall(x)
+    println(string(f))
+    println()
+  end
 end
+
+end #module

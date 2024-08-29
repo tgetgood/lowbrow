@@ -1,15 +1,10 @@
 module Xprl
 
-struct Node
-  inputs
-  outputs
-  body
-end
+include("./Forms.jl")
+import .Forms
 
-struct Network
-  nodes
-  wires
-  queues
-end
+include("./Reader.jl")
+import .Reader
+
 
 end # module Xprl
