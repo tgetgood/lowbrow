@@ -1,0 +1,47 @@
+#+TITLE: A Language
+
+xprl is (surprise!) an experimental programming language. A better name might be
+Janus since a primary goal is to open and watch the interfaces between systems
+and ecosystems.
+
+On the surface it's a lisp with a (mostly) clojure compatible syntax, but the
+semantics differ in two major (and many minor) aspects.
+
+Firstly there is no assignment. There are no variables. There are only values.
+We all know you can build let as a macro around calling a function, so we do
+have multiple lexical ~names~ for values, but those names do not correspond to
+places.
+
+Put differently, there is no observable mutation. Thanks to projects im.rs and
+Roc, there is a well established path to getting the performance of in place
+mutation without having any semantic notion of mutation or variable.
+
+This is taken to extemes. A symbol isn't a variable that will be set at link
+time. A symbol is a name that refers to a definite artefact specified during
+development. All linking is dev time static. Ideal Bagwell tries give us the
+performance benefits of dynamic linking without the problems that arise from not
+really knowing what the code you're calling is or does.
+
+Secondly, there are no side effects and nothing happens synchronously. In a
+massively parallel system (most modern hardware), the illusion of synchronicity
+is upheld via side effects, and it's my conjecture that we're better off without
+it.
+
+This is accomplished by replacing the notion of function with something that
+doesn't have a name yet. It operates like a function, but receives multiple
+inputs, possibly at different times and from different computations, and
+"returns" zero or more values to each of zero or more subsequent computations.
+Thus the "function analogue" describes what happens when the right precursors
+meet in one place at one time.
+
+Of course, at some point we need to set bits in hardware to do something.
+Receive input, send messages over sockets, talk to peripherals and screens. From
+the point of view of the language, these are all IO issues to be handled by the
+(virtual) system, effectively a kernel. Sources that produce messages without
+input represent inputs and sinks which receive messages and send none correspond
+to outputs. A function to create a TCP connection will emit a source/sink pair
+which represents a connection in the obvious way, etc..
+
+There will perhaps be an "unsafe subset" to the language with which to write new
+external integrations in the language itself. Or perhaps it would be better to
+keep all of that in the kernel. I don't yet know.
