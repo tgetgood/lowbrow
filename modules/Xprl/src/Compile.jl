@@ -5,10 +5,27 @@
 # mud. That's the hope, anyway.
 module Compile
 
+import DataStructures as ds
 import ..Forms
 
-function compile(f::Forms.Form)
+abstract type Form end
+
+struct SendingForm <: Form
+  form::Forms.Form
+  receiver
+  msg
+end
+
+function compile(f::Forms.ListForm)
   receiver = compile(f.head)
+end
+
+function compile(s::Forms.Symbol)
+  compile(ds.get(s.env), s.name)
+end
+
+function eval(f::Forms.ListForm)
+  System.exec(compile(f))
 end
 
 end # module

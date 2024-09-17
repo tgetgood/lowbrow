@@ -11,17 +11,19 @@ count(xs::Tuple) = length(xs)
 Creates a *new* vector containing all elements of `v` appended with `x`.
 
 N.B.: This can be VERY slow for large aggregations, ram usage growing
-quadratically with N (plus big constants).
+quadratically with N (plus big constants). I'm not going to waste time
+optimising something that shouldn't be used.
 
 If you need immutability, use persistent vectors. If you need speed, use
 `into!`. This is only here for completeness and to prevent unexpected failures
-in performance agnostic code.
+in performance agnostic code. But maybe it shouldn't be here at all...
 """
 function conj(v::Base.Vector, x)
   if v == []
     # Use x's type instead of `Any` if possible.
     [x]
   else
+    @warn "Using full copy-on-write instead of persistent datastructures!"
     vcat(v, [x])
   end
 end

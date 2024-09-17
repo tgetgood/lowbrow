@@ -85,8 +85,8 @@ end
 
 function readsymbol(env, x)
   name = readkeyword(x)
-  # @assert ds.containsp(env, name) "Error, unresolved name"
   Symbol(env, name)
+  end
 end
 
 function interpret(env, x::String)

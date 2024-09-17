@@ -1,6 +1,6 @@
 module Forms
 
-import Base: show, string
+import Base: show, string, hash, ==
 
 import DataStructures as ds
 
@@ -35,6 +35,12 @@ struct Keyword
   names::Vector{String}
 end
 
+const basehash = hash(":")
+
+hash(k::Keyword) = ds.transduce(ds.map(hash), xor, basehash, k.names)
+
+Base.:(==)(x::Keyword, y::Keyword) = x.names == y.names
+
 function string(s::Keyword)
   ds.into(":", ds.map(string) ∘ ds.interpose("."), s.names)
 end
@@ -49,6 +55,14 @@ end
 struct Symbol <: Form
   env::ds.Map
   name::Keyword
+end
+
+# REVIEW: Two symbols are only the same if they are syntactically and
+# semantically the same. Of course two symbols that *mean the same thing* could
+# also be considered equal, even if they're "different symbols". So maybe only
+# the second check is important...
+function Base.:(==)(x::Symbol, y::Symbol)
+  x.name == y.name && get(env, x.name) == get(env, y.name)
 end
 
 function string(s::Symbol)
