@@ -1,4 +1,4 @@
-module Env
+module DefaultEnv
 import DataStructures as ds
 
 import ..Forms
@@ -17,8 +17,10 @@ end
 
 # To start we're just going to use jl functions.
 default = ds.hashmap(
-  Forms.Keyword(["+"]), extensionalise(+),
-  Forms.Keyword(["eval"]), Eval.eval,
+  Forms.Symbol(["+"]), +,
+  Forms.Symbol(["eval"]), Eval.eval,
+  Forms.Symbol(["apply"]), Eval.apply,
+  Forms.Symbol(["μ"]), Eval.createμ
 )
 
 end

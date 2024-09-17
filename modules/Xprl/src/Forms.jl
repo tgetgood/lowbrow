@@ -7,7 +7,6 @@ import DataStructures as ds
 abstract type Form end
 
 struct ListForm <: Form
-  env::ds.Map
   head::Any
   tail::ds.Vector
 end
@@ -31,7 +30,7 @@ end
 
 # A keyword is a name intended for use soley as a name. It should mean something
 # to humans who read it.
-struct Keyword
+struct Keyword <: Form
   names::Vector{String}
 end
 
@@ -50,11 +49,9 @@ function show(io::IO, mime::MIME"text/plain", s::Keyword)
 end
 
 # A Symbol is a name standing in for another value and is not well defined
-# without knowing that value. `env` may contain more that just the definition of
-# this symbol, but that isn't required.
+# without knowing that value.
 struct Symbol <: Form
-  env::ds.Map
-  name::Keyword
+  names::Vector{String}
 end
 
 # REVIEW: Two symbols are only the same if they are syntactically and
@@ -62,11 +59,11 @@ end
 # also be considered equal, even if they're "different symbols". So maybe only
 # the second check is important...
 function Base.:(==)(x::Symbol, y::Symbol)
-  x.name == y.name && get(env, x.name) == get(env, y.name)
+  x.names == y.names
 end
 
 function string(s::Symbol)
-  ds.into("", ds.map(string) ∘ ds.interpose("."), s.name.names)
+  ds.into("", ds.map(string) ∘ ds.interpose("."), s.names)
 end
 
 function show(io::IO, mime::MIME"text/plain", s::Symbol)

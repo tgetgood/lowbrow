@@ -2,4 +2,17 @@
 
 (+ (+ 1 2) (+ 3 (+ 4 5)))
 
+(def list
+  (μ args
+     ~(List. ~@args)))
+
+(def fn
+  (μ [params body]
+     ~(μ args
+        ~((μ ~params ~body) ~~args))))
+
+(def let1
+  (μ [[x y] body]
+     ~((μ [~x] ~body) ~~y)))
+
 ((fn [x] (+ 1 x)) 1)

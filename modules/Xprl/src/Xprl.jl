@@ -18,7 +18,7 @@ import .Eval
 include("./Compile.jl")
 import .Compile
 
-include("./Env.jl")
-import .Env
+include("./DefaultEnv.jl")
+import .DefaultEnv
 
 end # module Xprl

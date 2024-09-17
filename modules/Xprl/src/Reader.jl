@@ -30,7 +30,7 @@ function read1(s::StringStream)
     try
         c = s.stream[s.index]
         s.index = nextind(s.stream, s.index)
-        return c
+      return c
     catch BoundsError
         throw(EOFError())
     end
@@ -83,13 +83,11 @@ function readkeyword(x)
   Keyword(splitsymbolic(x))
 end
 
-function readsymbol(env, x)
-  name = readkeyword(x)
-  Symbol(env, name)
-  end
+function readsymbol(x)
+  Symbol(splitsymbolic(x))
 end
 
-function interpret(env, x::String)
+function interpret(x::String)
     if startswith(x, ':')
         return readkeyword(x)
     end
@@ -105,14 +103,14 @@ function interpret(env, x::String)
     elseif x == "false"
         return false
     else
-        return readsymbol(env, x)
+        return readsymbol(x)
     end
 end
 
-function readsubforms(env, stream, until)
+function readsubforms(stream, until)
     forms = []
     while true
-        t = read(env, stream, ReaderOptions(until))
+        t = read(stream, ReaderOptions(until))
         if t === :close
             break
         elseif t === nothing
@@ -124,18 +122,18 @@ function readsubforms(env, stream, until)
     return forms
 end
 
-function readlist(env, stream, opts)
-  v = readsubforms(env, stream, ')')
+function readlist(stream, opts)
+  v = readsubforms(stream, ')')
   # TODO: Check symbol is in env and maybe pare down the env.
   #
   # Ideally we would merge all of the envs of the subforms and then remove
   # anything extraneous. Small contexts will be useful for compiling and
   # optimising.
-  ListForm(env, v[1], ds.vec(v[2:end]))
+  ListForm(v[1], ds.vec(v[2:end]))
 end
 
-function readvector(env, stream, opts)
-    ds.vector(readsubforms(env, stream, ']')...)
+function readvector(stream, opts)
+    ds.vector(readsubforms(stream, ']')...)
 end
 
 specialchars = Dict(
@@ -199,7 +197,7 @@ function readunicodeoctal(stream, ch)
     end
 end
 
-function readstring(env, stream, opts)
+function readstring(stream, opts)
     buf = []
     c = read1(stream)
     while (c != '"')
@@ -231,8 +229,8 @@ function readstring(env, stream, opts)
     return string(buf...)
 end
 
-function readmap(env, stream, opts)
-    elements = readsubforms(env, stream, '}')
+function readmap(stream, opts)
+    elements = readsubforms(stream, '}')
     @assert length(elements) % 2 === 0 "a map literal must contain an even number of entries"
 
     res = ds.emptymap
@@ -242,11 +240,11 @@ function readmap(env, stream, opts)
     return res
 end
 
-function readset(env, stream, opts)
+function readset(stream, opts)
     throw("not implemented")
 end
 
-function readcomment(env, stream, opts)
+function readcomment(stream, opts)
     c = read1(stream)
     while c != '\n' && c != '\r'
         c = read1(stream)
@@ -273,14 +271,17 @@ function readdispatch(stream, opts)
     end
 end
 
-function readmeta(env, stream, opts)
-    meta = read(env, stream, opts)
-    val = read(env, stream, opts)
+function readmeta(stream, opts)
+    meta = read(stream, opts)
+    val = read(stream, opts)
     if isa(meta, ds.Map)
         withmeta(val, meta)
     else
         withmeta(val, assoc(ds.emptymap, meta, true))
     end
+end
+
+function readimmediate(stream, opts)
 end
 
 dispatch = Dict(
@@ -290,8 +291,8 @@ dispatch = Dict(
     '{' => readmap,
     '#' => readdispatch,
     ';' => readcomment,
-    '^' => readmeta
-
+    '^' => readmeta,
+  '~' => readimmediate
 )
 
 delimiter = r"[({\[;]"
@@ -324,7 +325,7 @@ function readtoken(stream, opts)
     return out
 end
 
-function read(env, stream, opts)
+function read(stream, opts)
     c = firstnonwhitespace(stream)
 
     if opts.until !== nothing && c === opts.until
@@ -335,44 +336,42 @@ function read(env, stream, opts)
 
     if sub === nothing
         unread1(stream, c)
-        return interpret(env, readtoken(stream, opts))
+        return interpret(readtoken(stream, opts))
     else
-        return sub(env, stream, opts)
+        return sub(stream, opts)
     end
 end
 
-function read(env, stream)
-    read(env, stream, ReaderOptions(nothing))
+function read(stream)
+    read(stream, ReaderOptions(nothing))
 end
 
-function read(env, s::String)
-    read(env, tostream(s))
+function read(s::String)
+    read(tostream(s))
 end
 
-function read(env, s::IO)
-    read(env, tostream(s))
+function read(s::IO)
+    read(tostream(s))
 end
 
-# """N.B. This will run forever if `stream` doesn't eventually close"""
-function readall(env, stream::BufferedStream)
+"""N.B. This will run forever if `stream` doesn't eventually close"""
+function readall(stream::BufferedStream)
   forms = []
   while true
     try
-      push!(forms, read(env, stream))
+      push!(forms, read(stream))
     catch EOFError
       return ds.remove(isnothing, forms)
     end
   end
 end
 
-function readall(env, x::IO)
-  readall(env, tostream(x))
+function readall(x::IO)
+  readall(tostream(x))
 end
 
 function repall(x)
-  @info x
   for f in readall(ds.emptymap, x)
-    @info f
     println(string(f))
     println()
   end
