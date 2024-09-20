@@ -1,26 +1,36 @@
 module Forms
 
-import Base: show, string, hash, ==
+import Base: show, string, hash, ==, getindex, lastindex, iterate
 
 import DataStructures as ds
 
 abstract type Form end
 
-struct ListForm <: Form
-  head::Any
-  tail::ds.Vector
-end
-
-function string(f::ListForm)
-  "(" * string(f.head) * " " * ds.into("", ds.map(string) ∘ ds.interpose(" "), f.tail) * ")"
-end
-
-function show(io::IO, mime::MIME"text/plain", s::ListForm)
+function show(io::IO, mime::MIME"text/plain", s::Form)
   print(io, string(s))
 end
 
+struct ListForm <: Form
+  elements::Vector
+end
+
+function getindex(v::ListForm, n)
+  v.elements[n]
+end
+
+function lastindex(v::ListForm)
+  lastindex(v.elements)
+end
+
+function iterate(v::ListForm)
+  v.elements[1], v.elements[2:end]
+end
+
+function string(f::ListForm)
+  "(" * ds.into("", ds.map(string) ∘ ds.interpose(" "), f.elements) * ")"
+end
+
 struct ValueForm <: Form
-  env::ds.Map
   content::Any
 end
 
@@ -44,10 +54,6 @@ function string(s::Keyword)
   ds.into(":", ds.map(string) ∘ ds.interpose("."), s.names)
 end
 
-function show(io::IO, mime::MIME"text/plain", s::Keyword)
-  print(io, string(s))
-end
-
 # A Symbol is a name standing in for another value and is not well defined
 # without knowing that value.
 struct Symbol <: Form
@@ -66,8 +72,20 @@ function string(s::Symbol)
   ds.into("", ds.map(string) ∘ ds.interpose("."), s.names)
 end
 
-function show(io::IO, mime::MIME"text/plain", s::Symbol)
-  print(io, string(s))
+abstract type  Immediate <: Form end
+
+struct ImmediateSymbol <: Immediate
+  content::Symbol
 end
+
+struct ImmediateList <: Immediate
+  content::ListForm
+end
+
+struct ImmediateImmediate <: Immediate
+  content::Immediate
+end
+
+string(f::Immediate) = "~"*string(f.content)
 
 end # module
