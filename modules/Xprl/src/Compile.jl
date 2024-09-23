@@ -16,7 +16,7 @@ struct SendingForm <: Form
   msg
 end
 
-function compile(f::Forms.ListForm)
+function compile(f::Forms.Pair)
   receiver = compile(f.head)
 end
 
@@ -24,7 +24,7 @@ function compile(s::Forms.Symbol)
   compile(ds.get(s.env), s.name)
 end
 
-function eval(f::Forms.ListForm)
+function eval(f::Forms.Pair)
   System.exec(compile(f))
 end
 

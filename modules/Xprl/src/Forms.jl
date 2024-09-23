@@ -10,32 +10,50 @@ function show(io::IO, mime::MIME"text/plain", s::Form)
   print(io, string(s))
 end
 
-struct ListForm <: Form
-  elements::Vector
+struct Pair <: Form
+  head
+  tail
 end
 
-function getindex(v::ListForm, n)
-  v.elements[n]
+function consbuilder(agg, xs)
+  if length(xs) === 0
+    agg
+  else
+    consbuilder(Pair(xs[1], agg), xs[2:end])
+  end
 end
 
-function lastindex(v::ListForm)
-  lastindex(v.elements)
+function conslist(xs::Vector)
+  consbuilder(ds.nil, reverse(xs))
 end
 
-function iterate(v::ListForm)
-  v.elements[1], v.elements[2:end]
+iterate(c::Pair) = c.head, c.tail
+iterate(c::Pair, state::Pair) = iterate(state)
+iterate(c::Pair, state::Nothing) = nothing
+iterate(c::Pair, x::Any) = x, nothing
+
+function getindex(c::Pair, n)
+  if n === 1
+    c.head
+  else
+    getindex(c.tail, n - 1)
+  end
 end
 
-function string(f::ListForm)
-  "(" * ds.into("", ds.map(string) ∘ ds.interpose(" "), f.elements) * ")"
+function tailstring(c::Pair)
+  " " * string(c.head) * tailstring(c.tail)
 end
 
-struct ValueForm <: Form
-  content::Any
+function tailstring(x)
+  " . " * string(x)
 end
 
-function show(io::IO, mime::MIME"text/plain", s::ValueForm)
-  show(io, s.content)
+function tailstring(x::Nothing)
+  ""
+end
+
+function string(c::Pair)
+  "(" * string(c.head) * tailstring(c.tail) * ")"
 end
 
 # A keyword is a name intended for use soley as a name. It should mean something
@@ -72,20 +90,20 @@ function string(s::Symbol)
   ds.into("", ds.map(string) ∘ ds.interpose("."), s.names)
 end
 
-abstract type  Immediate <: Form end
+abstract type Immediate <: Form end
 
 struct ImmediateSymbol <: Immediate
   content::Symbol
 end
 
-struct ImmediateList <: Immediate
-  content::ListForm
+struct ImmediatePair <: Immediate
+  content::Pair
 end
 
 struct ImmediateImmediate <: Immediate
   content::Immediate
 end
 
-string(f::Immediate) = "~"*string(f.content)
+string(f::Immediate) = "~" * string(f.content)
 
 end # module

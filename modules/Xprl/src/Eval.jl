@@ -23,19 +23,21 @@ function uniquep(v)
   return true
 end
 
-function apply(cont, env, f::μ, args)
+function apply(cont, env, f::μ, arg)
 
 end
 
-function apply(cont, env, f::Function, args)
-  f(args...)
+function apply(cont, env, f::Function, arg)
+  # REVIEW: Should I splat on primitives? *Most* of them will take a list of
+  # args, but will it really be all?
+  f(arg...)
 end
 
-function eval(cont, env, f::Forms.ListForm)
+function eval(cont, env, f::Forms.Pair)
   function next(x)
-    apply(cont, env, x, f[2:end])
+    apply(cont, env, x, f.tail)
   end
-  eval(next, env, f[1])
+  eval(next, env, f.head)
 end
 
 function eval(cont, env, f::Forms.Symbol)
@@ -50,8 +52,8 @@ function eval(cont, env, f::Forms.Symbol)
   cont(ds.get(env, f))
 end
 
-function evalimmediate(cont, context, form::Forms.ImmediateList)
-  head = form[1]
+function evalimmediate(cont, context, form::Forms.ImmediatePair)
+  head = form.head
 
 end
 

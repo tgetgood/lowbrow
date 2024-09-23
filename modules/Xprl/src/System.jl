@@ -56,7 +56,7 @@ function start(exec, receiver, msg)
   pushngo!(exec, emissions)
 end
 
-function start(exec::Executor, f::Forms.ListForm)
+function start(exec::Executor, f::Forms.Pair)
   start(exec, f.head, f.tail)
 end
 

@@ -2,7 +2,7 @@ module Reader
 
 import DataStructures as ds
 
-import ..Forms: ListForm, ValueForm, Symbol, Keyword, Immediate, ImmediateSymbol, ImmediateList, ImmediateImmediate
+import ..Forms
 
 struct BufferedStream
   stream::IO
@@ -76,15 +76,19 @@ function firstnonwhitespace(stream)
 end
 
 function splitsymbolic(x::String)
-  split(x, '.')
+  if x == "."
+    ["."]
+  else
+    split(x, '.')
+  end
 end
 
 function readkeyword(x)
-  Keyword(splitsymbolic(x))
+  Forms.Keyword(splitsymbolic(x))
 end
 
 function readsymbol(x)
-  Symbol(splitsymbolic(x))
+  Forms.Symbol(splitsymbolic(x))
 end
 
 function interpret(x::String)
@@ -123,7 +127,22 @@ function readsubforms(stream, until)
 end
 
 function readlist(stream, opts)
-  ListForm(readsubforms(stream, ')'))
+  subs = readsubforms(stream, ')')
+
+  n = length(subs)
+  if n > 2 && subs[n-1] == Forms.Symbol(["."])
+    list = subs[n]
+    i = n - 2
+  else
+    list = ds.nil
+    i = n
+  end
+
+  for j in i:-1:1
+    list = Forms.Pair(subs[j], list)
+  end
+
+  return list
 end
 
 function readvector(stream, opts)
@@ -279,9 +298,9 @@ function readimmediate(stream, opts)
   createimmediate(read(stream, opts))
 end
 
-createimmediate(f::Symbol) = ImmediateSymbol(f)
-createimmediate(f::ListForm) = ImmediateList(f)
-createimmediate(f::Immediate) = ImmediateImmediate(f)
+createimmediate(f::Forms.Symbol) = Forms.ImmediateSymbol(f)
+createimmediate(f::Forms.Pair) = Forms.ImmediatePair(f)
+createimmediate(f::Forms.Immediate) = Forms.ImmediateImmediate(f)
 
 dispatch = Dict(
   '(' => readlist,
