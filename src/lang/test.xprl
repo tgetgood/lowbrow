@@ -2,17 +2,29 @@
 
 (+ (+ 1 2) (+ 3 (+ 4 5)))
 
-(def list
-  (μ args
-     ~(List. ~@args)))
+;; I like the way clojure bootstraps so that destructuring is implemented in
+;; clojure, not java. I'm going to follow a similar path, but this is somewhat
+;; weirder on the surface: μ* and fn* take exactly one argument and it doesn't
+;; have to be a list. This provides an elegant symmetry, but it's not very
+;; practical.
+;;
+;; I wanted to avoid cons cells entirely in this language, but I'm starting to
+;; realise why they're important: the symmetry between calling a function as (f
+;; x y z) and defining it as (fn [x y z] ...). The fact that the tail of the
+;; cons cell (f x y z) is the cons cell (x y z) makes this automatic. So... if I
+;; want to be able to call things with a single arg that isn't necessarily a
+;; list, I need improper cons cells. Once we have that, the convention of
+;; multiple args becomes automatic.
+;;
+;; I just learned something I probably should have twenty years ago.
 
-(def fn
-  (μ [params body]
-     ~(μ args
-        ~((μ ~params ~body) ~~args))))
+(def fn*
+  (μ* sargs
+     ~(μ* dargs
+         ~~((μ* ~(first sargs) ~(second sargs)) ~~dargs))))
 
 (def let1
-  (μ [[x y] body]
-     ~((μ [~x] ~body) ~~y)))
+  (μ* args
+     ~((μ* [~(first (first args))] ~(second args)) ~~(second (first args)))))
 
-((fn [x] (+ 1 x)) 1)
+((fn* x (+ 1 x)) . 1)

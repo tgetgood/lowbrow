@@ -5,12 +5,11 @@ import DataStructures as ds
 import ..Forms
 import ..System
 
-function aggbind(syms, v::ds.Vector)
-  ds.into(syms, map(x -> aggbind(ds.emptyvector, x)) ∘ ds.cat(), v)
-end
-
-function aggbind(syms, v::Forms.Symbol)
-  ds.conj(syms, v)
+struct μ
+  receiver
+  params
+  immediates
+  body
 end
 
 function uniquep(v)
@@ -24,25 +23,12 @@ function uniquep(v)
   return true
 end
 
-function bindings(form)
-  temp = aggbind(ds.emptyvector, form)
-  if uniquep(temp)
-    ds.into(ds.emptyset, temp)
-  else
-    @error "shadowed symbols in binding."
-    throw("no shadow")
-  end
-end
-
-function destructuringbind(params, args)
-end
-
 function apply(cont, env, f::μ, args)
 
 end
 
 function apply(cont, env, f::Function, args)
-  f(cont, env, args...)
+  f(args...)
 end
 
 function eval(cont, env, f::Forms.ListForm)
@@ -69,22 +55,12 @@ function evalimmediate(cont, context, form::Forms.ImmediateList)
 
 end
 
-struct μ
-  receiver
-  params
-  immediates
-  body
-end
-
 struct NestedContext
   params
   env
 end
 
-function createμ(cont, env, params, body)
-  params = args[1]
-  body = args[2]
-  syms = bindings(params)
+function createμ(cont, env, argsym, body)
   context = NestedContext(syms, env)
   mubody = evalimmediate(context, body)
 end
