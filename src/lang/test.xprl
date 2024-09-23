@@ -28,3 +28,7 @@
      ~~((μ* [~(first (first args))] ~(second args)) ~~(second (first args)))))
 
 ((fn* x (+ 1 x)) . 1)
+
+(μ s
+   ~(μ d
+       ~~((μ ~(first s) ~(second s)) ~~d)))

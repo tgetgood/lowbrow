@@ -3,9 +3,9 @@ module Receivers
 abstract type Receiver end
 
 mutable struct Collector <: Receiver
-  const r::Receiver
+  const r::Function
   const lock::Threads.SpinLock
-  @atomic count::Int
+  count::Int
   const xs::Vector
 end
 
@@ -41,7 +41,7 @@ function receive(c::Collector, m::CubbyWrite)
 end
 
 function receive(r::DirectReceiver, m)
-  r.f(m...)
+  r.f(m)
 end
 
 # simple invocation. Wait for message and apply message as args to f
@@ -50,7 +50,7 @@ function simpleinv(f::Function)
 end
 
 function receive(f::Function, m)
-  f(m...)
+  f(m)
 end
 
 

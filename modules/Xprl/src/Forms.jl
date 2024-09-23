@@ -15,18 +15,6 @@ struct Pair <: Form
   tail
 end
 
-function consbuilder(agg, xs)
-  if length(xs) === 0
-    agg
-  else
-    consbuilder(Pair(xs[1], agg), xs[2:end])
-  end
-end
-
-function conslist(xs::Vector)
-  consbuilder(ds.nil, reverse(xs))
-end
-
 iterate(c::Pair) = c.head, c.tail
 iterate(c::Pair, state::Pair) = iterate(state)
 iterate(c::Pair, state::Nothing) = nothing
@@ -40,8 +28,8 @@ function getindex(c::Pair, n)
   end
 end
 
-function tailstring(c::Pair)
-  " " * string(c.head) * tailstring(c.tail)
+function tailstring(c::Union{Vector, ds.Sequential})
+  ds.into(" ", map(string) ∘ ds.interpose(" "), c)
 end
 
 function tailstring(x)
@@ -90,20 +78,11 @@ function string(s::Symbol)
   ds.into("", ds.map(string) ∘ ds.interpose("."), s.names)
 end
 
-abstract type Immediate <: Form end
-
-struct ImmediateSymbol <: Immediate
-  content::Symbol
-end
-
-struct ImmediatePair <: Immediate
-  content::Pair
-end
-
-struct ImmediateImmediate <: Immediate
-  content::Immediate
+struct Immediate <: Form
+  content
 end
 
 string(f::Immediate) = "~" * string(f.content)
+
 
 end # module

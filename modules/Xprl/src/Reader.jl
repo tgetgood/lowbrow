@@ -130,19 +130,12 @@ function readlist(stream, opts)
   subs = readsubforms(stream, ')')
 
   n = length(subs)
-  if n > 2 && subs[n-1] == Forms.Symbol(["."])
-    list = subs[n]
-    i = n - 2
+  if n === 3 && subs[2] == Forms.Symbol(["."])
+    Forms.Pair(subs[1], subs[3])
   else
-    list = ds.nil
-    i = n
+    Forms.Pair(subs[1], subs[2:end])
   end
 
-  for j in i:-1:1
-    list = Forms.Pair(subs[j], list)
-  end
-
-  return list
 end
 
 function readvector(stream, opts)
@@ -298,9 +291,7 @@ function readimmediate(stream, opts)
   createimmediate(read(stream, opts))
 end
 
-createimmediate(f::Forms.Symbol) = Forms.ImmediateSymbol(f)
-createimmediate(f::Forms.Pair) = Forms.ImmediatePair(f)
-createimmediate(f::Forms.Immediate) = Forms.ImmediateImmediate(f)
+createimmediate(f::Forms.Form) = Forms.Immediate(f)
 
 dispatch = Dict(
   '(' => readlist,
