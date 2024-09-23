@@ -5,43 +5,88 @@ import DataStructures as ds
 import ..Forms
 import ..System
 
-struct μ
-  params
-  immediates
-  body
+function aggbind(syms, v::ds.Vector)
+  ds.into(syms, map(x -> aggbind(ds.emptyvector, x)) ∘ ds.cat(), v)
+end
+
+function aggbind(syms, v::Forms.Symbol)
+  ds.conj(syms, v)
+end
+
+function uniquep(v)
+  s = ds.emptyset
+  for e in v
+    if ds.containsp(s, e)
+      return false
+    end
+    s = ds.conj(s, e)
+  end
+  return true
+end
+
+function bindings(form)
+  temp = aggbind(ds.emptyvector, form)
+  if uniquep(temp)
+    ds.into(ds.emptyset, temp)
+  else
+    @error "shadowed symbols in binding."
+    throw("no shadow")
+  end
 end
 
 function destructuringbind(params, args)
 end
 
-function apply(env, f::μ, args)
-  env = extend(env, destructuringbind(f.params, args))
-  instantiate(f, env)
-end
-
-function apply(env, f::Function, args)
-  # N.B.: builtins ignore the env. What would they do with it?
-  f(args...)
-end
-
-function createμ(params::Forms.Form, body::Forms.Form)
+function apply(cont, env, f::μ, args)
 
 end
 
-function instantiate(f::μ, env)
-
+function apply(cont, env, f::Function, args)
+  f(cont, env, args...)
 end
 
-function eval(env, f::Forms.ListForm)
-  apply(env, eval(env, f.head), f.tail)
+function eval(cont, env, f::Forms.ListForm)
+  function next(x)
+    apply(cont, env, x, f[2:end])
+  end
+  eval(next, env, f[1])
 end
 
-function eval(env, f::Forms.Symbol)
+function eval(cont, env, f::Forms.Symbol)
   # REVIEW: This assertion will be costly. But then we're caching, so probably
   # worth it.
   v = ds.containsp(env, f)
-  @assert v != ds.nil "Error evaluating undefined symbol."
-  ds.get(env, f)
+
+  if v == ds.nil
+    @error "asserts are failing silent for some reason."
+    throw("Error evaluating undefined symbol.")
+  end
+  cont(ds.get(env, f))
+end
+
+function evalimmediate(cont, context, form::Forms.ImmediateList)
+  head = form[1]
+
+end
+
+struct μ
+  receiver
+  params
+  immediates
+  body
+end
+
+struct NestedContext
+  params
+  env
+end
+
+function createμ(cont, env, params, body)
+  params = args[1]
+  body = args[2]
+  syms = bindings(params)
+  context = NestedContext(syms, env)
+  mubody = evalimmediate(context, body)
 end
 
 end # module
