@@ -1,8 +1,5 @@
 module Xprl
 
-include("./Forms.jl")
-import .Forms
-
 include("./Receivers.jl")
 import .Receivers
 
@@ -14,9 +11,6 @@ import .System
 
 include("./Eval.jl")
 import .Eval
-
-include("./Compile.jl")
-import .Compile
 
 include("./DefaultEnv.jl")
 import .DefaultEnv

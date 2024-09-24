@@ -18,6 +18,13 @@
 ;;
 ;; I just learned something I probably should have twenty years ago.
 
+(def primitivewrap
+  "Converts a primitive that takes only literal values to a function that evals
+  its arguments."
+  (μ* f
+     ~(μ* args
+         ~(~f ~~args))))
+
 (def fn*
   (μ* sargs
      ~(μ* dargs

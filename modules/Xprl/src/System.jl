@@ -1,7 +1,6 @@
 module System
 
 import ..Receivers
-import ..Forms
 
 import DataStructures as ds
 
@@ -56,7 +55,7 @@ function start(exec, receiver, msg)
   pushngo!(exec, emissions)
 end
 
-function start(exec::Executor, f::Forms.Pair)
+function start(exec::Executor, f::ds.Pair)
   start(exec, f.head, f.tail)
 end
 

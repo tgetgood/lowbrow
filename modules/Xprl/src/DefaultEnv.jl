@@ -1,7 +1,6 @@
 module DefaultEnv
 import DataStructures as ds
 
-import ..Forms
 import ..Receivers
 import ..Eval
 
@@ -19,13 +18,13 @@ second(x) = x[2]
 
 # To start we're just going to use jl functions.
 default = ds.hashmap(
-  Forms.Symbol(["eval"]), Eval.eval,
-  Forms.Symbol(["apply"]), Eval.apply,
-  Forms.Symbol(["μ"]), Eval.createμ,
+  ds.Symbol(["eval"]), Eval.eval,
+  ds.Symbol(["apply"]), Eval.apply,
+  ds.Symbol(["μ"]), Eval.createμ,
 
-  Forms.Symbol(["+"]), argeval(+),
-  Forms.Symbol(["first"]), argeval(first),
-  Forms.Symbol(["second"]), argeval(second)
+  ds.Symbol(["+"]), argeval(+),
+  ds.Symbol(["first"]), argeval(first),
+  ds.Symbol(["second"]), argeval(second)
 )
 
 end

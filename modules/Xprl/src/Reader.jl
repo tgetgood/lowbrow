@@ -2,8 +2,6 @@ module Reader
 
 import DataStructures as ds
 
-import ..Forms
-
 struct BufferedStream
   stream::IO
   buffer::Base.Vector{Char}
@@ -84,11 +82,11 @@ function splitsymbolic(x::String)
 end
 
 function readkeyword(x)
-  Forms.Keyword(splitsymbolic(x))
+  ds.Keyword(splitsymbolic(x))
 end
 
 function readsymbol(x)
-  Forms.Symbol(splitsymbolic(x))
+  ds.Symbol(splitsymbolic(x))
 end
 
 function interpret(x::String)
@@ -129,13 +127,25 @@ end
 function readlist(stream, opts)
   subs = readsubforms(stream, ')')
 
-  n = length(subs)
-  if n === 3 && subs[2] == Forms.Symbol(["."])
-    Forms.Pair(subs[1], subs[3])
-  else
-    Forms.Pair(subs[1], subs[2:end])
-  end
+  # REVIEW: This is an ugly hack.
+  #
+  # But would a null (or other token) terminated list be any better?
+  #
+  # Remember that the real goal of cons cells here is a syntax to describe
+  # applying an arbitrary value to a callable while retaining the near universal
+  # convention that callables take a list of arguments passed à la (f x y z).
 
+  n = length(subs)
+  # (f . x)
+  if n === 3 && subs[2] == ds.Symbol(["."])
+    ds.Pair(subs[1], subs[3])
+  # (f (g ...))
+  elseif n == 2 && typeof(n[2]) === ds.Pair
+    ds.Pair(n[1], n[2])
+  # (f x y z)
+  else
+    ds.Pair(subs[1], ds.vec(subs[2:end]))
+  end
 end
 
 function readvector(stream, opts)
@@ -291,7 +301,7 @@ function readimmediate(stream, opts)
   createimmediate(read(stream, opts))
 end
 
-createimmediate(f::Forms.Form) = Forms.Immediate(f)
+createimmediate(f::ds.Sexp) = ds.Immediate(f)
 
 dispatch = Dict(
   '(' => readlist,
