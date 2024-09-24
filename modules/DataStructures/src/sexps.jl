@@ -101,35 +101,35 @@ function name(x::Keyword)
   x.names[end]
 end
 
-#### Syms
+#### Symbols
 
-# A Sym is a name standing in for another value and is not well defined
+# A Symbol is a name standing in for another value and is not well defined
 # without knowing that value.
-struct Sym <: Sexp
+struct Symbol <: Sexp
   names::Base.Vector{String}
 end
 
 function symbol(names::String...)
-  Sym(names)
+  Symbol(names)
 end
 
 function symbol(k::Keyword)
-  Sym(k.names)
+  Symbol(k.names)
 end
 
-const symhash = hash("#Sym")
+const symhash = hash("#Symbol")
 
-hash(s::Sym) = transduce(map(hash), xor, symhash, s.names)
+hash(s::Symbol) = transduce(map(hash), xor, symhash, s.names)
 
-function Base.:(==)(x::Sym, y::Sym)
+function Base.:(==)(x::Symbol, y::Symbol)
   x.names == y.names
 end
 
-function string(s::Sym)
+function string(s::Symbol)
   into("", map(string) ∘ interpose("."), s.names)
 end
 
-function name(x::Sym)
+function name(x::Symbol)
   x.names[end]
 end
 
@@ -147,6 +147,6 @@ function name(x::String)
   x
 end
 
-function keyword(s::Sym)
+function keyword(s::Symbol)
   Keyword(s.names)
 end

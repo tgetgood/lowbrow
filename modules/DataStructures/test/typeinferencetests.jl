@@ -16,14 +16,14 @@ end
   #### Array maps
   h = hashmap(:a, 1, :b, 2, :c, 3)
 
-  @test eltype(keys(h)) == Symbol
+  @test eltype(keys(h)) == Core.Symbol
   @test eltype(vals(h)) == Int
 
   #### hashmaps
 
-  h = into(emptymap, map(x -> (Base.Symbol(Char(x)), x)), 1:32)
+  h = into(emptymap, map(x -> (Core.Symbol(Char(x)), x)), 1:32)
 
-  @test eltype(keys(h)) == Symbol
+  @test eltype(keys(h)) == Core.Symbol
   @test eltype(vals(h)) == Int
 end
 

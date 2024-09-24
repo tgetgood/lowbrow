@@ -280,7 +280,7 @@ Base.:(==)(x::Map, y::EmptyMap) = emptyp(x)
 
 ##### Array Maps
 
-@inline function Base.getproperty(m::PersistentArrayMap, k::Symbol)
+@inline function Base.getproperty(m::PersistentArrayMap, k::Core.Symbol)
   if k === :kvs
     return getfield(m, :kvs)
   else
@@ -523,7 +523,7 @@ end
 
 ##### Hash Maps
 
-@inline function Base.getproperty(m::PersistentHashMap, k::Symbol)
+@inline function Base.getproperty(m::PersistentHashMap, k::Core.Symbol)
   if k === :root
     return getfield(m, :root)
   else

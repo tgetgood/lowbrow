@@ -56,7 +56,7 @@ export Queue, queue, emptyqueue, closedp, emptystream, put!, Stream, stream
 export conj, count, empty, emptyp, nil, keyword, name, symbol, withmeta, meta, every
 
 # Types
-export Keyword, Map, Vector, MapEntry, List, Sym
+export Keyword, Map, Vector, MapEntry, List, Symbol, Pair, Immediate, Sexp
 
 # Transients
 export transient!, persist!, conj!
