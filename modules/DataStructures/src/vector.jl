@@ -1,6 +1,5 @@
 abstract type Vector <: Sequential end
 
-
 """
 N-ary (where N == nodelength) trees with values stored only in the leaves.
 

@@ -1,6 +1,12 @@
-module DataStructures
+baremodule DataStructures
 
-import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex, eltype, show, last, empty, repeat, split, take!, put!, close, lock, unlock, isready
+import Base
+
+include(s) = Base.include(DataStructures, s)
+
+import Base: (:)
+
+import Base: string, hash, ==, length, iterate, put!, bind, reverse, get, merge, keys, values, first, map, filter, getindex, eltype, show, last, empty, repeat, split, take!, put!, close, lock, unlock, isready, lastindex, ^, @assert, @MIME_str, @info, @warn, @error, Channel, ReentrantLock, @inline, typemax, @async, @atomic, Threads, AbstractRange, UnitRange, identity, typejoin, convert, vcat, <=, copy, >, >=, <, +, -, *, /, ∘, !==, ===, !=, sum, rethrow, push!, divrem, gensym, !, isempty, %, ifelse, <<, >>, xor, unique, append!, InvalidStateException
 
 # N.B.: Base.rest is broken for ranges and zip iterators. It returns the
 # collection itself. Don't import it.
@@ -12,8 +18,12 @@ nil = nothing
 
 include("./util.jl")
 
-include("./sexps.jl")
+abstract type Sexp end
+
 include("./sequential.jl")
+
+include("./sexps.jl")
+
 include("./vector.jl")
 include("./transientvector.jl")
 include("./list.jl")
@@ -43,10 +53,10 @@ export emptyset, disj, set
 export Queue, queue, emptyqueue, closedp, emptystream, put!, Stream, stream
 
 # Generic
-export conj, count, empty, emptyp, nil, keyword, name, symbol, symbol, withmeta, meta, every
+export conj, count, empty, emptyp, nil, keyword, name, symbol, withmeta, meta, every
 
 # Types
-export Keyword, Map, Vector, MapEntry, List
+export Keyword, Map, Vector, MapEntry, List, Sym
 
 # Transients
 export transient!, persist!, conj!

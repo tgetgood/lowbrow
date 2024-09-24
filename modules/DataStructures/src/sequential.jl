@@ -1,4 +1,4 @@
-abstract type Sequential end
+abstract type Sequential <: Sexp end
 
 """ Returns `true` iff the collection `x` contains no elements. """
 emptyp(x::Sequential) = count(x) == 0
