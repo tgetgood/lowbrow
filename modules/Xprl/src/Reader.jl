@@ -140,8 +140,8 @@ function readlist(stream, opts)
   if n === 3 && subs[2] == ds.Symbol(["."])
     ds.Pair(subs[1], subs[3])
   # (f (g ...))
-  elseif n == 2 && typeof(n[2]) === ds.Pair
-    ds.Pair(n[1], n[2])
+  elseif n === 2 && typeof(subs[2]) === ds.Pair
+    ds.Pair(subs[1], subs[2])
   # (f x y z)
   else
     ds.Pair(subs[1], ds.vec(subs[2:end]))
