@@ -21,6 +21,7 @@
 (def primitivewrap
   "Converts a primitive that takes only literal values to a function that evals
   its arguments."
+  ;; I don't know if it makes more sense to have this as a builtin.
   (μ* f
      ~(μ* args
          ~(~f ~~args))))
