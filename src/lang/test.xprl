@@ -19,24 +19,20 @@
 ;; I just learned something I probably should have twenty years ago.
 
 (def primitivewrap
-  "Converts a primitive that takes only literal values to a function that evals
-  its arguments."
+  "Wraps a primitive that takes only literal values in a function that evals its
+  arguments."
   ;; I don't know if it makes more sense to have this as a builtin.
-  (μ* f
-     ~(μ* args
-         ~(~f ~~args))))
+  (μ f
+     ~(μ args
+         ~(f . ~~args))))
 
-(def fn*
-  (μ* sargs
-     ~(μ* dargs
-         ~~((μ* ~(first sargs) ~(second sargs)) ~~dargs))))
+(def fn
+  (μ sargs
+     ~(μ dargs
+         ~((μ ~(first sargs) ~(second sargs)) . ~~dargs))))
 
 (def let1
-  (μ* args
-     ~~((μ* [~(first (first args))] ~(second args)) ~~(second (first args)))))
+  (μ args
+     ~((μ ~(first (first args)) ~(second args)) . ~~(second (first args)))))
 
-((fn* x (+ 1 x)) . 1)
-
-(μ s
-   ~(μ d
-       ~~((μ ~(first s) ~(second s)) ~~d)))
+((fn x (+ 1 x)) . 1)
