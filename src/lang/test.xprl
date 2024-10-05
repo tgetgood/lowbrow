@@ -24,12 +24,19 @@
   ;; I don't know if it makes more sense to have this as a builtin.
   (μ f
      ~(μ args
-         ~(f . ~~args))))
+         ~(~f . ~~args))))
 
 (def fn
   (μ sargs
      ~(μ dargs
          ~((μ ~(first sargs) ~(second sargs)) . ~~dargs))))
+
+;; Below, `select` is non-branching like the ?: or ifelse ternary operators,
+;; except that it doesn't evaluate any of its arguments and the first must be a
+;; literal boolean. The name is taken from the llvm instruction.
+(def if
+  (μ args
+     ~~(select ~~(nth args 1) ~(nth args 2) ~(nth args 3))))
 
 (def let1
   (μ args
