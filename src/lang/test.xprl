@@ -29,7 +29,7 @@
 (def fn
   (μ sargs
      ~(μ dargs
-         ~((μ ~(first sargs) ~(second sargs)) . ~~dargs))))
+         ~((μ ~(first sargs) ~~(second sargs)) . ~~dargs))))
 
 ;; Below, `select` is non-branching like the ?: or ifelse ternary operators,
 ;; except that it doesn't evaluate any of its arguments and the first must be a
