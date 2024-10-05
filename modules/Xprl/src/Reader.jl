@@ -136,13 +136,13 @@ function readlist(stream, opts)
   # convention that callables take a list of arguments passed à la (f x y z).
 
   n = length(subs)
-  # (f . x)
+  # dot application: (f . x)
   if n === 3 && subs[2] == ds.Symbol(["."])
     ds.Pair(subs[1], subs[3])
-  # (f (g ...))
-  elseif n === 2 && typeof(subs[2]) === ds.Pair
-    ds.Pair(subs[1], subs[2])
-  # (f x y z)
+  # list catenation: (f x y z . more)
+  elseif subs[end-1] == ds.Symbol(["."])
+    ds.Pair(subs[1], ds.into(ds.vec(subs[2:end-2]), subs[end]))
+  # standard application: (f x y z)
   else
     ds.Pair(subs[1], ds.vec(subs[2:end]))
   end
