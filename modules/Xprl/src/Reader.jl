@@ -141,10 +141,10 @@ function readlist(stream, opts)
     ds.Pair(subs[1], subs[3])
   # list catenation: (f x y z . more)
   elseif subs[end-1] == ds.Symbol(["."])
-    ds.Pair(subs[1], ds.into(ds.vec(subs[2:end-2]), subs[end]))
+    ds.Pair(subs[1], ds.arglist(ds.into(ds.vec(subs[2:end-2]), subs[end])))
   # standard application: (f x y z)
   else
-    ds.Pair(subs[1], ds.vec(subs[2:end]))
+    ds.Pair(subs[1], ds.arglist(subs[2:end]))
   end
 end
 

@@ -16,6 +16,10 @@ function walk(inner, outer, f::Immediate)
   outer(Immediate(inner(f.content)))
 end
 
+function walk(inner, outer, l::ArgList)
+  outer(ArgList(into(emptyvector, map(inner), l.contents)))
+end
+
 function walk(inner, outer, v)
   outer(v)
 end
