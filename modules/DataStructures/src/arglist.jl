@@ -14,6 +14,18 @@ function iterate(x::ArgList)
   iterate(x.contents)
 end
 
+function iterate(_::ArgList, state)
+  if count(state) === 0
+    nothing
+  else
+    iterate(state)
+  end
+end
+
+function getindex(x::ArgList, n)
+  getindex(x.contents, n)
+end
+
 function eltype(x::ArgList)
   eltype(x.contents)
 end

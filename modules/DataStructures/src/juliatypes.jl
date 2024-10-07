@@ -77,7 +77,8 @@ function typeset()
         emit(r, n)
     end
     function inner(r, n)
-      @warn "Heterogeneous types, boxing."
+      # TODO: reflection warning switch.
+      # @warn "Heterogeneous types, boxing."
       emit(Base.Vector{Any}(r), n)
     end
   end

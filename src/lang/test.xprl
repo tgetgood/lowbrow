@@ -18,10 +18,10 @@
 ;;
 ;; I just learned something I probably should have twenty years ago.
 
+;; "Wraps a primitive that takes only literal values in a function that evals its
+;;  arguments. "
+;; I don't know if it makes more sense to have this as a builtin.
 (def primitivewrap
-  "Wraps a primitive that takes only literal values in a function that evals its
-  arguments."
-  ;; I don't know if it makes more sense to have this as a builtin.
   (μ f
      ~(μ args
          ~(~f . ~~args))))

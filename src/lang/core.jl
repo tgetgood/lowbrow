@@ -10,7 +10,7 @@ f = x.Reader.readall(open("./test.xprl"))
 exec = x.System.executor()
 
 # res = xSystem.start(exec, f[1])
-x.Eval.eval(print, env, f[1])
+# x.Eval.eval(print, env, f[1])
 
 function inspect(form::ds.Pair, level=0)
   print(repeat(" ", level))
@@ -45,37 +45,28 @@ function inspect(form::rt.Application, level=0)
   inspect(form.tail, level+2)
 end
 
+function inspect(form::rt.Mu, level=0)
+  print(repeat(" ", level))
+  println("μ")
+  inspect(form.argsym, level+2)
+  inspect(form.body, level+2)
+end
+
+function inspect(form::x.Eval.BuiltIn, level=0)
+  print(repeat(" ", level))
+  println("F["*string(form)*"]")
+end
+
+# function inspect(form::x.Eval.CreateMu, level=0)
+#   print(repeat(" ", level))
+#   println("F[μ]")
+# end
+
 function inspect(form, level=0)
   print(repeat(" ", level))
   println("V["*string(form)*"]")
 end
 
-cwalk(x) = x
-cwalk(x::ds.Immediate) = invoke(x.content)
+eval(env, form) = x.Eval.eval(env, form)
 
-valtype(x::Int) = true
-valtype(x::String) = true
-valtype(x::Bool) = true
-valtype(x::ds.Vector) = ds.every(valtype, x)
-valtype(x) = false
-
-function invoke(x)
-  if valtype(x)
-    x
-  else
-   ds.Immediate(x)
-  end
-end
-
-function invoke(x::ds.Pair)
-  rt.Application(ds.Immediate(x.head), x.tail)
-end
-
-function treereduce(form)
-  res = ds.postwalk(cwalk, form)
-  if res == form
-    res
-  else
-    treereduce(res)
-  end
-end
+compile = x.Eval.compile

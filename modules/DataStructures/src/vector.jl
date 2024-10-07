@@ -295,7 +295,7 @@ function leafpartition(; init=[])
 
           # TODO: Performance warnings flag and macro. Sometimes you just need
           # reflection and don't want to get swamped with warnings.
-          @warn "Heterogeneous type, boxing values."
+          # @warn "Heterogeneous type, boxing values."
 
           t = Base.Vector{Any}(undef, nodelength)
           for j in 1:i-1
