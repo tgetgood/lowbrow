@@ -25,57 +25,6 @@ function meta(x::MetaExpr)
   x.metadata
 end
 
-#### Cons cells (Pairs)
-
-struct Pair <: Sexp
-  head
-  tail
-end
-
-# REVIEW: Is this a reasonable way to talk about the length of a cons list?
-#
-# I'm treating improper lists as lists with the tail as a single element. This
-# seems to fit my purposes well, but might come back to bite.
-#
-# There shouldn't ever be proper cons lists in this language since functions of
-# zero args don't exist and we use vectors for storing actual lists of things.
-length(c::Pair) = 1 + taillength(c.tail)
-
-taillength(c::Pair) = 1 + taillength(c.tail)
-taillength(n::Nothing) = 0
-taillength(x) = 1
-
-iterate(c::Pair) = c.head, c.tail
-iterate(c::Pair, state::Pair) = iterate(state)
-iterate(c::Pair, state::Nothing) = nothing
-iterate(c::Pair, x::Any) = x, nothing
-
-function getindex(c::Pair, n)
-  if n === 1
-    c.head
-  else
-    getindex(c.tail, n - 1)
-  end
-end
-
-function tailstring(c::Union{Base.Vector, Sequential})
-  into(" ", map(string) ∘ interpose(" "), c)
-end
-
-function tailstring(x)
-  " . " * string(x)
-end
-
-function tailstring(x::Nothing)
-  ""
-end
-
-function string(c::Pair)
-  "(" * string(c.head) * tailstring(c.tail) * ")"
-end
-
-#### Keywords
-
 # A keyword is a name intended for use soley as a name. It should mean something
 # to humans who read it.
 struct Keyword <: Sexp
@@ -132,14 +81,6 @@ end
 function name(x::Symbol)
   x.names[end]
 end
-
-#### Immediates
-
-struct Immediate <: Sexp
-  content
-end
-
-string(f::Immediate) = "~" * string(f.content)
 
 #### Other
 
