@@ -1,5 +1,7 @@
 module Reader
 
+import ..AST as ast
+
 import DataStructures as ds
 
 struct BufferedStream

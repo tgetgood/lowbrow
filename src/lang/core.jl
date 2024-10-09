@@ -1,17 +1,15 @@
 import Xprl as x
 import Xprl.AST as ast
 import Xprl.Compiler: compile
-import Xprl.Reader: readall
+import Xprl.Reader as r
 
 import DataStructures as ds
 
-eval(env, form) = x.Eval.eval(env, form)
-
 def = x.DefaultEnv.default
-core = readall(open("./core.xprl"))
-env = reduce(eval, core; init=def)
+core = r.readall(open("./core.xprl"))
+# env = reduce(compile, core; init=def)
 
-f = x.Reader.readall(open("./test.xprl"))
+f = r.readall(open("./test.xprl"))
 
 exec = x.System.executor()
 
@@ -28,7 +26,7 @@ end
 function inspect(form::ast.ArgList, level=0)
   print(repeat(" ", level))
   println("L")
-  for e in form.contents
+  for e in form.args
     inspect(e, level+2)
   end
 end
@@ -36,7 +34,7 @@ end
 function inspect(form::ast.Immediate, level=0)
   print(repeat(" ", level))
   println("I")
-  inspect(form.content, level+2)
+  inspect(form.form, level+2)
 end
 
 function inspect(form::ds.Symbol, level=0)

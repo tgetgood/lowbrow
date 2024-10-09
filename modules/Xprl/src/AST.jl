@@ -1,9 +1,9 @@
 module AST
 
-import Base: hash, ==
+import Base: hash, ==, string, length, getindex, eltype, show
 
 import DataStructures as ds
-import DataStructures: containsp, walk
+import DataStructures: containsp, walk, emptyp, count, ireduce, first, rest
 
 ##### Dynamic Environment
 
@@ -116,6 +116,10 @@ immediate(e, f) = Immediate(e, f)
 
 string(f::Immediate) = "~" * string(f.form)
 
+function show(io::IO, mime::MIME"text/plain", s::Immediate)
+  print(io, string(s))
+end
+
 function walk(inner, outer, f::Immediate)
   outer(Immediate(f.env, inner(f.form)))
 end
@@ -126,11 +130,15 @@ struct Pair
   tail
 end
 
+struct ArgList
+  args::Tuple
+end
+
 pair(e, h, t) = Pair(e, h, t)
 pair(h, t) = pair(dctx, h, t)
 
-function tailstring(c::ds.Sequential)
-  into(" ", map(string) ∘ interpose(" "), c)
+function tailstring(c::ArgList)
+  ds.into(" ", map(string) ∘ ds.interpose(" "), c)
 end
 
 function tailstring(x)
@@ -141,17 +149,21 @@ function string(c::Pair)
   "(" * string(c.head) * tailstring(c.tail) * ")"
 end
 
-function walk(inner, outer, form::Pair)
-  outer(Pair(form.env, inner(form.head), inner(form.tail)))
+function show(io::IO, mime::MIME"text/plain", s::Pair)
+  print(io, string(s))
 end
 
-struct ArgList
-  args::Tuple
+function walk(inner, outer, form::Pair)
+  outer(Pair(form.env, inner(form.head), inner(form.tail)))
 end
 
 function count(x::ArgList)
   count(x.args)
 end
+
+length(x::ArgList) = count(x)
+
+emptyp(x::ArgList) = count(x) === 0
 
 function iterate(x::ArgList)
   iterate(x.args)
@@ -195,8 +207,8 @@ function string(x::ArgList)
   "#"*string(x.args)
 end
 
-function arglist(env, xs)
-  ArgList(env, tuple(xs...))
+function arglist(xs)
+  ArgList(tuple(xs...))
 end
 
 function walk(inner, outer, l::ArgList)
