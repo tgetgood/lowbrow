@@ -1,6 +1,6 @@
 module AST
 
-import Base: hash, ==, string, length, getindex, eltype, show
+import Base: hash, ==, string, length, getindex, eltype, show, get, iterate
 
 import DataStructures as ds
 import DataStructures: containsp, walk, emptyp, count, ireduce, first, rest
@@ -98,12 +98,16 @@ struct TopLevelForm <: ds.Sexp
   #
   # But then we can use the filesystem modified metadata (or source control) to
   # cache whole files.
-  env::ds.Map
+  env::Context
   form
 end
 
 function top(env, form)
   TopLevelForm(env, form)
+end
+
+function top(env::ds.Map, form)
+  TopLevelForm(RootContext(env), form)
 end
 
 struct Immediate
@@ -262,6 +266,6 @@ reduced(form::Application) = false
 reduced(form::ds.Symbol) = false
 reduced(form::Pair) = reduced(form.head) && reduced(form.tail)
 reduced(form::Mu) = reduced(form.arg) && reduced(form.body)
-reduced(form::ArgList) = ds.every(identity, map(reduced, form.contents))
+reduced(form::ArgList) = ds.every(identity, map(reduced, form.args))
 
 end # module

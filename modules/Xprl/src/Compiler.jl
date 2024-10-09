@@ -62,7 +62,7 @@ function compile(form)
 end
 
 function compile(form::ast.ArgList)
-  ast.arglist(map(x -> compile(env, x), form.contents))
+  ast.arglist(map(x -> compile(x), form.args))
 end
 
 function compile(form::ast.Immediate)
@@ -78,7 +78,7 @@ function compile(form::ast.Application)
 end
 
 function compile(form::ast.TopLevelForm)
-  compile(ast.immediate(ast.RootContext(form.env), form.form))
+  compile(ast.immediate(form.env, form.form))
 end
 
 end # module
