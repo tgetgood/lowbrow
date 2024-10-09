@@ -1,5 +1,8 @@
 module Xprl
 
+include("./Environment.jl")
+import .Environment
+
 include("./AST.jl")
 import .AST
 

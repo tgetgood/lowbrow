@@ -5,63 +5,7 @@ import Base: hash, ==, string, length, getindex, eltype, show, get, iterate
 import DataStructures as ds
 import DataStructures: containsp, walk, emptyp, count, ireduce, first, rest
 
-##### Dynamic Environment
-
-abstract type Context end
-
-struct DummyContext <: Context end
-dctx = DummyContext()
-
-struct RootContext <: Context
-  lex::ds.Map
-end
-
-struct BoundContext <: Context
-  parent::Context
-  sym::ds.Symbol
-  binding
-end
-
-struct UnboundContext <: Context
-  parent::Context
-  sym::ds.Symbol
-end
-
-get(c::DummyContext, _) = throw("dummy context!")
-
-function get(c::RootContext, s)
-  get(c.lex, s)
-end
-
-function get(c::BoundContext, s)
-  if s == c.sym
-    c.binding
-  else
-    get(c.parent, s)
-  end
-end
-
-function get(c::UnboundContext, s)
-  if s == c.sym
-    throw(string(s) * " is not yet bound")
-  else
-    get(c.parent, s)
-  end
-end
-
-
-containsp(c::DummyContext, _) = throw("dummy context!")
-containsp(c::RootContext, s) = containsp(c.lex, s)
-containsp(c::BoundContext, s) = s == c.sym || resolvedp(c.parent, s)
-containsp(c::UnboundContext, s) = s != c.sym && resolvedp(c.parent, s)
-
-unboundp(c::DummyContext, _) = throw("dummy context!")
-unboundp(c::UnboundContext, s) = s == c.sym || unboundp(c.parent, s)
-unboundp(c::RootContext, s) = false
-unboundp(c::Context, s) = unboundp(c.parent)
-
-lex(c::Context) = lex(c.parent)
-lex(c::RootContext) = c.lex
+import ..Environment as env
 
 ##### Run time data structures
 
@@ -83,47 +27,8 @@ struct PrimitiveMacro <: BuiltIn
   f::Function
 end
 
-struct TopLevelForm <: ds.Sexp
-  # REVIEW: string/read should be an isomorphism, but I'll need to prove that if
-  # hashed based caching is going to be reliable.
-  #
-  # There really isn't any way to get the string of a single form out of a
-  # stream without reading it...
-  #
-  # Of course we'll lose comments and formatting, but that's actually a good
-  # thing for hashing, isn't it?
-  #
-  # But then we'll need to read in the code text before we know whether we have
-  # it cached or not...
-  #
-  # But then we can use the filesystem modified metadata (or source control) to
-  # cache whole files.
-  env::Context
-  form
-end
-
-function setcontext(env, x)
-  x
-end
-
-function setcontext(env, x::Immediate)
-  Immediate(env, x.form)
-end
-
-function setcontext(env, x::Pair)
-  Pair(env, x.head, x.tail)
-end
-
-function top(env::Context, form)
-  ds.prewalk(x -> setcontext(env, x), form)
-end
-
-function top(env::ds.Map, form)
-  top(RootContext(env), form)
-end
-
 struct Immediate
-  env::Context
+  env
   form
 end
 
@@ -141,7 +46,7 @@ function walk(inner, outer, f::Immediate)
 end
 
 struct Pair
-  env::Context
+  env
   head
   tail
 end
@@ -236,7 +141,7 @@ Represents an application of args to a function-like entity which has not been
 performed yet.
 """
 struct Application
-  env::Context
+  env
   head
   tail
 end
@@ -252,7 +157,7 @@ function hash(x::Application)
 end
 
 struct Mu
-  env::Context
+  env
   arg::ds.Symbol
   body
 end
@@ -279,5 +184,76 @@ reduced(form::ds.Symbol) = false
 reduced(form::Pair) = reduced(form.head) && reduced(form.tail)
 reduced(form::Mu) = reduced(form.arg) && reduced(form.body)
 reduced(form::ArgList) = ds.every(identity, map(reduced, form.args))
+
+function inspect(form::Pair, level=0)
+  print(repeat(" ", level))
+  println("P")
+  inspect(form.head, level+2)
+  inspect(form.tail, level+2)
+end
+
+function inspect(form::ArgList, level=0)
+  print(repeat(" ", level))
+  println("L")
+  for e in form.args
+    inspect(e, level+2)
+  end
+end
+
+function inspect(form::Immediate, level=0)
+  print(repeat(" ", level))
+  println("I")
+  inspect(form.form, level+2)
+end
+
+function inspect(form::ds.Symbol, level=0)
+  print(repeat(" ", level))
+  println("S["*string(form)*"]")
+end
+
+function inspect(form::Application, level=0)
+  print(repeat(" ", level))
+  println("A")
+  inspect(form.head, level+2)
+  inspect(form.tail, level+2)
+end
+
+function inspect(form::Mu, level=0)
+  print(repeat(" ", level))
+  println("μ")
+  inspect(form.arg, level+2)
+  inspect(form.body, level+2)
+end
+
+function inspect(form::BuiltIn, level=0)
+  print(repeat(" ", level))
+  println("F["*string(form)*"]")
+end
+
+function inspect(form, level=0)
+  print(repeat(" ", level))
+  println("V["*string(form)*"]")
+end
+
+function setcontext(env, x)
+  x
+end
+
+function setcontext(env, x::Immediate)
+  Immediate(env, x.form)
+end
+
+function setcontext(env, x::Pair)
+  Pair(env, x.head, x.tail)
+end
+
+"""
+Takes a read but uncompiled form and replaces the lexical environment of all
+nodes with the new one given thus regrounding the meaning of all symbols in the
+expression.
+"""
+function reground(env, form)
+  ds.prewalk(x -> setcontext(env, x), form)
+end
 
 end # module

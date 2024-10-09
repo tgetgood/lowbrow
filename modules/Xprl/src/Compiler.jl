@@ -27,7 +27,7 @@ function invoke(env, x::ast.Immediate)
   ast.Immediate(env, invoke(env, x.form))
 end
 
-function invoke(env::ast.Context, x::ds.Symbol)
+function invoke(env, x::ds.Symbol)
   if ds.containsp(env, x)
     ds.get(env, x)
   elseif ast.unboundp(env, x)
@@ -77,8 +77,13 @@ function compile(form::ast.Application)
   apply(form.env, compile(form.head), compile(form.tail))
 end
 
-function compile(form::ast.TopLevelForm)
-  compile(ast.immediate(form.env, form.form))
+"""
+Takes a form as pure syntax, replaces the meaning of all symbols (the lexical
+environment) with the one provided, and compiles the result.
+"""
+function compilein(env, form)
+  rform = ast.reground(env, form)
+  compile(ast.Immediate(env, rform))
 end
 
 end # module
