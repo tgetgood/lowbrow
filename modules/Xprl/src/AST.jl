@@ -102,12 +102,24 @@ struct TopLevelForm <: ds.Sexp
   form
 end
 
-function top(env, form)
-  TopLevelForm(env, form)
+function setcontext(env, x)
+  x
+end
+
+function setcontext(env, x::Immediate)
+  Immediate(env, x.form)
+end
+
+function setcontext(env, x::Pair)
+  Pair(env, x.head, x.tail)
+end
+
+function top(env::Context, form)
+  ds.prewalk(x -> setcontext(env, x), form)
 end
 
 function top(env::ds.Map, form)
-  TopLevelForm(RootContext(env), form)
+  top(RootContext(env), form)
 end
 
 struct Immediate
@@ -216,7 +228,7 @@ function arglist(xs)
 end
 
 function walk(inner, outer, l::ArgList)
-  outer(argList(map(inner, l.args)))
+  outer(arglist(map(inner, l.args)))
 end
 
 """

@@ -25,7 +25,7 @@ function def(env, name, args...)
   end
 
   form = compile(ast.top(env, body))
-  e2 = ds.assoc(env, name, form)
+  # e2 = ds.assoc(env, name, form)
 
   # emit :env e2, :return form
 end
