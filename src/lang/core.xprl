@@ -1,0 +1,40 @@
+(def wrap
+  "Wraps a μ or primitive that takes only literal values in a function that
+  evals its arguments."
+  (μ f
+     ~(μ args
+         ~(~f . ~~args))))
+
+(def first (wrap . first*))
+(def second (wrap . second*))
+
+;; I like the way clojure bootstraps so that destructuring is implemented in
+;; clojure, not java. I'm going to follow a similar path, but this is somewhat
+;; weirder on the surface: μ* and fn* take exactly one argument and it doesn't
+;; have to be a list. This provides an elegant symmetry, but it's not very
+;; practical.
+;;
+;; I wanted to avoid cons cells entirely in this language, but I'm starting to
+;; realise why they're important: the symmetry between calling a function as (f
+;; x y z) and defining it as (fn [x y z] ...). The fact that the tail of the
+;; cons cell (f x y z) is the cons cell (x y z) makes this automatic. So... if I
+;; want to be able to call things with a single arg that isn't necessarily a
+;; list, I need improper cons cells. Once we have that, the convention of
+;; multiple args becomes automatic.
+;;
+;; I just learned something I probably should have twenty years ago.
+(def fn
+  (μ sargs
+     ~(μ dargs
+         ~((μ ~(first sargs) ~~(second sargs)) . ~~dargs))))
+
+;; Below, `select` is non-branching like the ?: or ifelse ternary operators,
+;; except that it doesn't evaluate any of its arguments and the first must be a
+;; literal boolean. The name is taken from the llvm instruction.
+;;
+;; In 3-lisp `select` was called `ef` for "extensionally defined if".
+(def if
+  (μ args
+     ~~(select ~~(nth args 1) ~(nth args 2) ~(nth args 3))))
+
+(def + (wrap . +*))
