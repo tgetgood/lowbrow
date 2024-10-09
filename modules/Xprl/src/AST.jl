@@ -3,36 +3,37 @@ module AST
 import Base: hash, ==
 
 import DataStructures as ds
-import DataStructures: containsp
+import DataStructures: containsp, walk
 
 ##### Dynamic Environment
 
 abstract type Context end
 
+struct DummyContext <: Context end
+dctx = DummyContext()
+
 struct RootContext <: Context
   lex::ds.Map
 end
 
-struct AppliedContext <: Context
+struct BoundContext <: Context
   parent::Context
   sym::ds.Symbol
   binding
 end
 
-struct OpenContext <: Context
-  parent::Context
-end
-
-struct ClosedContext <: Context
+struct UnboundContext <: Context
   parent::Context
   sym::ds.Symbol
 end
+
+get(c::DummyContext, _) = throw("dummy context!")
 
 function get(c::RootContext, s)
   get(c.lex, s)
 end
 
-function get(c::AppliedContext, s)
+function get(c::BoundContext, s)
   if s == c.sym
     c.binding
   else
@@ -40,11 +41,7 @@ function get(c::AppliedContext, s)
   end
 end
 
-function get(c::OpenContext, s)
-  get(c.parent, s)
-end
-
-function get(c::ClosedContext, s)
+function get(c::UnboundContext, s)
   if s == c.sym
     throw(string(s) * " is not yet bound")
   else
@@ -52,12 +49,14 @@ function get(c::ClosedContext, s)
   end
 end
 
-containsp(c::RootContext, s) = containsp(c.lex, s)
-containsp(c::AppliedContext, s) = s == c.sym || resolvedp(c.parent, s)
-containsp(c::OpenContext, s) = resolvedp(c.parent)
-containsp(c::ClosedContext, s) = s != c.sym && resolvedp(c.parent, s)
 
-unboundp(c::ClosedContext, s) = s == c.sym || unboundp(c.parent, s)
+containsp(c::DummyContext, _) = throw("dummy context!")
+containsp(c::RootContext, s) = containsp(c.lex, s)
+containsp(c::BoundContext, s) = s == c.sym || resolvedp(c.parent, s)
+containsp(c::UnboundContext, s) = s != c.sym && resolvedp(c.parent, s)
+
+unboundp(c::DummyContext, _) = throw("dummy context!")
+unboundp(c::UnboundContext, s) = s == c.sym || unboundp(c.parent, s)
 unboundp(c::RootContext, s) = false
 unboundp(c::Context, s) = unboundp(c.parent)
 
@@ -67,6 +66,7 @@ lex(c::RootContext) = c.lex
 ##### Run time data structures
 
 abstract type BuiltIn end
+
 """
 Primitive functions expect their arguments to be literal values. They should
 normally be wrapped to make sure args are evaluated.
@@ -102,18 +102,32 @@ struct TopLevelForm <: ds.Sexp
   form
 end
 
+function top(env, form)
+  TopLevelForm(env, form)
+end
+
 struct Immediate
   env::Context
   form
 end
 
+immediate(f) = immediate(dctx, f)
+immediate(e, f) = Immediate(e, f)
+
 string(f::Immediate) = "~" * string(f.form)
+
+function walk(inner, outer, f::Immediate)
+  outer(Immediate(f.env, inner(f.form)))
+end
 
 struct Pair
   env::Context
   head
   tail
 end
+
+pair(e, h, t) = Pair(e, h, t)
+pair(h, t) = pair(dctx, h, t)
 
 function tailstring(c::ds.Sequential)
   into(" ", map(string) ∘ interpose(" "), c)
@@ -125,6 +139,10 @@ end
 
 function string(c::Pair)
   "(" * string(c.head) * tailstring(c.tail) * ")"
+end
+
+function walk(inner, outer, form::Pair)
+  outer(Pair(form.env, inner(form.head), inner(form.tail)))
 end
 
 struct ArgList
@@ -181,6 +199,10 @@ function arglist(env, xs)
   ArgList(env, tuple(xs...))
 end
 
+function walk(inner, outer, l::ArgList)
+  outer(argList(map(inner, l.args)))
+end
+
 """
 Represents an application of args to a function-like entity which has not been
 performed yet.
@@ -223,11 +245,11 @@ evaluation. (Immediate evaluation just means evaluations that cannot be done yet
 but must eventually be performed).
 """
 reduced(form) = true
-reduced(form::ds.Immediate) = false
-reduced(form::rt.Application) = false
+reduced(form::Immediate) = false
+reduced(form::Application) = false
 reduced(form::ds.Symbol) = false
-reduced(form::ds.Pair) = reduced(form.head) && reduced(form.tail)
-reduced(form::rt.Mu) = reduced(form.arg) && reduced(form.body)
-reduced(form::ds.ArgList) = ds.every(identity, map(reduced, form.contents))
+reduced(form::Pair) = reduced(form.head) && reduced(form.tail)
+reduced(form::Mu) = reduced(form.arg) && reduced(form.body)
+reduced(form::ArgList) = ds.every(identity, map(reduced, form.contents))
 
 end # module

@@ -33,8 +33,6 @@ include("./queue.jl")
 include("./async.jl")
 include("./juliatypes.jl")
 
-include("./arglist.jl")
-
 include("./walk.jl")
 
 # Sequential
@@ -60,7 +58,7 @@ export Queue, queue, emptyqueue, closedp, emptystream, put!, Stream, stream
 export conj, count, empty, emptyp, nil, keyword, name, symbol, withmeta, meta, every
 
 # Types
-export Keyword, Map, Vector, MapEntry, List, Symbol, Pair, Immediate, Sexp, ArgList
+export Keyword, Map, Vector, MapEntry, List, Symbol, Sexp
 
 # Transients
 export transient!, persist!, conj!
@@ -69,7 +67,7 @@ export transient!, persist!, conj!
 export Atom, deref, swap!, pub, subscribe, tap
 
 # other
-export handleerror, arglist
+export handleerror
 
 # Mutable Julia collections
 export into!

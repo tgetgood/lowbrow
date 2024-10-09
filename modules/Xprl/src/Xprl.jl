@@ -1,7 +1,7 @@
 module Xprl
 
-include("./Runtime.jl")
-import .Runtime
+include("./AST.jl")
+import .AST
 
 include("./Receivers.jl")
 import .Receivers
@@ -12,10 +12,11 @@ import .Reader
 include("./System.jl")
 import .System
 
-include("./Eval.jl")
-import .Eval
+include("./Compiler.jl")
+import .Compiler
 
 include("./DefaultEnv.jl")
 import .DefaultEnv
+
 
 end # module Xprl

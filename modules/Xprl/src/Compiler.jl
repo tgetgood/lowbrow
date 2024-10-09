@@ -19,70 +19,66 @@ function invoke(env, x)
   if valuep(x)
     x
   else
-   rt.Immediate(env, compile(x))
+   ast.Immediate(env, compile(x))
   end
 end
 
-function invoke(env, x::ds.Immediate)
-  ds.Immediate(env, invoke(env, x.form))
+function invoke(env, x::ast.Immediate)
+  ast.Immediate(env, invoke(env, x.form))
 end
 
-function invoke(env::rt.Context, x::ds.Symbol)
+function invoke(env::ast.Context, x::ds.Symbol)
   if ds.containsp(env, x)
-    compile(ds.get(env, x))
-  elseif rt.unboundp(env, x)
-    rt.Immediate(env, x)
+    ds.get(env, x)
+  elseif ast.unboundp(env, x)
+    ast.Immediate(env, x)
   else
     throw("Unresolved symbol: " * string(x))
   end
 end
 
-function invoke(env, x::ds.Pair)
-  compile(rt.Application(env, rt.Immediate(env, x.head), x.tail))
+function invoke(env, x::ast.Pair)
+  compile(ast.Application(env, ast.Immediate(env, x.head), x.tail))
 end
 
-function apply(env, f::PrimitiveFunction, args)
+function apply(env, f::ast.PrimitiveFunction, args)
   if ast.reduced(args)
     f.f(args...)
   else
-    rt.Application(f, args)
+    ast.Application(f, args)
   end
 end
 
-function apply(env, f::PrimitiveMacro, args)
+function apply(env, f::ast.PrimitiveMacro, args)
   f.f(env, args...)
 end
 
-function apply(env, f::rt.ClosedMu, arg)
+function apply(env, f::ast.Mu, arg)
   compile(ds.assoc(env, f.arg, arg), f.body)
-end
-
-function apply(env, f::OpenMu, arg)
-  rt.Application(f, compile(env, arg))
 end
 
 function compile(form)
   form
 end
 
-function compile(form::ds.ArgList)
-  rt.arglist(map(x -> compile(env, x), form.contents))
+function compile(form::ast.ArgList)
+  ast.arglist(map(x -> compile(env, x), form.contents))
 end
 
-function compile(form::ds.Immediate)
+function compile(form::ast.Immediate)
   invoke(form.env, form.form)
 end
 
-function compile(env, form::ds.Pair)
-  ds.Pair(compile(env, form.head), compile(env, form.tail))
+function compile(env, form::ast.Pair)
+  ast.Pair(compile(env, form.head), compile(env, form.tail))
 end
 
-function compile(form::rt.Application)
+function compile(form::ast.Application)
   apply(form.env, compile(form.head), compile(form.tail))
 end
 
-function compile(form::rt.TopLevelForm)
-  compile(rt.immediate(rt.RootContext(form.env), form.form))
+function compile(form::ast.TopLevelForm)
+  compile(ast.immediate(ast.RootContext(form.env), form.form))
 end
 
 end # module

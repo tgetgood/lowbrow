@@ -138,13 +138,13 @@ function readlist(stream, opts)
   n = length(subs)
   # dot application: (f . x)
   if n === 3 && subs[2] == ds.Symbol(["."])
-    ds.Pair(subs[1], subs[3])
+    ast.pair(subs[1], subs[3])
   # list catenation: (f x y z . more)
   elseif subs[end-1] == ds.Symbol(["."])
-    ds.Pair(subs[1], ds.arglist(ds.into(ds.vec(subs[2:end-2]), subs[end])))
+    ast.pair(subs[1], ast.arglist(ds.into(ds.vec(subs[2:end-2]), subs[end])))
   # standard application: (f x y z)
   else
-    ds.Pair(subs[1], ds.arglist(subs[2:end]))
+    ast.pair(subs[1], ast.arglist(subs[2:end]))
   end
 end
 
@@ -298,10 +298,8 @@ function readmeta(stream, opts)
 end
 
 function readimmediate(stream, opts)
-  createimmediate(read(stream, opts))
+  ast.immediate(read(stream, opts))
 end
-
-createimmediate(f::ds.Sexp) = ds.Immediate(f)
 
 dispatch = Dict(
   '(' => readlist,

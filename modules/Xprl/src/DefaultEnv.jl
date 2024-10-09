@@ -2,21 +2,17 @@ module DefaultEnv
 import DataStructures as ds
 
 import ..Receivers
-import ..Eval
-import ..Runtime as rt
-
-"""
-Wraps a function so as to evaluate arguments before passing them in.
-
-This needs to be converted to a struct since we don't know how to evaluate the
-args at the point this is called.
-"""
-function argeval(f::Function)
-  Eval.Applicative(f)
-end
+import ..Compiler: compile
+import ..AST as ast
 
 function createμ(env, params, body)
-  rt.Mu(params, Eval.compile(env, body))
+  left = Eval.compilestar(env, params)
+  if isa(left, ds.Symbol)
+    e = rt.MuBody(env, ds.set(left))
+  else
+    e = rt.UnknownContext
+  end
+  rt.Mu(left, Eval.compile(e, body))
 end
 
 function def(env, name, args...)
@@ -28,26 +24,30 @@ function def(env, name, args...)
     body = args[1]
   end
 
-  form = Eval.eval(env, body)
+  form = compile(ast.top(env, body))
   e2 = ds.assoc(env, name, form)
 
   # emit :env e2, :return form
-
-  form
 end
 
 second(x) = x[2]
 
-# To start we're just going to use jl functions.
 default = ds.hashmap(
-  ds.Symbol(["eval"]), Eval.eval,
-  ds.Symbol(["apply"]), Eval.apply,
-  ds.Symbol(["def"]), Eval.PrimitiveMacro(def),
-  ds.Symbol(["μ"]), Eval.PrimitiveMacro(createμ),
+  # REVIEW: It seems to me (at the moment) that neither apply nor eval should be
+  # available in the language. You can always evaluate a constructed expression
+  # with the `~` syntax and apply an arbitrary argument to a thing with the ( .
+  # ) syntax.
+  #
+  # Both of these avoid requiring us to make the environment manipulable, which
+  # my gut tells me we'll be happy we did.
+  # ds.Symbol(["eval"]), Eval.eval,
+  # ds.Symbol(["apply"]), Eval.apply,
+  ds.Symbol(["def"]), ast.PrimitiveMacro(def),
+  ds.Symbol(["μ"]), ast.PrimitiveMacro(createμ),
 
-  ds.Symbol(["+"]), Eval.PrimitiveFunction(+),
-  ds.Symbol(["first"]), Eval.PrimitiveFunction(first),
-  ds.Symbol(["second"]), Eval.PrimitiveFunction(second)
+  ds.Symbol(["+*"]), ast.PrimitiveFunction(+),
+  ds.Symbol(["first*"]), ast.PrimitiveFunction(first),
+  ds.Symbol(["second*"]), ast.PrimitiveFunction(second)
 )
 
 end
