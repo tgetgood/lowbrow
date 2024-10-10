@@ -5,6 +5,7 @@ import DataStructures as ds
 import ..System
 import ..Receivers as rec
 import ..AST as ast
+import ..Environment as E
 
 # FIXME: This can be expensive to compute. We need a flag of some sort so as not
 # to do it more than once for a given value.
@@ -28,9 +29,10 @@ function invoke(env, x::ast.Immediate)
 end
 
 function invoke(env, x::ds.Symbol)
-  if ds.containsp(env, x)
-    ds.get(env, x)
-  elseif ast.unboundp(env, x)
+  v = E.get(env, x, :notfound)
+  if v !== :notfound
+    compile(v)
+  elseif E.unboundp(env, x)
     ast.Immediate(env, x)
   else
     throw("Unresolved symbol: " * string(x))
@@ -54,7 +56,12 @@ function apply(env, f::ast.PrimitiveMacro, args)
 end
 
 function apply(env, f::ast.Mu, arg)
-  compile(ds.assoc(env, f.arg, arg), f.body)
+  @info "mu"
+  compile(ast.bind(f.body, f.arg, arg))
+end
+
+function apply(env, f, arg)
+  ast.Application(env, f, arg)
 end
 
 function compile(form)
@@ -74,7 +81,11 @@ function compile(env, form::ast.Pair)
 end
 
 function compile(form::ast.Application)
-  apply(form.env, compile(form.head), compile(form.tail))
+  apply(form.env, compile(form.head), form.tail)
+end
+
+function compile(form::ast.TopLevel)
+  form.compiled
 end
 
 """
@@ -83,7 +94,7 @@ environment) with the one provided, and compiles the result.
 """
 function compilein(env, form)
   rform = ast.reground(env, form)
-  compile(ast.Immediate(env, rform))
+  cform = compile(ast.Immediate(env, rform))
 end
 
 end # module

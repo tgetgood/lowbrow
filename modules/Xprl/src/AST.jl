@@ -5,7 +5,7 @@ import Base: hash, ==, string, length, getindex, eltype, show, get, iterate
 import DataStructures as ds
 import DataStructures: containsp, walk, emptyp, count, ireduce, first, rest
 
-import ..Environment as env
+import ..Environment as E
 
 ##### Run time data structures
 
@@ -27,12 +27,27 @@ struct PrimitiveMacro <: BuiltIn
   f::Function
 end
 
+"""
+Container for defined forms and those typed into the repl.
+"""
+struct TopLevel
+  lexicalenv
+  source
+  compiled
+end
+
+string(x::TopLevel) = string(x.source)
+
+function show(io::IO, mime::MIME"text/plain", s::TopLevel)
+  print(io, string(s))
+end
+
 struct Immediate
   env
   form
 end
 
-immediate(f) = immediate(dctx, f)
+immediate(f) = immediate(ds.emptymap, f)
 immediate(e, f) = Immediate(e, f)
 
 string(f::Immediate) = "~" * string(f.form)
@@ -56,7 +71,7 @@ struct ArgList
 end
 
 pair(e, h, t) = Pair(e, h, t)
-pair(h, t) = pair(dctx, h, t)
+pair(h, t) = pair(ds.emptymap, h, t)
 
 function tailstring(c::ArgList)
   ds.into(" ", map(string) ∘ ds.interpose(" "), c)
@@ -146,6 +161,14 @@ struct Application
   tail
 end
 
+function string(x::Application)
+  "#Application(" * string(x.head) * ", " * string(x.tail) * ")"
+end
+
+function show(io::IO, mime::MIME"text/plain", s::Application)
+  print(io, string(s))
+end
+
 function Base.:(==)(x::Application, y::Application)
   x.head == y.head && x.tail == y.tail
 end
@@ -160,6 +183,12 @@ struct Mu
   env
   arg::ds.Symbol
   body
+end
+
+string(x::Mu) = "(μ " * string(x.arg) * " " * string(x.body) * ")"
+
+function show(io::IO, mime::MIME"text/plain", s::Mu)
+  print(io, string(s))
 end
 
 function Base.:(==)(x::Mu, y::Mu)
@@ -185,54 +214,66 @@ reduced(form::Pair) = reduced(form.head) && reduced(form.tail)
 reduced(form::Mu) = reduced(form.arg) && reduced(form.body)
 reduced(form::ArgList) = ds.every(identity, map(reduced, form.args))
 
+function space(level)
+  if level > 0
+    print(repeat(" |", level))
+  end
+end
+
 function inspect(form::Pair, level=0)
-  print(repeat(" ", level))
+  space(level)
   println("P")
-  inspect(form.head, level+2)
-  inspect(form.tail, level+2)
+  inspect(form.head, level+1)
+  inspect(form.tail, level+1)
 end
 
 function inspect(form::ArgList, level=0)
-  print(repeat(" ", level))
+  space(level)
   println("L")
   for e in form.args
-    inspect(e, level+2)
+    inspect(e, level+1)
   end
 end
 
 function inspect(form::Immediate, level=0)
-  print(repeat(" ", level))
+  space(level)
   println("I")
-  inspect(form.form, level+2)
+  inspect(form.form, level+1)
 end
 
 function inspect(form::ds.Symbol, level=0)
-  print(repeat(" ", level))
+  space(level)
   println("S["*string(form)*"]")
 end
 
 function inspect(form::Application, level=0)
-  print(repeat(" ", level))
+  space(level)
   println("A")
-  inspect(form.head, level+2)
-  inspect(form.tail, level+2)
+  inspect(form.head, level+1)
+  inspect(form.tail, level+1)
 end
 
 function inspect(form::Mu, level=0)
-  print(repeat(" ", level))
+  space(level)
   println("μ")
-  inspect(form.arg, level+2)
-  inspect(form.body, level+2)
+  inspect(form.arg, level+1)
+  inspect(form.body, level+1)
 end
 
 function inspect(form::BuiltIn, level=0)
-  print(repeat(" ", level))
+  space(level)
   println("F["*string(form)*"]")
 end
 
 function inspect(form, level=0)
-  print(repeat(" ", level))
-  println("V["*string(form)*"]")
+  space(level)
+  println("V["*string(typeof(form))*"]")
+end
+
+function inspect(form::TopLevel, level=0)
+  space(level)
+  println("-T-")
+  inspect(form.compiled, level)
 end
 
 function setcontext(env, x)
@@ -254,6 +295,47 @@ expression.
 """
 function reground(env, form)
   ds.prewalk(x -> setcontext(env, x), form)
+end
+
+function envwalk(form, _, _)
+  form
+end
+
+function envwalk(form::Pair, f, s)
+  Pair(f(form.env, s), envwalk(form.head, f, s), envwalk(form.tail, f, s))
+end
+
+function envwalk(form::Immediate, f, args)
+  Immediate(f(form.env, args), envwalk(form.form, f, args))
+end
+
+function envwalk(form::Mu, f, args)
+  if args == form.arg
+    @warn "shadowing"
+    # Shadowing
+    form
+  else
+    Mu(f(form.env, args), form.arg, envwalk(form.body, f, args))
+  end
+end
+
+function envwalk(form::ArgList, f, args)
+  arglist(map(x -> envwalk(x, f, args), form.args))
+end
+
+function envwalk(form::Application, f, args)
+  Application(
+    f(form.env, args),
+    envwalk(form.head, f, args),
+    envwalk(form.tail, f, args))
+end
+
+declare(form, s) = envwalk(form, E.declare, s)
+
+function bind(form, k, v)
+  inspect(form)
+  @info E.unboundp(form.env, k)
+  envwalk(form, (e, (k, v)) -> E.bind(e, k, v), (k, v))
 end
 
 end # module

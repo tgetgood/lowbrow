@@ -1,12 +1,13 @@
 import Xprl as x
 import Xprl.AST as ast
 import Xprl.AST: inspect
-import Xprl.Compiler: compile
+import Xprl.Compiler: compile, compilein
 import Xprl.Reader as r
+import Xprl.Environment as E
 
 import DataStructures as ds
 
-def = x.DefaultEnv.default
+def = x.Environment.create(x.DefaultEnv.default)
 core = r.readall(open("./core.xprl"))
 # env = reduce(compile, core; init=def)
 

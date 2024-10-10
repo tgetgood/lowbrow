@@ -2,17 +2,22 @@ module DefaultEnv
 import DataStructures as ds
 
 import ..Receivers
-import ..Compiler: compile
+import ..Compiler: compile, compilein
+import ..Environment as E
 import ..AST as ast
 
 function createμ(env, params, body)
-  left = Eval.compilestar(env, params)
+  left = compile(params)
   if isa(left, ds.Symbol)
-    e = rt.MuBody(env, ds.set(left))
+    env = E.declare(env, left)
+    ast.Mu(env, left, compile(ast.declare(body, left)))
   else
-    e = rt.UnknownContext
+    ast.Pair(
+      env,
+      ast.PrimitiveMacro(createμ),
+      ast.arglist((left, compile(body)))
+    )
   end
-  rt.Mu(left, Eval.compile(e, body))
 end
 
 function def(env, name, args...)
@@ -24,8 +29,11 @@ function def(env, name, args...)
     body = args[1]
   end
 
-  form = compile(ast.top(env, body))
-  # e2 = ds.assoc(env, name, form)
+  cform = compilein(env, body)
+
+  form = ast.TopLevel(E.lexical(env), body, cform)
+
+  e2 = E.extendlexical(env, name, form)
 
   # emit :env e2, :return form
 end
