@@ -33,8 +33,9 @@
 ;; literal boolean. The name is taken from the llvm instruction.
 ;;
 ;; In 3-lisp `select` was called `ef` for "extensionally defined if".
-(def if
-  (μ args
-     ~~(select ~~(nth args 1) ~(nth args 2) ~(nth args 3))))
+
+;; (def if
+;;   (μ args
+;;      ~~(select ~~(nth args 1) ~(nth args 2) ~(nth args 3))))
 
 (def + (wrap . +*))

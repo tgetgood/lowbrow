@@ -140,7 +140,11 @@ function hash(x::ArgList)
 end
 
 function string(x::ArgList)
-  "#"*string(x.args)
+  ds.into("#(", map(string) ∘ ds.interpose(" "), x.args) * ")"
+end
+
+function show(io::IO, mime::MIME"text/plain", s::ArgList)
+  print(io, string(s))
 end
 
 function arglist(xs)
@@ -201,6 +205,27 @@ function hash(x::Mu)
   xor(muhash, hash(x.env), hash(x.arg), hash(x.body))
 end
 
+struct PartialMu
+  env
+  arg
+  body
+end
+
+string(x::PartialMu) = "(μ " * string(x.arg) * " " * string(x.body) * ")"
+
+function show(io::IO, mime::MIME"text/plain", s::PartialMu)
+  print(io, string(s))
+end
+
+function Base.:(==)(x::PartialMu, y::PartialMu)
+  x.env == y.env && x.arg == y.arg && x.body == y.body
+end
+
+const muhash = hash("#Mu")
+
+function hash(x::PartialMu)
+  xor(muhash, hash(x.env), hash(x.arg), hash(x.body))
+end
 """
 Returns true iff the form cannot be further reduced and contains no immediate
 evaluation. (Immediate evaluation just means evaluations that cannot be done yet
@@ -251,6 +276,13 @@ function inspect(form::Application, level=0)
   println("A")
   inspect(form.head, level+1)
   inspect(form.tail, level+1)
+end
+
+function inspect(form::PartialMu, level=0)
+  space(level)
+  println("Pμ")
+  inspect(form.arg, level+1)
+  inspect(form.body, level+1)
 end
 
 function inspect(form::Mu, level=0)
@@ -310,6 +342,7 @@ function envwalk(form::Immediate, f, args)
 end
 
 function envwalk(form::Mu, f, args)
+  # FIXME: This will not work for binding.
   if args == form.arg
     @warn "shadowing"
     # Shadowing
@@ -317,6 +350,14 @@ function envwalk(form::Mu, f, args)
   else
     Mu(f(form.env, args), form.arg, envwalk(form.body, f, args))
   end
+end
+
+function envwalk(form::PartialMu, f, args)
+  PartialMu(
+    f(form.env, args),
+    envwalk(form.arg, f, args),
+    envwalk(form.body, f, args)
+  )
 end
 
 function envwalk(form::ArgList, f, args)
@@ -330,12 +371,22 @@ function envwalk(form::Application, f, args)
     envwalk(form.tail, f, args))
 end
 
+function evwalk(form::TopLevel, f, args)
+  TopLevel(form.env, form.source, envwalk(form.compiled, f, args))
+end
+
 declare(form, s) = envwalk(form, E.declare, s)
 
 function bind(form, k, v)
-  inspect(form)
-  @info E.unboundp(form.env, k)
   envwalk(form, (e, (k, v)) -> E.bind(e, k, v), (k, v))
+end
+
+function mergelocals(env, form)
+  function ml(e, env)
+    e = ds.update(e, :local, merge, get(env, :local))
+    ds.update(e, :unbound, ds.union, get(env, :unbound))
+  end
+  envwalk(form, ml, env)
 end
 
 end # module

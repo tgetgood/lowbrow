@@ -36,7 +36,6 @@ function declare(env, s)
 end
 
 function bind(m::ds.Map, k, v)
-  @info k, v
   if unboundp(m, k)
     ds.update(ds.associn(m, [:local, k], v), :unbound, ds.disj, k)
   else

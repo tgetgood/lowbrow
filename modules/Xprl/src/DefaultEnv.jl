@@ -12,10 +12,10 @@ function createμ(env, params, body)
     env = E.declare(env, left)
     ast.Mu(env, left, compile(ast.declare(body, left)))
   else
-    ast.Pair(
+    ast.PartialMu(
       env,
-      ast.PrimitiveMacro(createμ),
-      ast.arglist((left, compile(body)))
+      left,
+      compile(body)
     )
   end
 end

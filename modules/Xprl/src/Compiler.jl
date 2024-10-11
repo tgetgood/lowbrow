@@ -25,18 +25,29 @@ function invoke(env, x)
 end
 
 function invoke(env, x::ast.Immediate)
-  ast.Immediate(env, invoke(env, x.form))
+  y = invoke(env, x.form)
+  n = ast.Immediate(env, y)
+  if x == y
+    n
+  else
+    compile(n)
+  end
 end
 
 function invoke(env, x::ds.Symbol)
   v = E.get(env, x, :notfound)
   if v !== :notfound
-    compile(v)
+    ast.mergelocals(env, compile(v))
   elseif E.unboundp(env, x)
     ast.Immediate(env, x)
   else
+    @info string(env)
     throw("Unresolved symbol: " * string(x))
   end
+end
+
+function invoke(env, l::ast.ArgList)
+  ast.arglist(map(x -> compile(ast.Immediate(env, x)), l.args))
 end
 
 function invoke(env, x::ast.Pair)
@@ -44,10 +55,11 @@ function invoke(env, x::ast.Pair)
 end
 
 function apply(env, f::ast.PrimitiveFunction, args)
-  if ast.reduced(args)
-    f.f(args...)
+  cargs = compile(args)
+  if ast.reduced(cargs)
+    f.f(cargs...)
   else
-    ast.Application(f, args)
+    ast.Application(env, f, cargs)
   end
 end
 
@@ -56,8 +68,7 @@ function apply(env, f::ast.PrimitiveMacro, args)
 end
 
 function apply(env, f::ast.Mu, arg)
-  @info "mu"
-  compile(ast.bind(f.body, f.arg, arg))
+  compile(ast.mergelocals(env, ast.bind(f.body, f.arg, arg)))
 end
 
 function apply(env, f, arg)
@@ -66,6 +77,14 @@ end
 
 function compile(form)
   form
+end
+
+function compile(f::ast.Mu)
+  ast.Mu(f.env, f.arg, compile(f.body))
+end
+
+function compile(f::ast.PartialMu)
+  ast.PartialMu(f.env, compile(f.arg), compile(f.body))
 end
 
 function compile(form::ast.ArgList)
