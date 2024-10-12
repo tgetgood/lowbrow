@@ -226,6 +226,7 @@ const muhash = hash("#Mu")
 function hash(x::PartialMu)
   xor(muhash, hash(x.env), hash(x.arg), hash(x.body))
 end
+
 """
 Returns true iff the form cannot be further reduced and contains no immediate
 evaluation. (Immediate evaluation just means evaluations that cannot be done yet

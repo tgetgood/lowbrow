@@ -23,8 +23,6 @@ function eval(cont, env, f::ds.Pair)
 end
 
 function eval(cont, env, f::ds.Symbol)
-  # REVIEW: This assertion will be costly. But then we're caching, so probably
-  # worth it.
   v = ds.containsp(env, f)
 
   if v === false

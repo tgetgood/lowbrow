@@ -7,6 +7,7 @@
 
 (def first (wrap . first*))
 (def second (wrap . second*))
+(def + (wrap . +*))
 
 ;; I like the way clojure bootstraps so that destructuring is implemented in
 ;; clojure, not java. I'm going to follow a similar path, but this is somewhat
@@ -28,14 +29,20 @@
      ~(μ dargs
          ~((μ ~(first sargs) ~~(second sargs)) . ~~dargs))))
 
+;; This one is interesting because it doesn't require ~any~ builtins beyond μ
+;; itself. But the usage is ugly. (((fn* x) (+ x 1)) . 2)
+(def fn*
+  (μ params
+     ~(μ body
+         ~(μ args
+             ~((μ ~params ~~body) . ~~args)))))
+
 ;; Below, `select` is non-branching like the ?: or ifelse ternary operators,
 ;; except that it doesn't evaluate any of its arguments and the first must be a
 ;; literal boolean. The name is taken from the llvm instruction.
 ;;
 ;; In 3-lisp `select` was called `ef` for "extensionally defined if".
 
-;; (def if
-;;   (μ args
-;;      ~~(select ~~(nth args 1) ~(nth args 2) ~(nth args 3))))
-
-(def + (wrap . +*))
+(def if
+  (μ args
+     ~~(select ~~(nth args 1) ~(nth args 2) ~(nth args 3))))

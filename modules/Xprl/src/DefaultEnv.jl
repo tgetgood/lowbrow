@@ -2,25 +2,29 @@ module DefaultEnv
 import DataStructures as ds
 
 import ..Receivers
-import ..Compiler: compile, compilein
+import ..CPSCompiler: compile, chans
 import ..Environment as E
 import ..AST as ast
 
-function createμ(env, params, body)
-  left = compile(params)
-  if isa(left, ds.Symbol)
-    env = E.declare(env, left)
-    ast.Mu(env, left, compile(ast.declare(body, left)))
-  else
-    ast.PartialMu(
-      env,
-      left,
-      compile(body)
-    )
+function createμ(c, env, params, body)
+  function next(left)
+    if isa(left, ds.Symbol)
+      env = E.declare(env, left)
+      next = chans(body -> c.ret(ast.Mu(env, left, body)))
+      compile(next, env, body)
+    else
+      next = chans(body -> ast.PartialMu(
+        env,
+        left,
+        body
+      ))
+      compile(next, env, body)
+    end
   end
+  compile(chans(next), env, params)
 end
 
-function def(env, name, args...)
+function def(c, env, name, args...)
   if length(args) === 2
     docstring = args[1]
     body = args[2]
@@ -29,7 +33,7 @@ function def(env, name, args...)
     body = args[1]
   end
 
-  cform = compilein(env, body)
+  cform = compile(c, env, body)
 
   form = ast.TopLevel(E.lexical(env), body, cform)
 
@@ -53,6 +57,7 @@ default = ds.hashmap(
   ds.Symbol(["def"]), ast.PrimitiveMacro(def),
   ds.Symbol(["μ"]), ast.PrimitiveMacro(createμ),
 
+  ds.Symbol(["select"]), ast.PrimitiveFunction(ifelse),
   ds.Symbol(["+*"]), ast.PrimitiveFunction(+),
   ds.Symbol(["first*"]), ast.PrimitiveFunction(first),
   ds.Symbol(["second*"]), ast.PrimitiveFunction(second)
