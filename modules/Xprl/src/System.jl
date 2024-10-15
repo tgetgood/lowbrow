@@ -1,66 +1,68 @@
 module System
 
-import ..Receivers
-
 import DataStructures as ds
 
-abstract type Emission end
-
-struct Delivery <: Emission
-  receiver
-  message
+function runtask(t)
+  Threads.@spawn begin
+    try
+      t()
+    catch e
+      ds.handleerror(e)
+    end
+  end
 end
 
-struct EmissionList <: Emission
-  xs::Vector{Delivery}
+function debugruntask(t)
+  t()
 end
 
-function emit(rec::Receivers.Receiver, msg)
-  Delivery(rec, msg)
+function trysend(c, k, v)
+  k = ds.keyword(k)
+  if ds.containsp(c, k)
+    debugruntask(() -> ds.get(c, k)(v))
+  else
+    throw("Cannot emit message on unbound channel: " * string(k))
+  end
 end
 
-function emit(r1::Receivers.Receiver, m1, r2::Receivers.Receiver, m2)
-  [Delivery(r1, m1), Delivery(r2, m2)]
+function emit(c, kvs...)
+  @assert length(kvs) % 2 === 0
+  for (k, v) in ds.partition(2, kvs)
+    trysend(c, k, v)
+  end
 end
 
-function emit(m::ds.Map)
-  throw("not implemented")
+succeed(c, v) = emit(c, :return, v)
+
+function withcc(m::ds.Map, k, c, kvs...)
+  ds.into(
+    ds.assoc(m, ds.keyword(string(k)), c),
+    ds.partition(2) ∘ ds.map(e -> [ds.keyword(string(e[1])), e[2]]),
+    kvs
+  )
 end
 
-struct Executor
-  stack::Vector
+mutable struct Collector
+  @atomic counter::Int
+  const vec::Base.Vector
+  const next
 end
 
-function go!(m::Delivery)
-  Receivers.receive(m.receiver, m.message)
+function collector(c, n)
+  Collector(0, Vector(undef, n), c)
 end
 
-function pushngo!(exec::Executor, m::Delivery)
-  # If there's only one emission, step into it directly.
-  go!(m)
-end
+function receive(coll::Collector, i, v)
+  coll.vec[i] = v
+  @atomic coll.counter += 1
 
-function pushngo!(exec::Executor, ms::EmissionList)
-  m = popfirst!(ms)
-  append!(exec.stack)
-  go!(m)
-end
+  if coll.counter > length(coll.vec)
+    @error "Received too many messages."
+  end
 
-function pushngo!(exec::Executor, m::Any)
-  go!(exec.stack.pop!())
-end
-
-function start(exec, receiver, msg)
-  emissions = Receivers.receive(receiver, msg)
-  pushngo!(exec, emissions)
-end
-
-function start(exec::Executor, f::ds.Pair)
-  start(exec, f.head, f.tail)
-end
-
-function executor()
-  Executor([])
+  if coll.counter == length(coll.vec)
+    emit(coll.next, :return, ds.vec(coll.vec))
+  end
 end
 
 end # module

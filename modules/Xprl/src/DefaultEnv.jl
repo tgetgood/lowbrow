@@ -1,9 +1,8 @@
 module DefaultEnv
 import DataStructures as ds
 
-import ..Receivers
+import ..System as sys
 import ..CPSCompiler as comp
-import ..Environment as E
 import ..AST as ast
 
 function def(c, env, name, args...)
@@ -21,10 +20,27 @@ function def(c, env, name, args...)
     form = ast.TopLevel(lex, body, cform)
     eprime = ds.assoc(lex, name, form)
 
-    comp.emit(c, :env, eprime, :return, form)
+    sys.emit(c, :env, eprime, :return, form)
   end
 
   comp.entry(comp.withcc(c, :return, next), lex, body)
+end
+
+function createμ(c, env, params, body)
+  function next(left)
+    if isa(left, ds.Symbol)
+      env = comp.declare(env, left)
+      next = body -> sys.succeed(c, ast.Mu(env, left, body))
+    else
+      next = body -> sys.succeed(c, ast.PartialMu(
+        env,
+        left,
+        body
+      ))
+    end
+    comp.compile(sys.withcc(c, :return, next), env, body)
+  end
+  comp.compile(sys.withcc(c, :return, next), env, params)
 end
 
 second(x) = x[2]
@@ -43,7 +59,7 @@ default = ds.hashmap(
   # ds.Symbol(["eval"]), Eval.eval,
   # ds.Symbol(["apply"]), Eval.apply,
   ds.symbol("def"), ast.PrimitiveMacro(def),
-  ds.symbol("μ"), ast.PrimitiveMacro(comp.createμ),
+  ds.symbol("μ"), ast.PrimitiveMacro(createμ),
 
   ds.symbol("select"), ast.PrimitiveFunction(ifelse),
   ds.symbol("+*"), ast.PrimitiveFunction(+),

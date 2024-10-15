@@ -15,11 +15,11 @@ import .Reader
 include("./System.jl")
 import .System
 
-include("./Compiler.jl")
-import .Compiler
+# include("./Compiler.jl")
+# import .Compiler
 
-include("./CPSCompiler.jl")
-import .CPSCompiler
+# include("./CPSCompiler.jl")
+# import .CPSCompiler
 
 include("./DefaultEnv.jl")
 import .DefaultEnv

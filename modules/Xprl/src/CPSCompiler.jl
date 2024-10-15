@@ -59,8 +59,6 @@ function receive(coll::Collector, i, v)
     @error "calling too many times!!!"
   end
 
-  # @info coll.counter, length(coll.vec)
-
   if coll.counter == length(coll.vec)
     emit(coll.next, :return, ds.vec(coll.vec))
   end
