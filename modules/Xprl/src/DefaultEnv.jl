@@ -2,27 +2,9 @@ module DefaultEnv
 import DataStructures as ds
 
 import ..Receivers
-import ..CPSCompiler: compile, chans
+import ..CPSCompiler as comp
 import ..Environment as E
 import ..AST as ast
-
-function createμ(c, env, params, body)
-  function next(left)
-    if isa(left, ds.Symbol)
-      env = E.declare(env, left)
-      next = chans(body -> c.ret(ast.Mu(env, left, body)))
-      compile(next, env, body)
-    else
-      next = chans(body -> ast.PartialMu(
-        env,
-        left,
-        body
-      ))
-      compile(next, env, body)
-    end
-  end
-  compile(chans(next), env, params)
-end
 
 function def(c, env, name, args...)
   if length(args) === 2
@@ -33,16 +15,22 @@ function def(c, env, name, args...)
     body = args[1]
   end
 
-  cform = compile(c, env, body)
+  lex = env.env
 
-  form = ast.TopLevel(E.lexical(env), body, cform)
+  function next(cform)
+    form = ast.TopLevel(lex, body, cform)
+    eprime = ds.assoc(lex, name, form)
 
-  e2 = E.extendlexical(env, name, form)
+    comp.emit(c, :env, eprime, :return, form)
+  end
 
-  # emit :env e2, :return form
+  comp.entry(comp.withcc(c, :return, next), lex, body)
 end
 
 second(x) = x[2]
+
+# TODO: There ought to be top level channels for many things
+defaultchannels = ds.emptymap
 
 default = ds.hashmap(
   # REVIEW: It seems to me (at the moment) that neither apply nor eval should be
@@ -54,13 +42,13 @@ default = ds.hashmap(
   # my gut tells me we'll be happy we did.
   # ds.Symbol(["eval"]), Eval.eval,
   # ds.Symbol(["apply"]), Eval.apply,
-  ds.Symbol(["def"]), ast.PrimitiveMacro(def),
-  ds.Symbol(["μ"]), ast.PrimitiveMacro(createμ),
+  ds.symbol("def"), ast.PrimitiveMacro(def),
+  ds.symbol("μ"), ast.PrimitiveMacro(comp.createμ),
 
-  ds.Symbol(["select"]), ast.PrimitiveFunction(ifelse),
-  ds.Symbol(["+*"]), ast.PrimitiveFunction(+),
-  ds.Symbol(["first*"]), ast.PrimitiveFunction(first),
-  ds.Symbol(["second*"]), ast.PrimitiveFunction(second)
+  ds.symbol("select"), ast.PrimitiveFunction(ifelse),
+  ds.symbol("+*"), ast.PrimitiveFunction(+),
+  ds.symbol("first*"), ast.PrimitiveFunction(first),
+  ds.symbol("second*"), ast.PrimitiveFunction(second)
 )
 
 end

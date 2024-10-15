@@ -9,7 +9,13 @@ import ..Environment as E
 
 ##### Run time data structures
 
-abstract type BuiltIn end
+abstract type Node end
+abstract type EnvNode <: Node end
+abstract type BuiltIn <: Node end
+
+function show(io::IO, mime::MIME"text/plain", s::Node)
+  print(io, string(s))
+end
 
 """
 Primitive functions expect their arguments to be literal values. They should
@@ -30,19 +36,15 @@ end
 """
 Container for defined forms and those typed into the repl.
 """
-struct TopLevel
-  lexicalenv
+struct TopLevel <: EnvNode
+  env
   source
   compiled
 end
 
-string(x::TopLevel) = string(x.source)
+string(x::TopLevel) = string(x.compiled)
 
-function show(io::IO, mime::MIME"text/plain", s::TopLevel)
-  print(io, string(s))
-end
-
-struct Immediate
+struct Immediate <: EnvNode
   env
   form
 end
@@ -52,21 +54,17 @@ immediate(e, f) = Immediate(e, f)
 
 string(f::Immediate) = "~" * string(f.form)
 
-function show(io::IO, mime::MIME"text/plain", s::Immediate)
-  print(io, string(s))
-end
-
 function walk(inner, outer, f::Immediate)
   outer(Immediate(f.env, inner(f.form)))
 end
 
-struct Pair
+struct Pair <: EnvNode
   env
   head
   tail
 end
 
-struct ArgList
+struct ArgList <: Node
   args::Tuple
 end
 
@@ -83,10 +81,6 @@ end
 
 function string(c::Pair)
   "(" * string(c.head) * tailstring(c.tail) * ")"
-end
-
-function show(io::IO, mime::MIME"text/plain", s::Pair)
-  print(io, string(s))
 end
 
 function walk(inner, outer, form::Pair)
@@ -143,10 +137,6 @@ function string(x::ArgList)
   ds.into("#(", map(string) ∘ ds.interpose(" "), x.args) * ")"
 end
 
-function show(io::IO, mime::MIME"text/plain", s::ArgList)
-  print(io, string(s))
-end
-
 function arglist(xs)
   ArgList(tuple(xs...))
 end
@@ -159,7 +149,7 @@ end
 Represents an application of args to a function-like entity which has not been
 performed yet.
 """
-struct Application
+struct Application <: EnvNode
   env
   head
   tail
@@ -167,10 +157,6 @@ end
 
 function string(x::Application)
   "#Application(" * string(x.head) * ", " * string(x.tail) * ")"
-end
-
-function show(io::IO, mime::MIME"text/plain", s::Application)
-  print(io, string(s))
 end
 
 function Base.:(==)(x::Application, y::Application)
@@ -183,17 +169,13 @@ function hash(x::Application)
   xor(apphash, hash(x.head), hash(x.tail))
 end
 
-struct Mu
+struct Mu <: EnvNode
   env
   arg::ds.Symbol
   body
 end
 
 string(x::Mu) = "(μ " * string(x.arg) * " " * string(x.body) * ")"
-
-function show(io::IO, mime::MIME"text/plain", s::Mu)
-  print(io, string(s))
-end
 
 function Base.:(==)(x::Mu, y::Mu)
   x.env == y.env && x.arg == y.arg && x.body == y.body
@@ -205,7 +187,7 @@ function hash(x::Mu)
   xor(muhash, hash(x.env), hash(x.arg), hash(x.body))
 end
 
-struct PartialMu
+struct PartialMu <: EnvNode
   env
   arg
   body
@@ -213,15 +195,9 @@ end
 
 string(x::PartialMu) = "(μ " * string(x.arg) * " " * string(x.body) * ")"
 
-function show(io::IO, mime::MIME"text/plain", s::PartialMu)
-  print(io, string(s))
-end
-
 function Base.:(==)(x::PartialMu, y::PartialMu)
   x.env == y.env && x.arg == y.arg && x.body == y.body
 end
-
-const muhash = hash("#Mu")
 
 function hash(x::PartialMu)
   xor(muhash, hash(x.env), hash(x.arg), hash(x.body))
@@ -383,7 +359,7 @@ function bind(form, k, v)
 end
 
 function mergelocals(env, form)
-  function ml(e, env)
+  function ml(e::ds.Map, env::ds.Map)
     e = ds.update(e, :local, merge, get(env, :local))
     ds.update(e, :unbound, ds.union, get(env, :unbound))
   end

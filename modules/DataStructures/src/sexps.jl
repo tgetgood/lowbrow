@@ -46,6 +46,20 @@ function keyword(names::String...)
   Keyword(names)
 end
 
+function splitsymbolic(x::String)
+  if x == "."
+    ["."]
+  else
+    split(x, '.')
+  end
+end
+
+function keyword(name::String)
+  Keyword(splitsymbolic(name))
+end
+
+keyword(s::Core.Symbol) = keyword(string(s))
+
 function name(x::Keyword)
   x.names[end]
 end
@@ -64,6 +78,10 @@ end
 
 function symbol(k::Keyword)
   Symbol(k.names)
+end
+
+function symbol(name::String)
+  Symbol(splitsymbolic(name))
 end
 
 const symhash = hash("#Symbol")

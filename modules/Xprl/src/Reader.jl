@@ -84,11 +84,11 @@ function splitsymbolic(x::String)
 end
 
 function readkeyword(x)
-  ds.Keyword(splitsymbolic(x))
+  ds.keyword(x)
 end
 
 function readsymbol(x)
-  ds.Symbol(splitsymbolic(x))
+  ds.symbol(x)
 end
 
 function interpret(x::String)
@@ -139,10 +139,12 @@ function readlist(stream, opts)
 
   n = length(subs)
   # dot application: (f . x)
-  if n === 3 && subs[2] == ds.Symbol(["."])
+  if n === 0
+    ast.arglist(())
+  elseif n === 3 && subs[2] == ds.symbol(".")
     ast.pair(subs[1], subs[3])
   # list catenation: (f x y z . more)
-  elseif subs[end-1] == ds.Symbol(["."])
+  elseif subs[end-1] == ds.symbol(".")
     ast.pair(subs[1], ast.arglist(ds.into(ds.vec(subs[2:end-2]), subs[end])))
   # standard application: (f x y z)
   else
