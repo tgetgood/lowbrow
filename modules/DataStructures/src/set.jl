@@ -16,6 +16,8 @@ emptyp(s::Set) = false
 
 seq(s::EmptySet) = emptyvector
 
+disj(s::EmptySet, _) = emptyset
+
 function conj(s::EmptySet, x)
   PersistentArraySet([x])
 end

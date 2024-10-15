@@ -7,10 +7,24 @@ import DataStructures: get, containsp
 
 import ..AST as ast
 
+function runtask(t)
+  Threads.@spawn begin
+    try
+      t()
+    catch e
+      ds.handleerror(e)
+    end
+  end
+end
+
+function debugruntask(t)
+  t()
+end
+
 function trysend(c, k, v)
   k = ds.keyword(k)
   if ds.containsp(c, k)
-    ds.get(c, k)(v)
+    debugruntask(() -> ds.get(c, k)(v))
   else
     throw("Cannot emit message on unbound channel: " * string(k))
   end
@@ -26,6 +40,39 @@ end
 
 succeed(c, v) = emit(c, :return, v)
 fail(c, env, v) = emit(c, :failure, (env, v))
+
+mutable struct Collector
+  @atomic counter::Int
+  const vec::Base.Vector
+  const next
+end
+
+function collector(c, n)
+  Collector(0, Vector(undef, n), c)
+end
+
+function receive(coll::Collector, i, v)
+  coll.vec[i] = v
+  @atomic coll.counter += 1
+
+  if coll.counter > length(coll.vec)
+    @error "calling too many times!!!"
+  end
+
+  # @info coll.counter, length(coll.vec)
+
+  if coll.counter == length(coll.vec)
+    emit(coll.next, :return, ds.vec(coll.vec))
+  end
+end
+
+function failcoll(coll)
+  function(_)
+    # FIXME: this is aweful
+    @atomic coll.counter = -1000
+    emit(coll.next, :failure, :error)
+  end
+end
 
 struct Context
   env
@@ -113,7 +160,9 @@ function eval(c, env, form::ds.Symbol)
 
   v = get(env, form, :notfound)
   if v === :notfound
-    throw("Symbol not defined: " * string(form))
+    # FIXME: There's something wrong with my bookkeeping here.
+    fail(c, env, form)
+    # throw("Symbol not defined: " * string(form))
   else
     # succeed(c, lexicalextension(v, env))
     # TODO: I don't think the loaded code can ever depend on the loading
@@ -163,7 +212,6 @@ function apply(c, env, f::ast.Application, tail)
   function next(inner)
     apply(c, env, inner, tail)
   end
-  fail((env, v)) = succeed(c, ast.Application(mergeenv(env, f.env), f, tail))
   compile(withcc(c, :return, next), f.env, f)
 end
 
@@ -174,6 +222,30 @@ end
 
 function compile(c, env, form)
   succeed(c, lexicalextension(form, env))
+end
+
+function compile(c, env, form::ast.ArgList)
+  failure(env, v) = succeed(c, form)
+  next(coll) = succeed(c, ast.arglist(coll))
+  coll = collector(withcc(c, :return, next, :failure, failure), ds.count(form))
+  run((i, form)) = compile(withcc(c, :faliure, failcoll(coll), :return, x -> receive(coll, i, x)), env, form)
+
+  cmds = ds.into!([], ds.mapindexed((i, v) -> (:run, (i, v))) ∘ ds.cat(), form.args)
+
+  emit(withcc(c, :run, run), cmds...)
+end
+
+function compile(c, env, form::ast.Pair)
+  failure(_) = succeed(c, form)
+  function next(coll)
+    p = ast.Pair(env, coll[1], coll[2])
+    succeed(c, p)
+  end
+  coll = collector(withcc(c, :return, next, :failure, failure), 2)
+
+  cc((i, form)) = compile(withcc(c, :failure, failcoll(coll), :return, x -> receive(coll, i, x)), env, form)
+
+  emit(withcc(c, :run, cc), :run, (1, form.head), :run, (2, form.tail))
 end
 
 function compile(c, env, form::ast.TopLevel)
@@ -205,7 +277,7 @@ end
 
 function compile(c, env, form::ast.Immediate)
   failure((e, v)) = succeed(c, lexicalextension(form, e))
-  eval(withcc(c, :failure, failure), follow(env, :form), form.form)
+  eval(c, follow(env, :form), form.form)
 end
 
 function entry(c, env, form)
