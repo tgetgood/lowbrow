@@ -2,7 +2,7 @@ module DefaultEnv
 import DataStructures as ds
 
 import ..System as sys
-import ..C4 as comp
+import ..C4 as c
 import ..AST as ast
 
 function def(c, env, name, args...)
@@ -23,13 +23,13 @@ function def(c, env, name, args...)
     sys.emit(c, :env, eprime, :return, form)
   end
 
-  comp.entry(comp.withcc(c, :return, next), lex, body)
+  c.entry(comp.withcc(c, :return, next), lex, body)
 end
 
 function createμ(c, env, params, body)
   function next(left)
     if isa(left, ds.Symbol)
-      env = comp.declare(env, left)
+      env = c.declare(env, left)
       next = body -> sys.succeed(c, ast.Mu(env, left, body))
     else
       next = body -> sys.succeed(c, ast.PartialMu(
@@ -38,9 +38,9 @@ function createμ(c, env, params, body)
         body
       ))
     end
-    comp.compile(sys.withcc(c, :return, next), env, body)
+    c.compile(sys.withcc(c, :return, next), env, body)
   end
-  comp.compile(sys.withcc(c, :return, next), env, params)
+  c.compile(sys.withcc(c, :return, next), env, params)
 end
 
 second(x) = x[2]

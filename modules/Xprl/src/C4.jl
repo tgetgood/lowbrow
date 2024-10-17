@@ -3,9 +3,16 @@ module C4
 import DataStructures as ds
 import ..System as sys
 
+##### Context of Interpretation
+##
+## Storing the context (lexical + dynamic environments) of each form in band is
+## proving to be a logistical fiasco. So let's try out of band encoding.
+
 struct Context
   env
   unbound
+  form
+  children
 end
 
 string(x::Context) = "#Context"
@@ -14,7 +21,7 @@ function show(io::IO, mime::MIME"text/plain", s::Context)
   print(io, string(s))
 end
 
-context(m) = Context(m, ds.emptyset)
+context(m, f) = Context(m, ds.emptyset, f, )
 declare(m::Context, k) = Context(m.env, ds.conj(m.unbound, k))
 get(m::Context, k) = ds.get(m.env, k)
 get(m::Context, k, default) = ds.get(m.env, k, default)
@@ -28,6 +35,10 @@ function extend(m::Context, k, v)
     throw("Cannot bind undeclared symbol " * string(k))
   end
 end
+
+# REVIEW: We're going to pass around a pair of (env, form) as we build the tree
+# and see how that goes.
+succeed(c, e, f) = sys.emit(c, :return, (e, f))
 
 ################################################################################
 ##### The compiler is basically a state machine that can be in one state of
@@ -54,8 +65,13 @@ end
 
 ##### Top level entry point
 
-
-function entry(c, env, form)
+"""
+Interprets `form` in the lexical environment `env` as if the form were read from
+that environment. `c` is the bundle of channels to which messages may be emitted
+during interpretation.
+"""
+function interpret(c, env, form)
+  compile(c, context(env), ast.immediate(form))
 end
 
 end

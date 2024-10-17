@@ -54,8 +54,7 @@ struct Immediate <: Node
   form
 end
 
-immediate(f) = immediate(ds.emptymap, f)
-immediate(e, f) = Immediate(e, f)
+immediate(f) = Immediate(f)
 
 string(f::Immediate) = "~" * string(f.form)
 
@@ -66,7 +65,7 @@ end
 ### Pairs.
 ##
 ## N.B. These are *not* cons cells. They're just pairs. What would be a cons
-## list in lisp is here a pair whose tail is an ArgList.
+## list in lisp is here a pair whose tail is a vector (list).
 ##
 ## REVIEW: Maybe `head` and `tail` ought to be rethought in light of the above.
 
@@ -75,7 +74,7 @@ struct Pair <: Node
   tail
 end
 
-pair(h, t) = pair(h, t)
+pair(h, t) = Pair(h, t)
 
 function tailstring(x)
   " . " * string(x)
@@ -177,7 +176,6 @@ reduced(form::Application) = false
 reduced(form::ds.Symbol) = false
 reduced(form::Pair) = reduced(form.head) && reduced(form.tail)
 reduced(form::Mu) = reduced(form.arg) && reduced(form.body)
-reduced(form::ArgList) = ds.every(identity, map(reduced, form.args))
 
 ### Debugging and inspection
 
@@ -192,14 +190,6 @@ function inspect(form::Pair, level=0)
   println("P")
   inspect(form.head, level+1)
   inspect(form.tail, level+1)
-end
-
-function inspect(form::ArgList, level=0)
-  space(level)
-  println("L")
-  for e in form.args
-    inspect(e, level+1)
-  end
 end
 
 function inspect(form::Immediate, level=0)
@@ -302,10 +292,6 @@ end
 #     envwalk(form.arg, f, args),
 #     envwalk(form.body, f, args)
 #   )
-# end
-
-# function envwalk(form::ArgList, f, args)
-#   arglist(map(x -> envwalk(x, f, args), form.args))
 # end
 
 # function envwalk(form::Application, f, args)

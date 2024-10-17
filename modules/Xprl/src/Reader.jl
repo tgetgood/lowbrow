@@ -140,7 +140,13 @@ function readpair(stream, opts)
   n = length(subs)
   # dot application: (f . x)
   if n === 0
-    ast.arglist(())
+    throw("The expression '()' is meaningless.")
+  elseif n === 1
+    # REVIEW: (f) is ill defined in this language. So we would have an ambiguity
+    # between a function that can take the empty list directly (f . []) which is
+    # not useful but not prohibited, and calling a function of no arguments (f)
+    # which can't exist.
+    throw("Operatives that take no arguments cannot be defined, thus cannot be called.")
   elseif n === 3 && subs[2] == ds.symbol(".")
     ast.pair(subs[1], subs[3])
   # list catenation: (f x y z . more)
