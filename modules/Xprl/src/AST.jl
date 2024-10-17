@@ -210,6 +210,14 @@ function inspect(form::Application, level=0)
   inspect(form.tail, level+1)
 end
 
+function inspect(form::ds.Vector, level=0)
+  space(level)
+  println("L")
+  for e in form
+    inspect(e, level+1)
+  end
+end
+
 function inspect(form::PartialMu, level=0)
   space(level)
   println("Pμ")
