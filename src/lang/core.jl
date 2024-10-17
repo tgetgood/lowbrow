@@ -1,7 +1,8 @@
 import Xprl as x
 import Xprl.AST as ast
 import Xprl.AST: inspect
-import Xprl.CPSCompiler: entry, withcc, compile, context
+import Xprl.System as sys
+import Xprl.C4 as c
 import Xprl.Reader as r
 
 import DataStructures as ds
@@ -15,30 +16,30 @@ function eset(e)
   nothing
 end
 
-replchannels = withcc(
+replchannels = sys.withcc(
   ds.emptymap,
   :env, eset,
   :return, inspect
 )
 
-function evallist(env, list, i=1)
-  if i == length(list)
-    nothing
-  else
-    function next(f)
-      evalist(env, list, i+1)
-    end
-    form = list[i]
-    @info "compiling: " * string(form)
-    entry(withcc(replchannels, :return, next), env[], form)
-  end
-end
+# function evallist(env, list, i=1)
+#   if i == length(list)
+#     nothing
+#   else
+#     function next(f)
+#       evalist(env, list, i+1)
+#     end
+#     form = list[i]
+#     @info "compiling: " * string(form)
+#     entry(withcc(replchannels, :return, next), env[], form)
+#   end
+# end
 
 # evallist(env, core)
 
 for form in core
   @info "compiling: " * string(form)
-  entry(replchannels, env[], form)
+  c.entry(replchannels, env[], form)
 end
 
 f = r.readall(open("./test.xprl"))

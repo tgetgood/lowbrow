@@ -2,7 +2,7 @@ module DefaultEnv
 import DataStructures as ds
 
 import ..System as sys
-import ..CPSCompiler as comp
+import ..C4 as comp
 import ..AST as ast
 
 function def(c, env, name, args...)

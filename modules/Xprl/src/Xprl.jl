@@ -21,6 +21,9 @@ import .System
 # include("./CPSCompiler.jl")
 # import .CPSCompiler
 
+include("./C4.jl")
+import .C4
+
 include("./DefaultEnv.jl")
 import .DefaultEnv
 

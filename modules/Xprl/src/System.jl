@@ -2,6 +2,8 @@ module System
 
 import DataStructures as ds
 
+##### Work scheduling
+
 function runtask(t)
   Threads.@spawn begin
     try
@@ -15,6 +17,8 @@ end
 function debugruntask(t)
   t()
 end
+
+##### Channels
 
 function trysend(c, k, v)
   k = ds.keyword(k)
@@ -41,6 +45,8 @@ function withcc(m::ds.Map, k, c, kvs...)
     kvs
   )
 end
+
+##### Receivers
 
 mutable struct Collector
   @atomic counter::Int
