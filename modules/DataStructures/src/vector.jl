@@ -23,7 +23,7 @@ struct VectorLeaf{T} <: PersistentVector
   elements::Base.Vector{T}
 end
 
-vl(v::Base.Vector) = VectorLeaf(v)
+vl(v::Base.Vector) = VectorLeaf(copy(v))
 vl(t::Tuple) = VectorLeaf([x for x in t])
 vl(x) = VectorLeaf(convert(Base.Vector, x))
 
