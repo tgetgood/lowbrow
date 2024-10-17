@@ -363,7 +363,7 @@ function interleave(streams::Map)
           end
         end
       catch e
-        handleerror(ee
+        handleerror(e)
       end
     end
   end
