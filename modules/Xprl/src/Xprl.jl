@@ -1,13 +1,7 @@
 module Xprl
 
-include("./Environment.jl")
-import .Environment
-
 include("./AST.jl")
 import .AST
-
-include("./Receivers.jl")
-import .Receivers
 
 include("./Reader.jl")
 import .Reader
