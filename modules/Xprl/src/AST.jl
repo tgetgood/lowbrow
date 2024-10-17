@@ -5,17 +5,18 @@ import Base: hash, ==, string, length, getindex, eltype, show, get, iterate
 import DataStructures as ds
 import DataStructures: containsp, walk, emptyp, count, ireduce, first, rest
 
-import ..Environment as E
-
 ##### Run time data structures
 
 abstract type Node end
 abstract type EnvNode <: Node end
-abstract type BuiltIn <: Node end
 
 function show(io::IO, mime::MIME"text/plain", s::Node)
   print(io, string(s))
 end
+
+### Built ins
+
+abstract type BuiltIn <: Node end
 
 """
 Primitive functions expect their arguments to be literal values. They should
@@ -33,16 +34,31 @@ struct PrimitiveMacro <: BuiltIn
   f::Function
 end
 
+### Top level ("def"ed) forms
+##
+## The main purpose here is to keep metadata of what you would call "vars" in
+## Clojure, easily accessible at the namespace level.
+##
+## REVIEW: I'm not sure if this node needs the env. I'm actually not sure if any
+## nodes except symbols and μs need to keep an env. They certainly don't need to
+## use it, but having it around might make life easier.
+
 """
 Container for defined forms and those typed into the repl.
 """
 struct TopLevel <: EnvNode
   env
-  source
-  compiled
+  meta
+  form
 end
 
-string(x::TopLevel) = string(x.compiled)
+string(x::TopLevel) = string(x.form)
+
+### Immediate (eval asap) forms
+##
+## TODO: I don't think immediates need an env. Immediates, like applicatives and
+## lists are syntactic elements. All that they ~can~ mean is captured by their
+## existence and relative location.
 
 struct Immediate <: EnvNode
   env
@@ -58,22 +74,21 @@ function walk(inner, outer, f::Immediate)
   outer(Immediate(f.env, inner(f.form)))
 end
 
+### Pairs.
+##
+## N.B. These are *not* cons cells. They're just pairs. What would be a cons
+## list in lisp is here a pair whose tail is an ArgList.
+##
+## REVIEW: Maybe `head` and `tail` ought to be rethought in light of the above.
+
 struct Pair <: EnvNode
   env
   head
   tail
 end
 
-struct ArgList <: Node
-  args::Tuple
-end
-
 pair(e, h, t) = Pair(e, h, t)
 pair(h, t) = pair(ds.emptymap, h, t)
-
-function tailstring(c::ArgList)
-  ds.into(" ", map(string) ∘ ds.interpose(" "), c)
-end
 
 function tailstring(x)
   " . " * string(x)
@@ -85,6 +100,21 @@ end
 
 function walk(inner, outer, form::Pair)
   outer(Pair(form.env, inner(form.head), inner(form.tail)))
+end
+
+### Arg Lists
+##
+## Currently this only exists as a type so that we can dispatch on it.
+##
+## TODO: These should just be normal persistent vectors. Remind me why they
+## aren't...
+
+struct ArgList <: Node
+  args::Tuple
+end
+
+function tailstring(c::ArgList)
+  ds.into(" ", map(string) ∘ ds.interpose(" "), c)
 end
 
 function count(x::ArgList)
@@ -145,6 +175,10 @@ function walk(inner, outer, l::ArgList)
   outer(arglist(map(inner, l.args)))
 end
 
+### Application
+##
+### I.e. things that are to be applied as soon as possible
+
 """
 Represents an application of args to a function-like entity which has not been
 performed yet.
@@ -169,6 +203,10 @@ function hash(x::Application)
   xor(apphash, hash(x.head), hash(x.tail))
 end
 
+### Mu
+##
+### The basic syntactic combinator of the language.
+
 struct Mu <: EnvNode
   env
   arg::ds.Symbol
@@ -187,6 +225,14 @@ function hash(x::Mu)
   xor(muhash, hash(x.env), hash(x.arg), hash(x.body))
 end
 
+### Partially applied Mu
+##
+### This exists because a Mu is ill defined unless its argument is a symbol. A
+### partial μ is a binary node whose left tree will (presumably) evaluate to a
+### symbol at some point in the future. At that point we can construct a proper
+### μ operator. In the meantime, however, we need to treat the two cases as
+### fundamentally different.
+
 struct PartialMu <: EnvNode
   env
   arg
@@ -203,6 +249,8 @@ function hash(x::PartialMu)
   xor(muhash, hash(x.env), hash(x.arg), hash(x.body))
 end
 
+##### Helpers
+
 """
 Returns true iff the form cannot be further reduced and contains no immediate
 evaluation. (Immediate evaluation just means evaluations that cannot be done yet
@@ -215,6 +263,8 @@ reduced(form::ds.Symbol) = false
 reduced(form::Pair) = reduced(form.head) && reduced(form.tail)
 reduced(form::Mu) = reduced(form.arg) && reduced(form.body)
 reduced(form::ArgList) = ds.every(identity, map(reduced, form.args))
+
+### Debugging and inspection
 
 function space(level)
   if level > 0
@@ -285,6 +335,8 @@ function inspect(form::TopLevel, level=0)
   inspect(form.compiled, level)
 end
 
+### AST walkers
+
 function setcontext(env, x)
   x
 end
@@ -352,18 +404,18 @@ function evwalk(form::TopLevel, f, args)
   TopLevel(form.env, form.source, envwalk(form.compiled, f, args))
 end
 
-declare(form, s) = envwalk(form, E.declare, s)
+# declare(form, s) = envwalk(form, E.declare, s)
 
-function bind(form, k, v)
-  envwalk(form, (e, (k, v)) -> E.bind(e, k, v), (k, v))
-end
+# function bind(form, k, v)
+#   envwalk(form, (e, (k, v)) -> E.bind(e, k, v), (k, v))
+# end
 
-function mergelocals(env, form)
-  function ml(e::ds.Map, env::ds.Map)
-    e = ds.update(e, :local, merge, get(env, :local))
-    ds.update(e, :unbound, ds.union, get(env, :unbound))
-  end
-  envwalk(form, ml, env)
-end
+# function mergelocals(env, form)
+#   function ml(e::ds.Map, env::ds.Map)
+#     e = ds.update(e, :local, merge, get(env, :local))
+#     ds.update(e, :unbound, ds.union, get(env, :unbound))
+#   end
+#   envwalk(form, ml, env)
+# end
 
 end # module

@@ -66,7 +66,7 @@ end
 
 function failcoll(coll)
   function(_)
-    # FIXME: this is aweful
+    # FIXME: this is awful
     @atomic coll.counter = -1000
     emit(coll.next, :failure, :error)
   end
