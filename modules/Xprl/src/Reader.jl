@@ -126,7 +126,7 @@ function readsubforms(stream, until)
   return forms
 end
 
-function readlist(stream, opts)
+function readpair(stream, opts)
   subs = readsubforms(stream, ')')
 
   # REVIEW: This is an ugly hack.
@@ -145,15 +145,15 @@ function readlist(stream, opts)
     ast.pair(subs[1], subs[3])
   # list catenation: (f x y z . more)
   elseif subs[end-1] == ds.symbol(".")
-    ast.pair(subs[1], ast.arglist(ds.into(ds.vec(subs[2:end-2]), subs[end])))
+    ast.pair(subs[1], ds.into(ds.vec(subs[2:end-2]), subs[end]))
   # standard application: (f x y z)
   else
-    ast.pair(subs[1], ast.arglist(subs[2:end]))
+    ast.pair(subs[1], ds.vec(subs[2:end]))
   end
 end
 
 function readvector(stream, opts)
-  ds.vector(readsubforms(stream, ']')...)
+  ds.vec(readsubforms(stream, ']'))
 end
 
 specialchars = Dict(
@@ -306,7 +306,7 @@ function readimmediate(stream, opts)
 end
 
 dispatch = Dict(
-  '(' => readlist,
+  '(' => readpair,
   '[' => readvector,
   '"' => readstring,
   '{' => readmap,
