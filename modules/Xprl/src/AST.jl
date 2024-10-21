@@ -176,6 +176,9 @@ reduced(form::Application) = false
 reduced(form::ds.Symbol) = false
 reduced(form::Pair) = reduced(form.head) && reduced(form.tail)
 reduced(form::Mu) = reduced(form.arg) && reduced(form.body)
+reduced(form::ds.Vector) = ds.every(reduced, form)
+reduced(form::ds.Map) = ds.every(reduced, form)
+reduced(form::ds.MapEntry) = reduced(ds.key(form)) && reduced(ds.val(form))
 
 ### Debugging and inspection
 
@@ -245,7 +248,7 @@ end
 function inspect(form::TopLevel, level=0)
   space(level)
   println("-T-")
-  inspect(form.compiled, level)
+  inspect(form.form, level)
 end
 
 end # module

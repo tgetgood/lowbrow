@@ -2,45 +2,59 @@ module DefaultEnv
 import DataStructures as ds
 
 import ..System as sys
-import ..C4 as c
+import ..C4 as comp
 import ..AST as ast
 
-function def(c, env, name, args...)
-  if length(args) === 2
-    docstring = args[1]
-    body = args[2]
+function def(c, args)
+  args = args.form
+  name = args[1].form
+
+  if length(args) === 3
+    docstring = args[2].form
+    body = args[3]
   else
     docstring = ""
-    body = args[1]
+    body = args[2]
   end
 
-  lex = env.env
+  lex = body.env
 
   function next(cform)
-    form = ast.TopLevel(lex, body, cform)
-    eprime = ds.assoc(lex, name, form)
+    tl = ast.TopLevel(
+      ds.hashmap(
+        ds.keyword("env"), lex,
+        ds.keyword("doc"), docstring,
+        ds.keyword("src"), body
+      ),
+      cform
+    )
 
-    sys.emit(c, :env, eprime, :return, form)
+    eprime = ds.assoc(lex, name, tl)
+
+    sys.emit(c, :env, eprime, :return, tl)
   end
 
-  c.entry(comp.withcc(c, :return, next), lex, body)
+  comp.eval(sys.withcc(c, :return, next), body)
 end
 
-function createμ(c, env, params, body)
+function createμ(c, args)
+  env = args.env
+  args = args.form
+  params = args[1]
+  body = args[2]
   function next(left)
-    if isa(left, ds.Symbol)
-      env = c.declare(env, left)
-      next = body -> sys.succeed(c, ast.Mu(env, left, body))
+    if isa(left.form, ds.Symbol)
+      body = comp.declare(body, left.form)
+      next = body -> sys.succeed(c, comp.context(env, ast.Mu(left.form, body)))
     else
-      next = body -> sys.succeed(c, ast.PartialMu(
-        env,
+      next = body -> sys.succeed(c, comp.context(env, ast.PartialMu(
         left,
         body
-      ))
+      )))
     end
-    c.compile(sys.withcc(c, :return, next), env, body)
+    comp.compile(sys.withcc(c, :return, next), body)
   end
-  c.compile(sys.withcc(c, :return, next), env, params)
+  comp.compile(sys.withcc(c, :return, next), params)
 end
 
 second(x) = x[2]
@@ -64,7 +78,8 @@ default = ds.hashmap(
   ds.symbol("select"), ast.PrimitiveFunction(ifelse),
   ds.symbol("+*"), ast.PrimitiveFunction(+),
   ds.symbol("first*"), ast.PrimitiveFunction(first),
-  ds.symbol("second*"), ast.PrimitiveFunction(second)
+  ds.symbol("second*"), ast.PrimitiveFunction(second),
+  ds.symbol("nth*"), ast.PrimitiveFunction(ds.nth)
 )
 
 end

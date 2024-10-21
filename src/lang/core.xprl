@@ -5,6 +5,7 @@
      ~(μ args
          ~(~f . ~~args))))
 
+(def nth (wrap . nth*))
 (def first (wrap . first*))
 (def second (wrap . second*))
 (def + (wrap . +*))
@@ -36,6 +37,10 @@
      ~(μ body
          ~(μ args
              ~((μ ~params ~~body) . ~~args)))))
+
+(def let1
+  (μ args
+     ~((μ ~(first (first args)) ~(second args)) . ~~(second (first args)))))
 
 ;; Below, `select` is non-branching like the ?: or ifelse ternary operators,
 ;; except that it doesn't evaluate any of its arguments and the first must be a

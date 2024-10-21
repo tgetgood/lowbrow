@@ -8,9 +8,4 @@
 
 (+ (+ 1 2) (+ 3 (+ 4 5)))
 
-
-(def let1
-  (μ args
-     ~((μ ~(first (first args)) ~(second args)) . ~~(second (first args)))))
-
 ((fn x (+ 1 x)) . 1)
