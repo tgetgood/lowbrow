@@ -61,23 +61,53 @@ containsp(m::Context, k) = ds.containsp(m.env, k)
 unboundp(m::Context, k) = ds.containsp(m.unbound, k)
 unboundp(m::Context{ds.Symbol}) = unboundp(m, m.form)
 
+function lexicalextender(m::Context, k, v)
+  if !unboundp(m, k)
+    @info string(k), string(m.unbound), string(ds.keys(m.env))
+    @info ds.containsp(m.unbound, k)
+    inspect(m)
+    throw("Trying to bind undeclared variable: " * string(k))
+  else
+    Context(
+      ds.assoc(m.env, k, v), ds.disj(m.unbound, k), lexicalextender(m.form, k, v)
+    )
+  end
+end
+
+function lexicalextender(m::ast.Mu, k, v)
+  if m.arg == k
+    m
+  else
+    ast.Mu(m.arg, lexicalextender(m.body, k, v))
+  end
+end
+
+function lexicalextender(m::ast.Immediate, k, v)
+  ast.Immediate(lexicalextender(m.form, k, v))
+end
+
+function lexicalextender(m::ast.Pair, k, v)
+  ast.Pair(lexicalextender(m.head, k, v), lexicalextender(m.tail, k, v))
+end
+
+function lexicalextender(m::ast.Application, k, v)
+  ast.Application(lexicalextender(m.head, k, v), lexicalextender(m.tail, k, v))
+end
+
+function lexicalextender(m::ast.PartialMu, k, v)
+  ast.PartialMu(lexicalextender(m.arg, k, v), lexicalextender(m.body, k, v))
+end
+
+lexicalextender(m::ds.Symbol, k, v) = m
+lexicalextender(m::ast.BuiltIn, k, v) = m
+
+function lexicalextender(m, k, v)
+  @warn "lexical extension fallthrough: " * string(typeof(m))
+  m
+end
 
 function extend(m::Context, k, v)
-  exwalk(inner, outer, f) = ds.walk(inner, outer, f)
-
-  function exwalk(inner, outer, f::Context{ast.Mu})
-    if f.form.arg == k
-      outer(f)
-    else
-      ds.walk(inner, outer, f)
-    end
-  end
-
-  ex(m::Context) = Context(ds.assoc(m.env, k, v), ds.disj(m.unbound, k), m.form)
-  ex(f) = f
-
-  prewalk(f, form) = exwalk(x -> prewalk(f, x), identity, f(form))
-  prewalk(ex, m)
+  lexicalextender(m, k, v)
 end
 
 ################################################################################
@@ -100,11 +130,16 @@ end
 ##### Sub eval
 
 function subeval(c, env, f::ds.Vector)
-  compile(c, context(env, ds.into(
+  imms = ds.into(
     ds.emptyvector,
     map(x -> context(env, ast.Immediate(x))),
     f
-  )))
+  )
+  compile(c, context(env, imms))
+end
+
+function subeval(c, _, x)
+  sys.succeed(c, x)
 end
 
 ##### Eval
@@ -170,13 +205,10 @@ end
 
 function apply(c, f::Context{ast.Mu}, t)
   e = extend(f.form.body, f.form.arg, t)
-  @info string(ds.keys(e.env)), string(e.unbound)
   compile(c, e)
 end
 
 function apply(c, f::Context{ast.PartialMu}, t)
-  # REVIEW: I don't like this: I know that the context of an application doesn't
-  # matter. So why am I tracking it?
   sys.succeed(c, context(f, ast.Application(f, t)))
 end
 
@@ -189,7 +221,7 @@ function apply(c, f::ast.PrimitiveFunction, t)
     if ast.reduced(t)
       sys.succeed(c, f.f(decontextualise(t)...))
     else
-      sys.succeed(c, context(ds.emptymap, ast.Application(f, t)))
+      sys.succeed(c, context(t, ast.Application(f, t)))
     end
   end
 
@@ -202,7 +234,7 @@ end
 
 function apply(c, f, t)
   @info "failed application: " * string(typeof(f))
-  sys.succeed(c, context(ds.emptymap, ast.Application(f, t)))
+  sys.succeed(c, context(t, ast.Application(f, t)))
 end
 
 ##### sub compile
@@ -216,10 +248,19 @@ subcompile(c, env, f) = sys.succeed(c, f)
 subcompile(c, env, f::ds.Symbol) = sys.succeed(c, context(env, f))
 
 function subcompile(c, ctx, f::ds.Vector)
-  next(v) = sys.succeed(c, context(ctx, v))
+  function next(v)
+    sys.succeed(c, context(ctx, v))
+  end
+
   coll = sys.collector(sys.withcc(c, :return, next), ds.count(f))
 
-  runner((i, f)) = compile(sys.withcc(c, :return, x -> sys.receive(coll, i, x)), f)
+  function runner((i, f))
+    function next(x)
+      sys.receive(coll, i, context(f, x))
+    end
+    compile(sys.withcc(c, :return, next), f)
+  end
+
   tasks = ds.into(
     ds.emptyvector,
     ds.interleave(),
@@ -262,8 +303,12 @@ function compile(c, f::Context)
   subcompile(c, f, f.form)
 end
 
+function compile(c, f::ast.BuiltIn)
+  sys.succeed(c, f)
+end
+
 function compile(c, f)
-  @info f
+  @warn "compile fallthrough", typeof(f)
   sys.succeed(c, f)
 end
 
