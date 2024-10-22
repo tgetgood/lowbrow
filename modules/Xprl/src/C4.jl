@@ -20,7 +20,11 @@ struct Context{T}
 end
 
 reduced(x::Context) = reduced(x.form)
-inspect(x::Context, level=0) = inspect(x.form, level)
+
+function inspect(x::Context, level=0)
+  print("*")
+  inspect(x.form, level)
+end
 
 string(x::Context) = string(x.form)
 
@@ -32,13 +36,18 @@ function walk(inner, outer, m::Context)
   outer(Context(m.env, m.unbound, inner(m.form)))
 end
 
-context(m, f) = Context(m, ds.emptyset, f)
+context(m::ds.Map, f) = Context(m, ds.emptyset, f)
+context(m::Context, f) = Context(m.env, m.unbound, f)
 
 """
 Embeds a form recursively in a fixed lexical environment.
 """
 contextualise(m ,f) = ds.postwalk(x -> context(m, x), f)
-decontextualise(f) = ds.prewalk(x -> x.form, f)
+function decontextualise(f)
+  walker(x) = x
+  walker(x::Context) = x.form
+  ds.prewalk(walker, f)
+end
 
 function declare(m::Context, k)
   dec1(m::Context) = Context(m.env, ds.conj(m.unbound, k), m.form)
@@ -52,17 +61,24 @@ containsp(m::Context, k) = ds.containsp(m.env, k)
 unboundp(m::Context, k) = ds.containsp(m.unbound, k)
 unboundp(m::Context{ds.Symbol}) = unboundp(m, m.form)
 
-function extend(m::Context, k, v)
-  if ds.containsp(m.unbound, k)
-    Context(ds.assoc(m.env, k, v), ds.disj(m.unbound, k), m.cursor)
-  else
-    throw("Cannot bind undeclared symbol " * string(k))
-  end
-end
 
-# REVIEW: We're going to pass around a pair of (env, form) as we build the tree
-# and see how that goes.
-succeed(c, e, f) = sys.emit(c, :return, (e, f))
+function extend(m::Context, k, v)
+  exwalk(inner, outer, f) = ds.walk(inner, outer, f)
+
+  function exwalk(inner, outer, f::Context{ast.Mu})
+    if f.form.arg == k
+      outer(f)
+    else
+      ds.walk(inner, outer, f)
+    end
+  end
+
+  ex(m::Context) = Context(ds.assoc(m.env, k, v), ds.disj(m.unbound, k), m.form)
+  ex(f) = f
+
+  prewalk(f, form) = exwalk(x -> prewalk(f, x), identity, f(form))
+  prewalk(ex, m)
+end
 
 ################################################################################
 ##### The compiler is basically a state machine that can be in one state of
@@ -81,16 +97,27 @@ succeed(c, e, f) = sys.emit(c, :return, (e, f))
 ##### Sufficiently late binding, maybe.
 ################################################################################
 
+##### Sub eval
+
+function subeval(c, env, f::ds.Vector)
+  compile(c, context(env, ds.into(
+    ds.emptyvector,
+    map(x -> context(env, ast.Immediate(x))),
+    f
+  )))
+end
+
 ##### Eval
 
 function eval(c, f::Context{ds.Symbol})
   if unboundp(f)
-    sys.succeed(c, context(f.env, ast.Immediate(f)))
+    sys.succeed(c, context(f, ast.Immediate(f)))
     return nothing
   end
 
   v = get(f.env, f.form, :notfound)
   if v === :notfound
+    @info f.env
     throw("Cannot evaluate unbound symbol: " * string(f.form))
   else
     compile(c, v)
@@ -100,7 +127,7 @@ end
 
 function eval(c, f::Context{ast.Immediate})
   function next(x::Context{ast.Immediate})
-    sys.succeed(c, context(x.env, ast.Immediate(x)))
+    sys.succeed(c, context(x, ast.Immediate(x)))
   end
   function next(x)
     eval(c, x)
@@ -109,16 +136,20 @@ function eval(c, f::Context{ast.Immediate})
 end
 
 function eval(c, f::Context{ast.Application})
-  next(x::Context{ast.Application}) = context(x.env, ast.Immediate(x))
+  next(x::Context{ast.Application}) = context(x, ast.Immediate(x))
   next(x) = eval(c, x)
   compile(sys.withcc(c, :return, next), f.form)
 end
 
 function eval(c, f::Context{ast.Pair})
-  compile(c, context(f.env, ast.Application(
-    context(f.env, ast.immediate(f.form.head)),
+  compile(c, context(f, ast.Application(
+    context(f, ast.immediate(f.form.head)),
     f.form.tail
   )))
+end
+
+function eval(c, f::Context)
+  subeval(c, f, f.form)
 end
 
 function eval(c, f)
@@ -129,12 +160,24 @@ end
 
 function apply(c, f::Context{ast.Application}, t)
   function next(a::Context{ast.Application})
-    sys.succeed(c, context(ds.emptymap, ast.Application, f, t))
+    sys.succeed(c, context(f, ast.Application(f, t)))
   end
   function next(a)
     apply(c, a, t)
   end
-  apply(withcc(c, :return, next), f.form.head, f.form.tail)
+  apply(sys.withcc(c, :return, next), f.form.head, f.form.tail)
+end
+
+function apply(c, f::Context{ast.Mu}, t)
+  e = extend(f.form.body, f.form.arg, t)
+  @info string(ds.keys(e.env)), string(e.unbound)
+  compile(c, e)
+end
+
+function apply(c, f::Context{ast.PartialMu}, t)
+  # REVIEW: I don't like this: I know that the context of an application doesn't
+  # matter. So why am I tracking it?
+  sys.succeed(c, context(f, ast.Application(f, t)))
 end
 
 function apply(c, f::ast.PrimitiveMacro, t)
@@ -153,6 +196,10 @@ function apply(c, f::ast.PrimitiveFunction, t)
   compile(sys.withcc(c, :return, next), t)
 end
 
+function apply(c, f::Context{ast.Immediate}, t)
+  sys.succeed(c, context(f, ast.Application(f, t)))
+end
+
 function apply(c, f, t)
   @info "failed application: " * string(typeof(f))
   sys.succeed(c, context(ds.emptymap, ast.Application(f, t)))
@@ -165,11 +212,13 @@ end
 ## parameter itself could be parametrised (a Context{Vector{T}} is not a
 ## Context{Vector}). Thus this indirection.
 
-subcompile(c, env, f) = throw("Compiling invalid expression")
+subcompile(c, env, f) = sys.succeed(c, f)
 subcompile(c, env, f::ds.Symbol) = sys.succeed(c, context(env, f))
 
-function subcompile(c, _, f::ds.Vector)
-  coll = sys.collector(c, ds.count(f))
+function subcompile(c, ctx, f::ds.Vector)
+  next(v) = sys.succeed(c, context(ctx, v))
+  coll = sys.collector(sys.withcc(c, :return, next), ds.count(f))
+
   runner((i, f)) = compile(sys.withcc(c, :return, x -> sys.receive(coll, i, x)), f)
   tasks = ds.into(
     ds.emptyvector,
@@ -195,18 +244,28 @@ function compile(c, f::Context{ast.Application})
   compile(sys.withcc(c, :return, next), f.form.head)
 end
 
-function compile(c, f::Context{ast.TopLevel})
-  compile(c, f.form.form)
+function compile(c, f::ast.TopLevel)
+  env = get(f.meta, ds.keyword("env"))
+  compile(c, context(env, f.form.form))
 end
 
-function compile(c, f::Context)
-  subcompile(c, f.env, f.form)
+function compile(c, f::Context{ast.Mu})
+  next(x) = sys.succeed(c, context(f, x.form))
+  compile(sys.withcc(c, :return, next), f.form.body)
 end
 
-function compile(c, f)
+function compile(c, f::Context{ast.PartialMu})
   sys.succeed(c, f)
 end
 
+function compile(c, f::Context)
+  subcompile(c, f, f.form)
+end
+
+function compile(c, f)
+  @info f
+  sys.succeed(c, f)
+end
 
 ##### Top level entry point
 
