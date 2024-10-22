@@ -15,15 +15,33 @@ function eset(e)
   nothing
 end
 
+o = Ref{Any}()
+
 rc = sys.withcc(
   ds.emptymap,
   :env, eset,
   :return, inspect
 )
 
-for form in core
-  @info "compiling: " * string(form)
-  c.interpret(rc, env[], form)
+rcc = sys.withcc(rc, :return, x -> o[] = x)
+
+function evalseq(root, envvar, forms)
+  function next(x)
+    inspect(x)
+    if ds.count(forms) > 1
+      evalseq(root, envvar, ds.rest(forms))
+    end
+  end
+
+  @info "compiling: " * string(first(forms))
+
+  c.interpret(
+    sys.withcc(root, :return, next, :env, x -> envvar[] = x),
+    envvar[],
+    first(forms)
+  )
 end
+
+evalseq(rc, env, core)
 
 f = r.readall(open("./test.xprl"))
