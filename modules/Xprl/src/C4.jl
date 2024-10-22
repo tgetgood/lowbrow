@@ -250,7 +250,7 @@ function compile(c, f::ast.TopLevel)
 end
 
 function compile(c, f::Context{ast.Mu})
-  next(x) = sys.succeed(c, context(f, x.form))
+  next(x) = sys.succeed(c, context(x, ast.Mu(f.form.arg, x)))
   compile(sys.withcc(c, :return, next), f.form.body)
 end
 
