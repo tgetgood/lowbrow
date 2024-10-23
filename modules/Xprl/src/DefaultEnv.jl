@@ -2,65 +2,61 @@ module DefaultEnv
 import DataStructures as ds
 
 import ..System as sys
-import ..C4 as comp
+import ..C5 as comp
 import ..AST as ast
 
-function def(c, args)
-  args = args.form
-  name = args[1].form
+function def(c, env, args)
+  name = args[1]
 
   if length(args) === 3
-    docstring = args[2].form
+    docstring = args[2]
     body = args[3]
   else
     docstring = ""
     body = args[2]
   end
 
-  lex = body.env
-
   function next(cform)
     tl = ast.TopLevel(
       ds.hashmap(
-        ds.keyword("env"), lex,
+        ds.keyword("env"), env.env,
         ds.keyword("doc"), docstring,
         ds.keyword("src"), body
       ),
       cform
     )
 
-    eprime = ds.assoc(lex, name, tl)
+    eprime = ds.assoc(env.env, name, tl)
 
     sys.emit(c, :env, eprime, :return, tl)
   end
 
-  comp.eval(sys.withcc(c, :return, next), body)
+  comp.eval(sys.withcc(c, :return, next), env, body)
 end
 
-function createμ(c, args)
-  env = args.env
-  args = args.form
+function createμ(c, env, args)
+  args = args
   params = args[1]
   body = args[2]
   function next(left)
-    if isa(left.form, ds.Symbol)
-      body = comp.declare(body, left.form)
-      next = body -> sys.succeed(c, comp.context(env, ast.Mu(left.form, body)))
+    if isa(left, ds.Symbol)
+      env = comp.declare(env, left)
+      next = body -> sys.succeed(c, ast.Mu(left, body))
     else
-      @info "pm cons", string(body.unbound)
-      ast.inspect(body)
       function next(body)
-        @info "pm body"
-        ast.inspect(body)
-        sys.succeed(c, comp.context(env, ast.PartialMu(
+        sys.succeed(c, ast.PartialMu(
           left,
           body
-        )))
+        ))
       end
     end
-    comp.compile(sys.withcc(c, :return, next), body)
+    comp.compile(sys.withcc(c, :return, next), env, body)
   end
-  comp.compile(sys.withcc(c, :return, next), params)
+  if isa(params, ds.Symbol)
+    next(params)
+  else
+    comp.compile(sys.withcc(c, :return, next), env, params)
+  end
 end
 
 second(x) = x[2]
