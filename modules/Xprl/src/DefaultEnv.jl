@@ -47,10 +47,16 @@ function createμ(c, args)
       body = comp.declare(body, left.form)
       next = body -> sys.succeed(c, comp.context(env, ast.Mu(left.form, body)))
     else
-      next = body -> sys.succeed(c, comp.context(env, ast.PartialMu(
-        left,
-        body
-      )))
+      @info "pm cons", string(body.unbound)
+      ast.inspect(body)
+      function next(body)
+        @info "pm body"
+        ast.inspect(body)
+        sys.succeed(c, comp.context(env, ast.PartialMu(
+          left,
+          body
+        )))
+      end
     end
     comp.compile(sys.withcc(c, :return, next), body)
   end

@@ -139,6 +139,7 @@ function subeval(c, env, f::ds.Vector)
 end
 
 function subeval(c, _, x)
+  @warn "subeval fallthrough", typeof(x)
   sys.succeed(c, x)
 end
 
@@ -161,13 +162,19 @@ function eval(c, f::Context{ds.Symbol})
 end
 
 function eval(c, f::Context{ast.Immediate})
+  @info "ev i"
+  inspect(f.form.form)
   function next(x::Context{ast.Immediate})
+    @info "ev i fail"
+    inspect(x)
     sys.succeed(c, context(x, ast.Immediate(x)))
   end
   function next(x)
+    @info "ev i inner"
+    inspect(x)
     eval(c, x)
   end
-  eval(sys.withcc(c, :return, next), f.form.form)
+  compile(sys.withcc(c, :return, next), f)
 end
 
 function eval(c, f::Context{ast.Application})
@@ -178,7 +185,7 @@ end
 
 function eval(c, f::Context{ast.Pair})
   compile(c, context(f, ast.Application(
-    context(f, ast.immediate(f.form.head)),
+    context(f.form.head, ast.immediate(f.form.head)),
     f.form.tail
   )))
 end
