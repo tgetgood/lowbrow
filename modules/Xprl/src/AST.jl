@@ -163,6 +163,49 @@ function hash(x::PartialMu)
   xor(muhash, hash(x.arg), hash(x.body))
 end
 
+##### Embedded Symbols
+##
+## If a symbol is written (read) in a context in which is has a meaning, then we
+## have a lexical symbol which has a known (fixed) meaning *unless* it has been
+## shadowed dynamically.
+##
+## A symbol which is not defined in the dev time environment is free. Free
+## symbols must be bound by a μ before any attempt to evaluate them.
+##
+## There is no way to programmatically construct a symbol at runtime. That means
+## that you can never refer to something that doesn't exist at the time you're
+## writing the code. You can exist to a quantity that you don't know yet (and
+## indeed might not yet exist) using the μ operator. That's enough, though often
+## awkward to use.
+##
+## What that means concretely is that *any* FreeSymbol *must* be the lefthand
+## arg to *at least one* μ. I'm not yet willing to rule out shadowing like Roc.
+## It would make it easier to write the compiler, but I'm not willing to let my
+## own ease define the language.
+
+struct LexicalSymbol <: Node
+  name::ds.Symbol
+  env::ds.Map
+end
+
+string(x::LexicalSymbol) = string(x.name)
+
+function Base.:(==)(x::LexicalSymbol, y::LexicalSymbol)
+  x.name == y.name && x.value == y.value
+end
+
+hash(x::LexicalSymbol) = hash(x.name)
+
+struct FreeSymbol <: Node
+  name::ds.Symbol
+end
+
+string(x::FreeSymbol) = string(x.name)
+
+Base.:(==)(x::FreeSymbol, y::FreeSymbol) = x.name == y.name
+
+hash(x::FreeSymbol) = hash(x.name)
+
 ##### Helpers
 
 """
@@ -201,9 +244,14 @@ function inspect(form::Immediate, level=0)
   inspect(form.form, level+1)
 end
 
-function inspect(form::ds.Symbol, level=0)
+function inspect(form::LexicalSymbol, level=0)
   space(level)
-  println("S["*string(form)*"]")
+  println("Sl["*string(form)*"]")
+end
+
+function inspect(form::FreeSymbol, level=0)
+  space(level)
+  println("Sf["*string(form)*"]")
 end
 
 function inspect(form::Application, level=0)

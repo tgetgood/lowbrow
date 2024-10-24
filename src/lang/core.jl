@@ -8,7 +8,9 @@ import Xprl.Reader as r
 import DataStructures as ds
 
 env = Ref{Any}(x.DefaultEnv.default)
-core = r.readall(open("./core.xprl"))
+
+core = r.tostream(open("./core.xprl"))
+test = r.tostream(open("./test.xprl"))
 
 function eset(e)
   env[] = e
@@ -25,23 +27,35 @@ rc = sys.withcc(
 
 rcc = sys.withcc(rc, :return, x -> o[] = x)
 
-function evalseq(root, envvar, forms)
+function readeval(conts, env, stream)
+  try
+    form = r.read(env, stream)
+    if form === nothing
+      readeval(conts, env, stream)
+    else
+      @info "Compiling:" * string(form)
+      c.interpret(conts, env, form)
+    end
+  catch EOFError
+    nothing
+  end
+end
+
+function evalseq(root, envvar, stream)
   function next(x)
-    inspect(x)
-    if ds.count(forms) > 1
-      evalseq(root, envvar, ds.rest(forms))
+    if x !== nothing
+      inspect(x)
+      evalseq(root, envvar, stream)
     end
   end
 
-  @info "compiling: " * string(first(forms))
-
-  c.interpret(
+  readeval(
     sys.withcc(root, :return, next, :env, x -> envvar[] = x),
     envvar[],
-    first(forms)
+    stream
   )
 end
 
 evalseq(rc, env, core)
 
-f = r.readall(open("./test.xprl"))
+# f = r.readall(open("./test.xprl"))

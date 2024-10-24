@@ -4,12 +4,14 @@ import ..AST as ast
 
 import DataStructures as ds
 
-struct BufferedStream
+abstract type Stream end
+
+struct BufferedStream <: Stream
   stream::IO
   buffer::Base.Vector{Char}
 end
 
-mutable struct StringStream
+mutable struct StringStream <: Stream
   stream::String
   index::UInt
 end
@@ -54,8 +56,12 @@ ts = "łβ∘"
 
 struct ReaderOptions
   until
+  env
 end
 
+function until(opts, c)
+  ReaderOptions(c, opts.env)
+end
 
 ## This will raise an error on EOF. That's normally the right behaviour, but we
 ## might need a softer try-read sort of fn.
@@ -83,17 +89,22 @@ function splitsymbolic(x::String)
   end
 end
 
-function readkeyword(x)
+function readkeyword(x, _)
   ds.keyword(x)
 end
 
-function readsymbol(x)
-  ds.symbol(x)
+function readsymbol(x, opts)
+  s = ds.symbol(x)
+  if s == ds.symbol(".")
+    s
+  else
+    ast.LexicalSymbol(s, opts.env)
+  end
 end
 
-function interpret(x::String)
+function interpret(x::String, opts)
   if startswith(x, ':')
-    return readkeyword(x)
+    return readkeyword(x, opts)
   end
   try
     return parse(Int, x)
@@ -107,14 +118,14 @@ function interpret(x::String)
   elseif x == "false"
     return false
   else
-    return readsymbol(x)
+    return readsymbol(x, opts)
   end
 end
 
-function readsubforms(stream, until)
+function readsubforms(stream, opts)
   forms = []
   while true
-    t = read(stream, ReaderOptions(until))
+    t = read(stream, opts)
     if t === :close
       break
     elseif t === nothing
@@ -127,7 +138,7 @@ function readsubforms(stream, until)
 end
 
 function readpair(stream, opts)
-  subs = readsubforms(stream, ')')
+  subs = readsubforms(stream, until(opts, ')'))
 
   # REVIEW: This is an ugly hack.
   #
@@ -159,7 +170,7 @@ function readpair(stream, opts)
 end
 
 function readvector(stream, opts)
-  ds.vec(readsubforms(stream, ']'))
+  ds.vec(readsubforms(stream, until(opts, ']')))
 end
 
 specialchars = Dict(
@@ -256,7 +267,7 @@ function readstring(stream, opts)
 end
 
 function readmap(stream, opts)
-  elements = readsubforms(stream, '}')
+  elements = readsubforms(stream, until(opts, '}'))
   @assert length(elements) % 2 === 0 "a map literal must contain an even number of entries"
 
   res = ds.emptymap
@@ -352,7 +363,7 @@ function readtoken(stream, opts)
   return out
 end
 
-function read(stream, opts)
+function read(stream::Stream, opts::ReaderOptions)
   c = firstnonwhitespace(stream)
 
   if opts.until !== nothing && c === opts.until
@@ -363,45 +374,41 @@ function read(stream, opts)
 
   if sub === nothing
     unread1(stream, c)
-    return interpret(readtoken(stream, opts))
+    return interpret(readtoken(stream, opts), opts)
   else
     return sub(stream, opts)
   end
 end
 
-function read(stream)
-  read(stream, ReaderOptions(nothing))
+function read(env::ds.Map, stream::Stream)
+  read(stream, ReaderOptions(nothing, env))
 end
 
-function read(s::String)
-  read(tostream(s))
+function read(env, s::String)
+  read(env, tostream(s))
 end
 
-function read(s::IO)
-  read(tostream(s))
+function read(env, s::IO)
+  read(env, tostream(s))
 end
 
-"""N.B. This will run forever if `stream` doesn't eventually close"""
-function readall(stream::BufferedStream)
-  forms = []
-  while true
-    try
-      push!(forms, read(stream))
-    catch EOFError
-      return ds.remove(isnothing, forms)
-    end
-  end
-end
+# REVIEW: readall is problematic since you, in general, need a different env for
+# each read
 
-function readall(x::IO)
-  readall(tostream(x))
-end
+# """N.B. This will run forever if `stream` doesn't eventually close"""
+# function readall(stream::BufferedStream)
+#   forms = []
+#   while true
+#     try
+#       push!(forms, read(stream))
+#     catch EOFError
+#       return ds.remove(isnothing, forms)
+#     end
+#   end
+# end
 
-function repall(x)
-  for f in readall(ds.emptymap, x)
-    println(string(f))
-    println()
-  end
-end
+# function readall(x::IO)
+#   readall(tostream(x))
+# end
 
 end #module

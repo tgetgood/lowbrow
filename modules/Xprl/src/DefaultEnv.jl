@@ -19,14 +19,14 @@ function def(c, env, args)
   function next(cform)
     tl = ast.TopLevel(
       ds.hashmap(
-        ds.keyword("env"), env.env,
+        ds.keyword("env"), name.env,
         ds.keyword("doc"), docstring,
         ds.keyword("src"), body
       ),
       cform
     )
 
-    eprime = ds.assoc(env.env, name, tl)
+    eprime = ds.assoc(name.env, name.name, tl)
 
     sys.emit(c, :env, eprime, :return, tl)
   end

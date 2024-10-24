@@ -1,6 +1,6 @@
 (def wrap
-  "Wraps a μ or primitive that takes only literal values in a function that
-  evals its arguments."
+  "\nWraps a μ or primitive that takes only literal values in a function that
+  evals its arguments.\n"
   (μ f
      ~(μ args
          ~(~f . ~~args))))

@@ -8,15 +8,10 @@ import ..System as sys
 import ..AST as ast
 import ..AST: inspect, reduced
 
-struct BoundName
-  name
-  value
-end
-
 ##### Context of Interpretation
 
 struct Context
-  env::ds.Map
+  bindings::ds.Map
   stack::ds.Vector
 end
 
@@ -32,10 +27,10 @@ context(m::ds.Map) = Context(m, ds.emptyvector)
 Embeds a form recursively in a fixed lexical environment.
 """
 function declare(m::Context, k)
-  Context(ds.dissoc(m.env, k), ds.conj(m.stack, k))
+  Context(ds.dissoc(m.bindings, k), ds.conj(m.stack, k))
 end
 
-containsp(m::Context, k) = ds.containsp(m.env, k)
+containsp(m::Context, k) = ds.containsp(m.bindings, k)
 
 function unboundp(m::Context, k)
   for j = m.stack
@@ -49,21 +44,26 @@ end
 function extend(m::Context, k, v)
   # @assert m.stack[1] == k "Cannot apply to inner μs before outer μs."
 
-  Context(ds.assoc(m.env, k, v), ds.into(ds.emptyvector, ds.rest(m.stack)))
+  Context(ds.assoc(m.bindings, k, v), ds.into(ds.emptyvector, ds.rest(m.stack)))
 end
 
 ##### Eval
 
-function eval(c, env, f::ds.Symbol)
-  if unboundp(env, f)
-    sys.succeed(c, ast.Immediate(f))
+function eval(c, env, f::ast.LexicalSymbol)
+  if ds.containsp(env.bindings, f.name)
+    compile(c, env, get(env.bindings, f.name))
+  elseif unboundp(env, f.name)
+    sys.succeed(c, ast.FreeSymbol(f.name))
   else
-    v = get(env.env, f, :notfound)
-    if v === :notfound
-      throw("Cannot evaluate unbound symbol: " * string(f))
-    else
-      compile(c, env, v)
-    end
+    compile(c, env, get(f.env, f.name))
+  end
+end
+
+function eval(c, env, f::ast.FreeSymbol)
+  if ds.containsp(env.bindings, f.name)
+    compile(c, env, get(env.bindings, f.name))
+  else
+    sys.succeed(c, f)
   end
 end
 
@@ -165,18 +165,12 @@ function compile(c, env, f::ds.Vector)
   sys.emit(sys.withcc(c, :run, runner), tasks...)
 end
 
-function compile(c, env, f::ds.Symbol)
-  if unboundp(env, f)
-    sys.succeed(c, f)
-  else
-    v = get(env.env, f, :notfound)
-    if v === :notfound
-      @info string(ds.keys(env.env)), string(env.stack)
-      throw("unbound symbol: " * string(f))
-    else
-      sys.succeed(c, BoundName(f, v))
-    end
-  end
+function compile(c, env, f::ast.FreeSymbol)
+  sys.succeed(c, f)
+end
+
+function compile(c, env, f::ast.LexicalSymbol)
+  sys.succeed(c, f)
 end
 
 function compile(c, env, f::ast.Immediate)
