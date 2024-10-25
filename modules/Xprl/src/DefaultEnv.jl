@@ -2,7 +2,7 @@ module DefaultEnv
 import DataStructures as ds
 
 import ..System as sys
-import ..C5 as comp
+import ..C6 as comp
 import ..AST as ast
 
 function def(c, env, args)
@@ -17,18 +17,15 @@ function def(c, env, args)
   end
 
   function next(cform)
-    tl = ast.TopLevel(
-      ds.hashmap(
-        ds.keyword("env"), name.env,
+    meta = ds.hashmap(
+        ds.keyword("env"), env,
         ds.keyword("doc"), docstring,
         ds.keyword("src"), body
-      ),
-      cform
     )
 
-    eprime = ds.assoc(name.env, name.name, tl)
+    eprime = ds.assoc(env, name, cform)
 
-    sys.emit(c, :env, eprime, :return, tl)
+    sys.emit(c, :env, eprime, :return, cform)
   end
 
   comp.eval(sys.withcc(c, :return, next), env, body)

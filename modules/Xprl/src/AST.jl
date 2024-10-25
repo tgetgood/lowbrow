@@ -33,21 +33,6 @@ struct PrimitiveMacro <: BuiltIn
   f::Function
 end
 
-### Top level ("def"ed) forms
-##
-## The main purpose here is to keep metadata of what you would call "vars" in
-## Clojure, easily accessible at the namespace level.
-
-"""
-Container for defined forms and those typed into the repl.
-"""
-struct TopLevel <: Node
-  meta
-  form
-end
-
-string(x::TopLevel) = string(x.form)
-
 ### Immediate (eval asap) forms
 
 struct Immediate <: Node
@@ -281,12 +266,6 @@ end
 function inspect(form, level=0)
   space(level)
   println("V["*string(typeof(form))*"]")
-end
-
-function inspect(form::TopLevel, level=0)
-  space(level)
-  println("-T-")
-  inspect(form.form, level)
 end
 
 end # module

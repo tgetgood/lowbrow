@@ -94,12 +94,7 @@ function readkeyword(x, _)
 end
 
 function readsymbol(x, opts)
-  s = ds.symbol(x)
-  if s == ds.symbol(".")
-    s
-  else
-    ast.Symbol(s, opts.env)
-  end
+  ds.symbol(x)
 end
 
 function interpret(x::String, opts)
@@ -392,16 +387,30 @@ function read(stream::Stream, opts::ReaderOptions)
   end
 end
 
-function read(env::ds.Map, stream::Stream)
-  read(stream, ReaderOptions(nothing, env))
+function read(stream::Stream)
+  read(stream, ReaderOptions(nothing, ds.emptymap))
 end
 
-function read(env, s::String)
-  read(env, tostream(s))
+function read(s::String)
+  read(tostream(s))
 end
 
-function read(env, s::IO)
-  read(env, tostream(s))
+function read(s::IO)
+  read(tostream(s))
+end
+
+function readall(io::Stream)
+  forms = []
+  form = read(io)
+  while form !== nothing
+    push!(forms, form)
+    form = read(io)
+  end
+  forms
+end
+
+function readall(io)
+  readall(tostream(io))
 end
 
 end #module
