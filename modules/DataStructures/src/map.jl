@@ -268,6 +268,8 @@ get(m::EmptyMap, x, default) = default
 seq(x::Nothing) = emptyvector
 seq(x::EmptyMap) = emptyvector
 
+dissoc(x::EmptyMap, _) = x
+
 function getindexed(m::EmptyMap, k)
   nothing, :notfound
 end

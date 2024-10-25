@@ -28,16 +28,10 @@ rc = sys.withcc(
 rcc = sys.withcc(rc, :return, x -> o[] = x)
 
 function readeval(conts, env, stream)
-  try
-    form = r.read(env, stream)
-    if form === nothing
-      readeval(conts, env, stream)
-    else
-      @info "Compiling:" * string(form)
-      c.interpret(conts, env, form)
-    end
-  catch EOFError
-    nothing
+  form = r.read(env, stream)
+  if form !== nothing
+    @info "Compiling:" * string(form)
+    c.interpret(conts, env, form)
   end
 end
 
@@ -46,6 +40,8 @@ function evalseq(root, envvar, stream)
     if x !== nothing
       inspect(x)
       evalseq(root, envvar, stream)
+    else
+      @info "EOF"
     end
   end
 
@@ -56,6 +52,17 @@ function evalseq(root, envvar, stream)
   )
 end
 
-evalseq(rc, env, core)
+"""
+Reads file `fname` and merges it into the given environment.
+"""
+function loadfile(envvar, fname)
+  stream = r.tostream(open(fname))
 
-# f = r.readall(open("./test.xprl"))
+  evalseq(rc, envvar, stream)
+end
+
+form = r.read(env[], core)
+
+res = c.interpret(rc, env[], form)
+
+loadfile(env, "./core.xprl")

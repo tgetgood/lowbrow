@@ -39,9 +39,10 @@ function createμ(c, env, args)
   params = args[1]
   body = args[2]
   function next(left)
-    if isa(left, ds.Symbol)
-      env = comp.declare(env, left)
-      next = body -> sys.succeed(c, ast.Mu(left, body))
+    if isa(left, ast.Symbol)
+      @warn "declaring: " * string(left.name)
+      env = comp.declare(env, left.name)
+      next = body -> sys.succeed(c, ast.Mu(left.name, body))
     else
       function next(body)
         sys.succeed(c, ast.PartialMu(

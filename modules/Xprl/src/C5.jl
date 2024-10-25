@@ -21,7 +21,7 @@ function show(io::IO, mime::MIME"text/plain", s::Context)
   print(io, string(s))
 end
 
-context(m::ds.Map) = Context(m, ds.emptyvector)
+context(m::ds.Map) = Context(ds.emptymap, ds.emptyvector)
 
 """
 Embeds a form recursively in a fixed lexical environment.
@@ -44,26 +44,27 @@ end
 function extend(m::Context, k, v)
   # @assert m.stack[1] == k "Cannot apply to inner μs before outer μs."
 
-  Context(ds.assoc(m.bindings, k, v), ds.into(ds.emptyvector, ds.rest(m.stack)))
+  Context(ds.assoc(m.bindings, k, v), ds.into(ds.emptyvector, m.stack))
 end
 
 ##### Eval
 
-function eval(c, env, f::ast.LexicalSymbol)
+function eval(c, env, f::ast.Symbol)
   if ds.containsp(env.bindings, f.name)
+    @info "dyn", string(f.name), string(env.bindings), string(env.stack)
     compile(c, env, get(env.bindings, f.name))
   elseif unboundp(env, f.name)
-    sys.succeed(c, ast.FreeSymbol(f.name))
+    @info "unbound"
+    sys.succeed(c, ast.Immediate(f))
   else
-    compile(c, env, get(f.env, f.name))
-  end
-end
-
-function eval(c, env, f::ast.FreeSymbol)
-  if ds.containsp(env.bindings, f.name)
-    compile(c, env, get(env.bindings, f.name))
-  else
-    sys.succeed(c, f)
+    v = get(f.env, f.name, :notfound)
+    if v === :notfound
+      throw("Unresolvable symbol: " * string(f.name))
+    else
+      @info "lex", string(f.name), string(v)
+      @info "with", string(ds.keys(env.bindings)), string(env.stack)
+      compile(c, env, v)
+    end
   end
 end
 
@@ -78,9 +79,32 @@ function eval(c, env, f::ast.Immediate)
 end
 
 function eval(c, env, f::ast.Application)
-  next(x::ast.Application) = ast.Immediate(x)
+  next(x::ast.Application) = sys.succeed(c, ast.Immediate(x))
   next(x) = eval(c, env, x)
   compile(sys.withcc(c, :return, next), env, f)
+end
+
+function eval(c, env, f::ds.Vector)
+  function next(v)
+    sys.succeed(c, v)
+  end
+
+  coll = sys.collector(sys.withcc(c, :return, next), ds.count(f))
+
+  function runner((i, f))
+    function next(x)
+      sys.receive(coll, i, x)
+    end
+    eval(sys.withcc(c, :return, next), env, f)
+  end
+
+  tasks = ds.into(
+    ds.emptyvector,
+    ds.interleave(),
+    ds.repeat(:run),
+    ds.mapindexed(tuple, f)
+  )
+  sys.emit(sys.withcc(c, :run, runner), tasks...)
 end
 
 function eval(c, env, f::ast.Pair)
@@ -121,6 +145,7 @@ end
 
 function apply(c, env, f::ast.PrimitiveFunction, t)
   function next(t)
+    @info string(t)
     if ast.reduced(t)
       sys.succeed(c, f.f(t...))
     else
@@ -128,6 +153,7 @@ function apply(c, env, f::ast.PrimitiveFunction, t)
     end
   end
 
+  inspect(t)
   compile(sys.withcc(c, :return, next), env, t)
 end
 
@@ -165,11 +191,7 @@ function compile(c, env, f::ds.Vector)
   sys.emit(sys.withcc(c, :run, runner), tasks...)
 end
 
-function compile(c, env, f::ast.FreeSymbol)
-  sys.succeed(c, f)
-end
-
-function compile(c, env, f::ast.LexicalSymbol)
+function compile(c, env, f::ast.Symbol)
   sys.succeed(c, f)
 end
 
@@ -183,7 +205,7 @@ function compile(c, env, f::ast.Application)
 end
 
 function compile(c, env, f::ast.TopLevel)
-  sys.succeed(c, f.form)
+  compile(c, env, f.form)
 end
 
 function compile(c, env, f::ast.Mu)
@@ -201,7 +223,7 @@ function compile(c, env, f::ast.BuiltIn)
 end
 
 function compile(c, env, f)
-  @warn "compile fallthrough", typeof(f)
+  @warn "compile fallthrough: " * string(typeof(f))
   sys.succeed(c, f)
 end
 

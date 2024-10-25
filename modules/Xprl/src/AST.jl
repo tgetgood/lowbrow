@@ -183,28 +183,18 @@ end
 ## It would make it easier to write the compiler, but I'm not willing to let my
 ## own ease define the language.
 
-struct LexicalSymbol <: Node
+struct Symbol <: Node
   name::ds.Symbol
   env::ds.Map
 end
 
-string(x::LexicalSymbol) = string(x.name)
+string(x::Symbol) = string(x.name)
 
-function Base.:(==)(x::LexicalSymbol, y::LexicalSymbol)
+function Base.:(==)(x::Symbol, y::Symbol)
   x.name == y.name && x.value == y.value
 end
 
-hash(x::LexicalSymbol) = hash(x.name)
-
-struct FreeSymbol <: Node
-  name::ds.Symbol
-end
-
-string(x::FreeSymbol) = string(x.name)
-
-Base.:(==)(x::FreeSymbol, y::FreeSymbol) = x.name == y.name
-
-hash(x::FreeSymbol) = hash(x.name)
+hash(x::Symbol) = hash(x.name)
 
 ##### Helpers
 
@@ -244,14 +234,14 @@ function inspect(form::Immediate, level=0)
   inspect(form.form, level+1)
 end
 
-function inspect(form::LexicalSymbol, level=0)
+function inspect(form::Symbol, level=0)
   space(level)
-  println("Sl["*string(form)*"]")
+  println("S["*string(form)*"]")
 end
 
-function inspect(form::FreeSymbol, level=0)
+function inspect(form::ds.Symbol, level=0)
   space(level)
-  println("Sf["*string(form)*"]")
+  println("S["*string(form)*"]*")
 end
 
 function inspect(form::Application, level=0)

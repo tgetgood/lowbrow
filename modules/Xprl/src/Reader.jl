@@ -98,7 +98,7 @@ function readsymbol(x, opts)
   if s == ds.symbol(".")
     s
   else
-    ast.LexicalSymbol(s, opts.env)
+    ast.Symbol(s, opts.env)
   end
 end
 
@@ -363,7 +363,7 @@ function readtoken(stream, opts)
   return out
 end
 
-function read(stream::Stream, opts::ReaderOptions)
+function readinner(stream::Stream, opts::ReaderOptions)
   c = firstnonwhitespace(stream)
 
   if opts.until !== nothing && c === opts.until
@@ -380,6 +380,18 @@ function read(stream::Stream, opts::ReaderOptions)
   end
 end
 
+function read(stream::Stream, opts::ReaderOptions)
+  form = nothing
+  try
+    while form === nothing
+      form = readinner(stream, opts)
+    end
+    form
+  catch EOFError
+    nothing
+  end
+end
+
 function read(env::ds.Map, stream::Stream)
   read(stream, ReaderOptions(nothing, env))
 end
@@ -391,24 +403,5 @@ end
 function read(env, s::IO)
   read(env, tostream(s))
 end
-
-# REVIEW: readall is problematic since you, in general, need a different env for
-# each read
-
-# """N.B. This will run forever if `stream` doesn't eventually close"""
-# function readall(stream::BufferedStream)
-#   forms = []
-#   while true
-#     try
-#       push!(forms, read(stream))
-#     catch EOFError
-#       return ds.remove(isnothing, forms)
-#     end
-#   end
-# end
-
-# function readall(x::IO)
-#   readall(tostream(x))
-# end
 
 end #module
