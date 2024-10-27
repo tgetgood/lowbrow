@@ -77,6 +77,16 @@ function tailstring(c::ds.Sequential)
   ds.into(" ", map(string) ∘ ds.interpose(" "), c)
 end
 
+function Base.:(==)(x::Pair, y::Pair)
+  x.head == y.head && x.tail == y.tail
+end
+
+const phash = hash("#Pair")
+
+function hash(x::Pair)
+  xor(phash, hash(x.head), hash(x.tail))
+end
+
 ### Application
 ##
 ### I.e. things that are to be applied as soon as possible
@@ -109,6 +119,7 @@ end
 ### The basic syntactic combinator of the language.
 
 struct Mu <: Node
+  meta
   arg::ds.Symbol
   body
 end
@@ -134,6 +145,7 @@ end
 ### fundamentally different.
 
 struct PartialMu <: Node
+  meta
   arg
   body
 end
@@ -147,39 +159,6 @@ end
 function hash(x::PartialMu)
   xor(muhash, hash(x.arg), hash(x.body))
 end
-
-##### Embedded Symbols
-##
-## If a symbol is written (read) in a context in which is has a meaning, then we
-## have a lexical symbol which has a known (fixed) meaning *unless* it has been
-## shadowed dynamically.
-##
-## A symbol which is not defined in the dev time environment is free. Free
-## symbols must be bound by a μ before any attempt to evaluate them.
-##
-## There is no way to programmatically construct a symbol at runtime. That means
-## that you can never refer to something that doesn't exist at the time you're
-## writing the code. You can exist to a quantity that you don't know yet (and
-## indeed might not yet exist) using the μ operator. That's enough, though often
-## awkward to use.
-##
-## What that means concretely is that *any* FreeSymbol *must* be the lefthand
-## arg to *at least one* μ. I'm not yet willing to rule out shadowing like Roc.
-## It would make it easier to write the compiler, but I'm not willing to let my
-## own ease define the language.
-
-struct Symbol <: Node
-  name::ds.Symbol
-  env::ds.Map
-end
-
-string(x::Symbol) = string(x.name)
-
-function Base.:(==)(x::Symbol, y::Symbol)
-  x.name == y.name && x.value == y.value
-end
-
-hash(x::Symbol) = hash(x.name)
 
 ##### Helpers
 
@@ -219,14 +198,9 @@ function inspect(form::Immediate, level=0)
   inspect(form.form, level+1)
 end
 
-function inspect(form::Symbol, level=0)
-  space(level)
-  println("S["*string(form)*"]")
-end
-
 function inspect(form::ds.Symbol, level=0)
   space(level)
-  println("S["*string(form)*"]*")
+  println("S["*string(form)*"]")
 end
 
 function inspect(form::Application, level=0)
