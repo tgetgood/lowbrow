@@ -46,7 +46,11 @@ bindings(x::ds.Symbol) = [x]
 bindings(x::ds.Vector) = ds.into!([], map(bindings) ∘ ds.cat(), x)
 
 # FIXME: Maps!
-destructuringbind(x, y) = throw("incompatible sexps in destructuring.")
+function destructuringbind(x, y)
+  @warn "incompatible sexps in destructuring."
+  :bindfailure
+end
+
 destructuringbind(x::ds.Symbol, y::Any) = ds.hashmap(x, y)
 
 function destructuringbind(xs::ds.Vector, ys::ds.Vector)
@@ -110,7 +114,7 @@ function eval(c, env, f::ds.Vector)
 end
 
 function eval(c, env, f)
-  @warn "eval fallthrough: " * string(typeof(f))
+  # @warn "eval fallthrough: " * string(typeof(f))
   sys.succeed(c, f)
 end
 
@@ -128,10 +132,20 @@ function apply(c, env, f::ast.Application, tail)
 end
 
 function apply(c, env, f::ast.Mu, tail)
-  # TODO: What if we can't bind yet?
-  bindings = destructuringbind(f.params, tail)
-  innerenv = extendin(f.env, env, bindings)
-  compile(c, innerenv, f.body)
+  function next(tail)
+    bindings = destructuringbind(f.params, tail)
+    if bindings === :bindfailure
+      sys.succeed(c, ast.Application(f, tail))
+    else
+      innerenv = extendin(f.env, env, bindings)
+      compile(c, innerenv, f.body)
+    end
+  end
+  compile(wrt(c, next), env, tail)
+end
+
+function apply(c, env, f::ast.PartialMu, tail)
+  sys.succeed(c, ast.Application(f, tail))
 end
 
 function apply(c, env, f::ast.PrimitiveMacro, tail)
@@ -159,17 +173,6 @@ function apply(c, env, f::ast.PrimitiveFunction, tail)
 end
 
 ##### Compile
-#
-# Properly speaking, only immediates and applications can be compiled. This has
-# to do with homoiconicity.
-#
-# Immediates are what separate reading from execution. Immediates can be read in
-# this language, but they immediately (!) break out of the reader and *do*
-# stuff. Applications are just the result of applying immediates to pairs.
-#
-# Trying to compile anything except an immediate (or by extension an
-# application) is a no op. That's what it means when we say lisp is homoiconic.
-# Only eval breaks the symmetry.
 
 function compile(c, env, f::ast.Immediate)
   eval(c, env, f.form)
@@ -210,7 +213,7 @@ function compile(c, env, f::ContextSwitch)
 end
 
 function compile(c, env, f)
-  @warn "compile fallthrough: " * string(typeof(f))
+  # @warn "compile fallthrough: " * string(typeof(f))
   sys.succeed(c, f)
 end
 

@@ -27,42 +27,38 @@ rc = sys.withcc(
 
 rcc = sys.withcc(rc, :return, x -> o[] = x)
 
-# function readeval(conts, env, stream)
-#   form = r.read(env, stream)
-#   if form !== nothing
-#     @info "Compiling:" * string(form)
-#     c.interpret(conts, env, form)
-#   end
-# end
+function evalseq(root, envvar, forms)
+  function next(x)
+    if x !== nothing
+      inspect(x)
+      if ds.count(forms) > 1
+        evalseq(root, envvar, ds.rest(forms))
+      end
+    else
+      @info "EOF"
+    end
+  end
 
-# function evalseq(root, envvar, stream)
-#   function next(x)
-#     if x !== nothing
-#       inspect(x)
-#       evalseq(root, envvar, stream)
-#     else
-#       @info "EOF"
-#     end
-#   end
+  @info "compiling: " * string(first(forms))
 
-#   readeval(
-#     sys.withcc(root, :return, next, :env, x -> envvar[] = x),
-#     envvar[],
-#     stream
-#   )
-# end
+  c.interpret(
+    sys.withcc(root, :return, next, :env, x -> envvar[] = x),
+    envvar[],
+    first(forms)
+  )
+end
 
-# """
-# Reads file `fname` and merges it into the given environment.
-# """
-# function loadfile(envvar, fname)
-#   stream = r.tostream(open(fname))
+"""
+Reads file `fname` and merges it into the given environment.
+"""
+function loadfile(envvar, fname)
+  forms = r.readall(open(fname))
 
-#   evalseq(rc, envvar, stream)
-# end
+  evalseq(rc, envvar, forms)
+end
 
 # form = r.read(env[], core)
 
 # res = c.interpret(rc, env[], form)
 
-# loadfile(env, "./core.xprl")
+loadfile(env, "./core.xprl")

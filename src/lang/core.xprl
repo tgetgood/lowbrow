@@ -32,3 +32,7 @@
 (def if
   (μ [pred t f]
      ~~(select ~~pred ~t ~f)))
+
+(def inc (fn [x] (+ x 1)))
+
+(def map (fn [f] (fn [x] (f x))))
