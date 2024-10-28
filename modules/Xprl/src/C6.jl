@@ -47,7 +47,7 @@ bindings(x::ds.Vector) = ds.into!([], map(bindings) ∘ ds.cat(), x)
 
 # FIXME: Maps!
 function destructuringbind(x, y)
-  @warn "incompatible sexps in destructuring."
+  # @warn "incompatible sexps in destructuring."
   :bindfailure
 end
 
