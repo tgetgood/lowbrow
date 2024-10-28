@@ -25,15 +25,30 @@ function def(c, env, args)
 
     eprime = ds.assoc(env, name, cform)
 
-    sys.emit(c, :env, eprime, :return, cform)
+    sys.emit(c, :env, eprime, :return, name)
   end
 
   comp.eval(sys.withcc(c, :return, next), env, body)
 end
 
 
+function inspect(c, env, s)
+  function next(f)
+    ast.inspect(f)
+    # FIXME: It should never be necessary to return nothing. There shouldn't be
+    # a reified Nothing at all; just don't return anything.
+    #
+    # But right now the repl waits for messages on the return channel. This
+    # wouldn't be necessary if we had a :complete handler or something of the
+    # sort that lets us know when all messages that will be sent by a given
+    # subunit have been sent.
+    #
+    # I'm not entirely sure how to implement that at the moment.
+    sys.succeed(c, nothing)
+  end
 
-
+  comp.eval(sys.withcc(c, :return, next), env, first(s))
+end
 
 second(x) = x[2]
 
@@ -52,10 +67,13 @@ default = ds.hashmap(
   # ds.Symbol(["apply"]), Eval.apply,
   ds.symbol("def"), ast.PrimitiveMacro(def),
   ds.symbol("μ"), ast.PrimitiveMacro(comp.createμ),
+  ds.symbol("mu"), ast.PrimitiveMacro(comp.createμ),
+  ds.symbol("inspect"), ast.PrimitiveMacro(inspect),
 
   ds.symbol("nth*"), ast.PrimitiveFunction(ds.nth),
   ds.symbol("select"), ast.PrimitiveFunction(ifelse),
   ds.symbol("+*"), ast.PrimitiveFunction(+),
+  ds.symbol("-*"), ast.PrimitiveFunction(-)
 )
 
 end

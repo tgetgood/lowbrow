@@ -57,8 +57,26 @@ function loadfile(envvar, fname)
   evalseq(rc, envvar, forms)
 end
 
+function repl(envvar)
+  print("> ")
+  form = r.read(stdin)
+  if form !== nothing
+    function next(x)
+      println(string(x))
+      repl(envvar)
+    end
+    c.interpret(
+      sys.withcc(ds.emptymap, :env, x -> envvar[] = x, :return, next),
+      envvar[],
+      form
+    )
+  end
+end
+
 # form = r.read(env[], core)
 
 # res = c.interpret(rc, env[], form)
 
 loadfile(env, "./core.xprl")
+
+repl(env)
