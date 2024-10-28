@@ -114,6 +114,13 @@ end
 
   @test merge(c, c) == c
 
+  @test dissoc(a, :a) == hashmap(:b, 2)
+  @test dissoc(a, :a, :b) == emptymap
+
+  m = into(emptymap, map(i -> (i, i)), 1:64)
+  n = into(emptymap, map(i -> (i, i)), 33:64)
+
+  @test dissoc(m, 1:32...) == n
 end
 
 @testset "merging maps" begin

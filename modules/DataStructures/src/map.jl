@@ -610,15 +610,6 @@ function addtomap(e1::MapEntry, e2::MapEntry, l)
   end
 end
 
-function conj(m::PersistentHashMap, e::MapEntry)
-  (v, i) = getindexed(m, key(e))
-  if i !== :notfound && val(e) == i
-    m
-  else
-    PersistentHashMap(addtomap(m.root, e))
-  end
-end
-
 function addtomap(x::PersistentHashNode, y::PersistentHashNode, l)
   ht = Base.Vector{MapNode}(undef, nodelength)
 
@@ -627,6 +618,15 @@ function addtomap(x::PersistentHashNode, y::PersistentHashNode, l)
   end
 
   PersistentHashNode(ht, l, sum(count, ht))
+end
+
+function conj(m::PersistentHashMap, e::MapEntry)
+  (v, i) = getindexed(m, key(e))
+  if i !== :notfound && val(e) == i
+    m
+  else
+    PersistentHashMap(addtomap(m.root, e))
+  end
 end
 
 function merge(x::PersistentHashMap, y::PersistentHashMap)
@@ -654,11 +654,60 @@ function mergewith(f, m1, m2)
   reduce(rf, m1, m2)
 end
 
+function containsp(m::PersistentHashNode, k)
+  (v, i) = getindexed(m, k, :notfound, m.level)
+  i !== :notfound
+end
+
+function removefrommap(n::PersistentHashNode, k)
+  # FIXME: This is too unncessarily complicated to be correct, despite the tests
+  # passing.
+  if containsp(n, k)
+    if n.level > 1 && n.count === 1
+      emptymarker
+    elseif n.level > 1 && n.count == 2
+      ne = filter(x -> x !== emptymarker, n.ht)
+      if count(ne) == 2
+        first(filter(x -> key(x) != k, ne))
+      else
+        PersistentHashNode(
+          into!([], map(x -> removefrommap(x, k)), n.ht),
+          n.level,
+          n.count - 1
+        )
+      end
+    else
+      PersistentHashNode(
+        into!([], map(x -> removefrommap(x, k)), n.ht),
+        n.level,
+        n.count - 1
+      )
+    end
+  else
+    n
+  end
+end
+
+function removefrommap(n::MapEntry, k)
+  if key(n) == k
+    emptymarker
+  else
+    n
+  end
+end
+
+removefrommap(n::EmptyMarker, _) = n
+
 function dissoc(m::PersistentHashMap, k)
-  # It's telling that I haven't actually hit this error in the months I've been
-  # using this library. Is it just my style of programming?  Monotonicity has a
-  # lot of benefits. And there's always `selectkeys`.
-  throw("not implemented")
+  if containsp(m, k)
+    PersistentHashMap(removefrommap(m.root, k))
+  else
+    m
+  end
+end
+
+function dissoc(m::Map, k, ks...)
+  reduce(dissoc, dissoc(m, k), ks)
 end
 
 gather(acc, m::EmptyMarker) = acc
