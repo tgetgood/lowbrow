@@ -9,12 +9,6 @@
 
 (def + (wrap . +*))
 
-;; I like the way clojure bootstraps so that destructuring is implemented in
-;; clojure, not java. I'm going to follow a similar path, but this is somewhat
-;; weirder on the surface: μ* and fn* take exactly one argument and it doesn't
-;; have to be a list. This provides an elegant symmetry, but it's not very
-;; practical.
-;;
 ;; I wanted to avoid cons cells entirely in this language, but I'm starting to
 ;; realise why they're important: the symmetry between calling a function as (f
 ;; x y z) and defining it as (fn [x y z] ...). The fact that the tail of the
@@ -25,17 +19,9 @@
 ;;
 ;; I just learned something I probably should have twenty years ago.
 (def fn
-  (μ sargs
-     ~(μ dargs
-         ~((μ ~(nth sargs 1) ~~(nth sargs 2)) . ~~dargs))))
-
-;; This one is interesting because it doesn't require ~any~ builtins beyond μ
-;; itself. But the usage is ugly. (((fn* x) (+ x 1)) . 2)
-(def fn*
-  (μ params
-     ~(μ body
-         ~(μ args
-             ~((μ ~params ~~body) . ~~args)))))
+  (μ [params body]
+     ~(μ args
+         ~((μ ~params ~~body) . ~~args))))
 
 ;; Below, `select` is non-branching like the ?: or ifelse ternary operators,
 ;; except that it doesn't evaluate any of its arguments and the first must be a
@@ -44,5 +30,5 @@
 ;; In 3-lisp `select` was called `ef` for "extensionally defined if".
 
 (def if
-  (μ args
-     ~~(select ~~(nth args 1) ~(nth args 2) ~(nth args 3))))
+  (μ [pred t f]
+     ~~(select ~~pred ~t ~f)))

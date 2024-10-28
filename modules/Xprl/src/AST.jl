@@ -119,21 +119,22 @@ end
 ### The basic syntactic combinator of the language.
 
 struct Mu <: Node
-  meta
-  arg::ds.Symbol
+  env
+  source
+  params
   body
 end
 
-string(x::Mu) = "(μ " * string(x.arg) * " " * string(x.body) * ")"
+string(x::Mu) = "(μ " * string(x.params) * " " * string(x.body) * ")"
 
 function Base.:(==)(x::Mu, y::Mu)
-  x.arg == y.arg && x.body == y.body
+  x.params == y.params && x.body == y.body
 end
 
 const muhash = hash("#Mu")
 
 function hash(x::Mu)
-  xor(muhash, hash(x.arg), hash(x.body))
+  xor(muhash, hash(x.params), hash(x.body))
 end
 
 ### Partially applied Mu
@@ -145,19 +146,18 @@ end
 ### fundamentally different.
 
 struct PartialMu <: Node
-  meta
-  arg
+  params
   body
 end
 
-string(x::PartialMu) = "(μ " * string(x.arg) * " " * string(x.body) * ")"
+string(x::PartialMu) = "(μ " * string(x.params) * " " * string(x.body) * ")"
 
 function Base.:(==)(x::PartialMu, y::PartialMu)
-  x.arg == y.arg && x.body == y.body
+  x.params == y.params && x.body == y.body
 end
 
 function hash(x::PartialMu)
-  xor(muhash, hash(x.arg), hash(x.body))
+  xor(muhash, hash(x.params), hash(x.body))
 end
 
 ##### Helpers
@@ -172,7 +172,7 @@ reduced(form::Immediate) = false
 reduced(form::Application) = false
 reduced(form::ds.Symbol) = false
 reduced(form::Pair) = reduced(form.head) && reduced(form.tail)
-reduced(form::Mu) = reduced(form.arg) && reduced(form.body)
+reduced(form::Mu) = reduced(form.params) && reduced(form.body)
 reduced(form::ds.Vector) = ds.every(reduced, form)
 reduced(form::ds.Map) = ds.every(reduced, form)
 reduced(form::ds.MapEntry) = reduced(ds.key(form)) && reduced(ds.val(form))
@@ -221,14 +221,14 @@ end
 function inspect(form::PartialMu, level=0)
   space(level)
   println("Pμ")
-  inspect(form.arg, level+1)
+  inspect(form.params, level+1)
   inspect(form.body, level+1)
 end
 
 function inspect(form::Mu, level=0)
   space(level)
   println("μ")
-  inspect(form.arg, level+1)
+  inspect(form.params, level+1)
   inspect(form.body, level+1)
 end
 

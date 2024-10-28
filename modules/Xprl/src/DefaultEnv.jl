@@ -31,31 +31,9 @@ function def(c, env, args)
   comp.eval(sys.withcc(c, :return, next), env, body)
 end
 
-function createμ(c, env, args)
-  args = args
-  params = args[1]
-  body = args[2]
-  function next(left)
-    if isa(left, ast.Symbol)
-      @warn "declaring: " * string(left.name)
-      env = comp.declare(env, left.name)
-      next = body -> sys.succeed(c, ast.Mu(left.name, body))
-    else
-      function next(body)
-        sys.succeed(c, ast.PartialMu(
-          left,
-          body
-        ))
-      end
-    end
-    comp.compile(sys.withcc(c, :return, next), env, body)
-  end
-  if isa(params, ds.Symbol)
-    next(params)
-  else
-    comp.compile(sys.withcc(c, :return, next), env, params)
-  end
-end
+
+
+
 
 second(x) = x[2]
 
@@ -73,13 +51,11 @@ default = ds.hashmap(
   # ds.Symbol(["eval"]), Eval.eval,
   # ds.Symbol(["apply"]), Eval.apply,
   ds.symbol("def"), ast.PrimitiveMacro(def),
-  ds.symbol("μ"), ast.PrimitiveMacro(createμ),
+  ds.symbol("μ"), ast.PrimitiveMacro(comp.createμ),
 
+  ds.symbol("nth*"), ast.PrimitiveFunction(ds.nth),
   ds.symbol("select"), ast.PrimitiveFunction(ifelse),
   ds.symbol("+*"), ast.PrimitiveFunction(+),
-  ds.symbol("first*"), ast.PrimitiveFunction(first),
-  ds.symbol("second*"), ast.PrimitiveFunction(second),
-  ds.symbol("nth*"), ast.PrimitiveFunction(ds.nth)
 )
 
 end
