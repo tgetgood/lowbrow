@@ -2,7 +2,7 @@ module DefaultEnv
 import DataStructures as ds
 
 import ..System as sys
-import ..C6 as comp
+import ..Interpreter as rt
 import ..AST as ast
 
 function def(c, env, args)
@@ -28,7 +28,7 @@ function def(c, env, args)
     sys.emit(c, :env, eprime, :return, name)
   end
 
-  comp.eval(sys.withcc(c, :return, next), env, body)
+  rt.eval(sys.withcc(c, :return, next), env, body)
 end
 
 
@@ -47,14 +47,14 @@ function inspect(c, env, s)
     sys.succeed(c, nothing)
   end
 
-  comp.eval(sys.withcc(c, :return, next), env, first(s))
+  rt.eval(sys.withcc(c, :return, next), env, first(s))
 end
 
 function emit(c, env, args)
   if length(args) > 1
     for (ch, val) in ds.partition(2, args)
       # Now this ought to work, but I don't trust the dynamics yet.
-      comp.compile(sys.withcc(c, :return, x -> sys.emit(c, x, val)), env, ch)
+      rt.compile(sys.withcc(c, :return, x -> sys.emit(c, x, val)), env, ch)
     end
   end
 end
@@ -75,18 +75,20 @@ default = ds.hashmap(
   # ds.Symbol(["eval"]), Eval.eval,
   # ds.Symbol(["apply"]), Eval.apply,
   ds.symbol("def"), ast.PrimitiveMacro(def),
-  ds.symbol("μ"), ast.PrimitiveMacro(comp.createμ),
+  ds.symbol("μ"), ast.PrimitiveMacro(rt.createμ),
 
   # HACK: This really shouldn't be necessary, but my repl is running in the
   # julia repl which is running in an emacs term-mode window which leads to some
   # degradation in usability.
-  ds.symbol("mu"), ast.PrimitiveMacro(comp.createμ),
+  ds.symbol("mu"), ast.PrimitiveMacro(rt.createμ),
   ds.symbol("emit"), ast.PrimitiveMacro(emit),
 
   # REVIEW: This is really just for debugging right now.
   ds.symbol("inspect"), ast.PrimitiveMacro(inspect),
 
   ds.symbol("nth*"), ast.PrimitiveFunction(ds.nth),
+  # In 3-lisp `select` was called `ef` for "extensionally defined if".
+  # Notice how it's a function and not a macro.
   ds.symbol("select"), ast.PrimitiveFunction(ifelse),
   ds.symbol("+*"), ast.PrimitiveFunction(+),
   ds.symbol("-*"), ast.PrimitiveFunction(-),

@@ -21,21 +21,10 @@
 (def < (wrap . <*))
 (def = (wrap . =*))
 
-;; I wanted to avoid cons cells entirely in this language, but I'm starting to
-;; realise why they're important: the symmetry between calling a function as (f
-;; x y z) and defining it as (fn [x y z] ...). The fact that the tail of the
-;; cons cell (f x y z) is the cons cell (x y z) makes this automatic. So... if I
-;; want to be able to call things with a single arg that isn't necessarily a
-;; list, I need improper cons cells. Once we have that, the convention of
-;; multiple args becomes automatic.
-;;
-;; I just learned something I probably should have twenty years ago.
-
 ;; Below, `select` is non-branching like the ?: or ifelse ternary operators,
 ;; except that it doesn't evaluate any of its arguments and the first must be a
 ;; literal boolean. The name is taken from the llvm instruction.
 ;;
-;; In 3-lisp `select` was called `ef` for "extensionally defined if".
 
 (def if
   (μ [pred t f]

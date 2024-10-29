@@ -2,7 +2,7 @@ import Xprl as x
 import Xprl.AST as ast
 import Xprl.AST: inspect
 import Xprl.System as sys
-import Xprl.C6 as c
+import Xprl.Interpreter as rt
 import Xprl.Reader as r
 
 import DataStructures as ds
@@ -41,7 +41,7 @@ function evalseq(root, envvar, forms)
 
   @info "compiling: " * string(first(forms))
 
-  c.interpret(
+  rt.interpret(
     sys.withcc(root, :return, next, :env, x -> envvar[] = x),
     envvar[],
     first(forms)
@@ -65,17 +65,13 @@ function repl(envvar)
       println(string(x))
       repl(envvar)
     end
-    c.interpret(
+    rt.interpret(
       sys.withcc(ds.emptymap, :env, x -> envvar[] = x, :return, next),
       envvar[],
       form
     )
   end
 end
-
-# form = r.read(env[], core)
-
-# res = c.interpret(rc, env[], form)
 
 loadfile(env, "./core.xprl")
 
