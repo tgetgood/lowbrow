@@ -33,8 +33,12 @@ function read1(s::StringStream)
     c = s.stream[s.index]
     s.index = nextind(s.stream, s.index)
     return c
-  catch BoundsError
-    throw(EOFError())
+  catch e
+    if e isa BoundsError
+      throw(EOFError())
+    else
+      rethrow(e)
+    end
   end
 end
 
@@ -103,7 +107,11 @@ function interpret(x::String, opts)
   end
   try
     return parse(Int, x)
-  catch ArgumentError
+  catch e
+    if e isa ArgumentError
+    else
+      rethrow(e)
+    end
   end
 
   # TODO: Read in floats as rationals.
@@ -147,11 +155,7 @@ function readpair(stream, opts)
   if n === 0
     throw("The expression '()' is meaningless.")
   elseif n === 1
-    # REVIEW: (f) is ill defined in this language. So we would have an ambiguity
-    # between a function that can take the empty list directly (f . []) which is
-    # not useful but not prohibited, and calling a function of no arguments (f)
-    # which can't exist.
-    throw("Operatives that take no arguments cannot be defined, thus cannot be called.")
+    ast.pair(subs[1], ds.emptyvector)
   # dot application: (f . x)
   elseif n === 3 && subs[2] == ds.symbol(".")
     ast.pair(subs[1], subs[3])
@@ -350,7 +354,7 @@ function readtoken(stream, opts)
       if typeof(e) == EOFError
         break
       else
-        throw(e)
+        rethrow(e)
       end
     end
   end
@@ -382,8 +386,12 @@ function read(stream::Stream, opts::ReaderOptions)
       form = readinner(stream, opts)
     end
     form
-  catch EOFError
-    nothing
+  catch e
+    if e isa EOFError
+      nothing
+    else
+      rethrow(e)
+    end
   end
 end
 
