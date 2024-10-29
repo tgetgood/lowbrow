@@ -74,7 +74,7 @@ function walk(inner, outer, form::Pair)
 end
 
 function tailstring(c::ds.Sequential)
-  ds.into(" ", map(string) ∘ ds.interpose(" "), c)
+  ds.into("", ds.interleave(), ds.repeat(" "), map(string, c))
 end
 
 function Base.:(==)(x::Pair, y::Pair)
@@ -170,7 +170,6 @@ but must eventually be performed).
 reduced(form) = true
 reduced(form::Immediate) = false
 reduced(form::Application) = false
-reduced(form::ds.Symbol) = false
 reduced(form::Pair) = reduced(form.head) && reduced(form.tail)
 reduced(form::Mu) = reduced(form.params) && reduced(form.body)
 reduced(form::ds.Vector) = ds.every(reduced, form)

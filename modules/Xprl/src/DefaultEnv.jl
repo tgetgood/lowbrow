@@ -50,6 +50,15 @@ function inspect(c, env, s)
   comp.eval(sys.withcc(c, :return, next), env, first(s))
 end
 
+function emit(c, env, args)
+  if length(args) > 1
+    for (ch, val) in ds.partition(2, args)
+      # Now this ought to work, but I don't trust the dynamics yet.
+      comp.compile(sys.withcc(c, :return, x -> sys.emit(c, x, val)), env, ch)
+    end
+  end
+end
+
 second(x) = x[2]
 
 # TODO: There ought to be top level channels for many things
@@ -67,13 +76,25 @@ default = ds.hashmap(
   # ds.Symbol(["apply"]), Eval.apply,
   ds.symbol("def"), ast.PrimitiveMacro(def),
   ds.symbol("μ"), ast.PrimitiveMacro(comp.createμ),
+
+  # HACK: This really shouldn't be necessary, but my repl is running in the
+  # julia repl which is running in an emacs term-mode window which leads to some
+  # degradation in usability.
   ds.symbol("mu"), ast.PrimitiveMacro(comp.createμ),
+  ds.symbol("emit"), ast.PrimitiveMacro(emit),
+
+  # REVIEW: This is really just for debugging right now.
   ds.symbol("inspect"), ast.PrimitiveMacro(inspect),
 
   ds.symbol("nth*"), ast.PrimitiveFunction(ds.nth),
   ds.symbol("select"), ast.PrimitiveFunction(ifelse),
   ds.symbol("+*"), ast.PrimitiveFunction(+),
-  ds.symbol("-*"), ast.PrimitiveFunction(-)
+  ds.symbol("-*"), ast.PrimitiveFunction(-),
+  ds.symbol("**"), ast.PrimitiveFunction(*),
+  ds.symbol("/*"), ast.PrimitiveFunction(/),
+  ds.symbol("<*"), ast.PrimitiveFunction(<),
+  ds.symbol(">*"), ast.PrimitiveFunction(>),
+  ds.symbol("=*"), ast.PrimitiveFunction(==),
 )
 
 end

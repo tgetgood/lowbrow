@@ -105,6 +105,12 @@ function eval(c, env, f::ast.Immediate)
   compile(wrt(c, next), env, f)
 end
 
+function eval(c, env, f::ast.Application)
+  next(f::ast.Application) = sys.succeed(c, ast.Immediate(f))
+  next(f) = eval(c, env, f)
+  compile(wrt(c, next), env, f)
+end
+
 function eval(c, env, f::ast.Pair)
   compile(c, env, ast.Application(ast.Immediate(f.head), f.tail))
 end

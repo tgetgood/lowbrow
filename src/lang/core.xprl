@@ -5,9 +5,21 @@
      ~(μ args
          ~(~f . ~~args))))
 
+(def fn
+  (μ [params body]
+     ~(μ args
+         ~((μ ~params ~~body) . ~~args))))
+
 (def nth (wrap . nth*))
 
 (def + (wrap . +*))
+(def - (wrap . -*))
+(def * (wrap . **))
+(def / (wrap . /*))
+
+(def > (wrap . >*))
+(def < (wrap . <*))
+(def = (wrap . =*))
 
 ;; I wanted to avoid cons cells entirely in this language, but I'm starting to
 ;; realise why they're important: the symmetry between calling a function as (f
@@ -18,10 +30,6 @@
 ;; multiple args becomes automatic.
 ;;
 ;; I just learned something I probably should have twenty years ago.
-(def fn
-  (μ [params body]
-     ~(μ args
-         ~((μ ~params ~~body) . ~~args))))
 
 ;; Below, `select` is non-branching like the ?: or ifelse ternary operators,
 ;; except that it doesn't evaluate any of its arguments and the first must be a
@@ -33,6 +41,12 @@
   (μ [pred t f]
      ~~(select ~~pred ~t ~f)))
 
+(def when
+  (μ [pred then]
+     ~(if ~pred ~then (emit))))
+
 (def inc (fn [x] (+ x 1)))
 
 (def map (fn [f] (fn [x] (f x))))
+
+(def filter (fn [p] (fn [x] (when (p x) x))))
