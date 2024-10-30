@@ -24,7 +24,6 @@
 ;; Below, `select` is non-branching like the ?: or ifelse ternary operators,
 ;; except that it doesn't evaluate any of its arguments and the first must be a
 ;; literal boolean. The name is taken from the llvm instruction.
-;;
 
 (def if
   (μ [pred t f]

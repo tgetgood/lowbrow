@@ -15,5 +15,8 @@ import .Interpreter
 include("./DefaultEnv.jl")
 import .DefaultEnv
 
+interpret = Interpreter.interpret
+
+export interpret
 
 end # module Xprl
