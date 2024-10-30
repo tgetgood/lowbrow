@@ -1,201 +1,47 @@
-#+TITLE: A Language
+#+TITLE: Janus
 
-* Early Speculation
-  xprl is (surprise!) an experimental programming language. A better name might be
-  Janus since a primary goal is to open and watch the interfaces between systems
-  and ecosystems.
+* The Name
+  In part the name is a nod to Koestler's later work which has, for a very long
+  time, shaped the way I look at complexity.
 
-  On the surface it's a lisp with a (mostly) clojure compatible syntax, but the
-  semantics differ in two major (and many minor) aspects.
+  Partly I just want to open new doors.
 
-  Firstly there is no assignment. There are no variables. There are only values.
-  We all know you can build let as a macro around calling a function, so we do
-  have multiple lexical ~names~ for values, but those names do not correspond to
-  places.
+  Plus if it takes off, maybe it can be snuck into other projects by repurposing
+  the "js" file extension...
+* Justification
+  People always ask "why write a new language? What's different about it?".
 
-  Put differently, there is no observable mutation. Thanks to projects like im.rs
-  and Roc, there is a well established path to getting the performance of in place
-  mutation without having any semantic notion of mutation or variable.
+  When people ask me that, I call this an art project. I work on it because I
+  can't not work on it. I refuse to reduce it to anyone's criteria. It isn't and
+  won't be justified.
 
-  This is taken to extemes. A symbol isn't a variable that will be set at link
-  time. A symbol is a name that refers to a definite artefact specified during
-  development. All linking is dev time static. Ideal Bagwell tries give us the
-  performance benefits of dynamic linking without the problems that arise from not
-  really knowing what the code you're calling is or does.
+  I refuse to say what it *is* because, in the end, I don't know. And focusing
+  on that up front is uselessly limiting.
 
-  Secondly, there are no side effects and nothing happens synchronously. In a
-  massively parallel system (most modern hardware), the illusion of synchronicity
-  is upheld via side effects, and it's my conjecture that we're better off without
-  it.
+  Instead, let's focus on a set of things that I don't think should be as hard
+  as they are in practice, and a set of assumptions that need to be questioned.
+* Usage
+  This is still very early. There's no editor support, basically no tooling. All
+  we have is a some data structures, an interpreter, and a repl. To run the repl:
 
-  This is accomplished by replacing the notion of function with something that
-  doesn't have a name yet. It operates like a function, but receives multiple
-  inputs, possibly at different times and from different computations, and
-  "returns" zero or more values to each of zero or more subsequent computations.
-  Thus the "function analogue" describes what happens when the right precursors
-  meet in one place at one time.
+  #+BEGIN_SRC julia
+    # First time project setup
+    import Pkg
+    Pkg.activate("./") # Assumes you're running the repl from project root.
+    Pkg.instantiate()
 
-  These "function analogues" are a generalisation of Hickey's transducers.
+    # Optional, takes a while but speeds up subsequent runs
+    Pkg.precompile()
 
-  Of course, at some point we need to set bits in hardware to do something.
-  Receive input, send messages over sockets, talk to peripherals and screens. From
-  the point of view of the language, these are all IO issues to be handled by the
-  (virtual) system, effectively a kernel. Sources that produce messages without
-  input represent inputs and sinks which receive messages and send none correspond
-  to outputs. A function to create a TCP connection will emit a source/sink pair
-  which represents a connection in the obvious way, etc..
-
-  There will perhaps be an "unsafe subset" to the language with which to write new
-  external integrations in the language itself. Or perhaps it would be better to
-  keep all of that in the kernel. I don't yet know.
-
-* Syntax
-  With no implicit evaluation, we need a syntax to make evaluation explicit.
-  Kernel had some great ideas, but having to call builtin functions that operate
-  differently leaves me uneasy.
-
-  The basic syntactic operator is called μ. Why? Because it comes after λ.
-
-  μ is a syntactic operator which means it receives unevaluated arguments and
-  its output is sent on verbatim, again without being evaluated.
-
-  Note the difference from a macro whose return value is passed to =eval= at
-  compile time.
-
-  Also note that μs are first class.
-
-  An expression (+ 4 5) is just an expression. The language doesn't evaluate it
-  automatically. To cause an expression to be evaluated, prepend a tilde: ~(+
-  4 5) => 9.
-
-  It might help to think of the body of a μ as quasiquoted. Except that you can
-  unquote as many times as you like because unquoting just evals an expression.
-
-  Example:
-
-  #+BEGIN_SRC clojure
-    (def f (μ [x y] (+ x y)))
-
-    (f 4 5) => (+ x y)
-    ;; x & y are copied verbatim as symbols. Since they aren't defined, this
-    ;; expression is ill defined.
-
-    (def f2 (μ [x y] (+ ~x ~y)))
-
-    (f2 4 5) => (+ 4 5)
-
-    (def f3 (μ [x y] ~(+ ~x ~y)))
-
-    (f3 4 5) => 9
-
-    ;; Of course if `+` is so defined as to evaluate its own arguments, we could
-    ;; then write:
-
-    (def f3 (μ [x y] ~(+ x y)))
-
-    (f3 4 5) => 9
+    # Run a demo
+    include("src/janus/core.jl")
   #+END_SRC
 
-  Now I said above that there is *no* implicit evaluation. That's actually a
-  lie. Expressions typed into the repl are automatically prepended with a ~, and
-  so is the body of a =def=. That leads to a mostly normal feeling when
-  programming.
+  Have fun. Or try to without rlwrap...
+* Docs
+  For a primer on the language (in progress) See docs/langauge.org.
 
-  Now, what if you want to define a "standard function" or applicative, which
-  evals its arguments before passing them on? Try this:
-
-  #+BEGIN_SRC clojure
-    (def fn
-      (μ [params body]
-         ~(μ args
-             ~((μ ~params ~~body) . ~~args))))
-
-    (def f (fn [x y] (+ x y)))
-
-    (f 4 5) => 9
-  #+END_SRC
-
-  Note that the above assumes that =+= will evaluate its arguments.
-
-  Given an addition operator that can only operate on literal numbers, call it
-  =+*=, we can define an applicative wrapper:
-
-
-  #+BEGIN_SRC clojure
-    (def wrap
-      (μ f
-         ~(μ args
-             ~(~f . ~~args))))
-
-    (def + (wrap . +*))
-
-    (let [x 4]
-      (+* x 1))
-
-    => (+* x 1) ; which is an error
-
-    (let [x 4]
-      (+ x 1))
-
-    => 5
-  #+END_SRC
-
-  So primitives need only operate on literal values, which makes them easy to
-  implement on different platforms.
-
-  A Note on improper pairs:
-
-  You may have noticed that =+= is defined as =(wrap . +*)=. What exactly does
-  that mean?
-
-  Well, this language doesn't use cons cells. It has pairs, and what would, in
-  lisp, be a cons list (say =(f 1 2 3 4)=) becomes the pair =(f, [1 2 3 4])=.
-
-  So when you evaluate =(f 4 5)=, what you're really doing is sending the list
-  =[4 5]= to =f=. That list =[4 5]= is unified with the params of f (in this
-  case =[x y]=) yeilding x = 4 and y = 5.
-
-Now notice that in the definition of wrap, we have =(μ (f ...=. That =f= isn't
-  in a list. =f= is bound to the tail of the invoking form.
-
-  I need to clean up this explanation, but basically =.= is the syntax for what
-  would be =apply= in most lisps. And by using that syntax we can pass arguments
-  that aren't lists directly without necessarily boxing or otherwise coercing
-  them.
-
-
-* Outline
-** Syntax of an Odd Language
-   This language is deeply inspired by lisps, especially Clojure, and on the
-   surface it *looks* like a lisp. I'm not sure if it is. And I don't care. I'm
-   not going for purity.
-
-   Functional programming, particularly the ideas of squiggol, are a core
-   influence of this language. It wouldn't be unfair to say the whole project
-   grew out of an attempt to extend Hickey's ideas with transducers to a theory
-   of computation. And yet I don't think it's a functional language. That
-   doesn't worry me.
-
-   Hell, it's not even a *structured* language. So what do I care about
-   ~functions~?...
-
-   Enough of that, let's talk instead about what it *is*.
-*** .
-    I wanted to avoid cons cells entirely in this language, but I'm starting to
-    realise why they're important: the symmetry between calling a function as (f
-    x y z) and defining it as (fn [x y z] ...). The fact that the tail of the
-    cons cell (f x y z) is the cons cell (x y z) makes this automatic. So... if
-    I want to be able to call things with a single arg that isn't necessarily a
-    list, I need improper cons cells. Once we have that, the convention of
-    multiple args becomes automatic.
-*** ~
-*** μ
-** History, Environment, and Context
-** Purity and the State
-** Transduction
-** Message Passing
-** Runtime
-** Compiler
-** FFI / Distributed Execution
-   These aren't normally the same thing, but they both boil down to talking to
-   other computers, so their solutions largely overlap.
+  For a bit of justification, in spite of the above diatribe, see
+  docs/research-aesthetics.org. That doc is a mosaic of years of my own notes.
+  It's sprawling, sometimes repetitive, and often (though I've tried to clarify)
+  obscure. Enjoy if you can, otherwise ignore it
