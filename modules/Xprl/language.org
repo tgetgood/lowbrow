@@ -75,6 +75,7 @@ This is largely an aid to my own memory so bear with me.
 
      (f 4 5)
      ;; => (+ x y)
+
      ;; which is an error because x and y aren't defined.
    #+END_SRC
 
@@ -125,7 +126,7 @@ This is largely an aid to my own memory so bear with me.
    #+END_SRC
 
    Given a function that only works on literal values (say a version of =+=
-   called =+*=), we can define an operator =wrap= which will invoke in in the
+   called =+*=), we can define an operator =wrap= which will invoke it in the
    standard applicative manner by first evaluating its arguments:
 
    #+BEGIN_SRC clojure
@@ -149,6 +150,25 @@ This is largely an aid to my own memory so bear with me.
    #+END_SRC
 
    This is the actual definition of =fn= at the core of the language.
+
+   It may help to think of the body of a μ as quasiquoted, except that we can
+   unquote as many times as we please.
+
+   That said, there is no quote, unquote, quasiquote, eval, nor apply defined in
+   the language — you can easily write them yourself, but please don't — so the
+   analogy is a bit weak.
+** An Exception
+   One final note: I said above that there is *no* implicit evaluation. You've
+   probably noticed in my examples that everything typed into the repl *is*
+   automatically evaluated. The same holds for the code reader =loadfile=. This
+   is a convenience that once again makes code that acts as expected look
+   normal. Also there's no point entering code into a repl unless you want it to
+   be evaluated, so it seems like the right thing to do.
+
+   μs are, of course, free to evaluate their arguments when and as they see fit.
+   =def= adds an evaluation to the beginning of its body, for instance. I think
+   that's the right thing to do as well, but it adds a bit of asymmetry to the
+   definition of metaprogramming operations like =fn= and =wrap=.
 * Outline
   Sections to be written.
 ** History, Environment, and Context
